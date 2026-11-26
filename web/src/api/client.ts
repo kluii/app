@@ -101,6 +101,7 @@ export const api = {
   createBoard: (input: { name: string; template?: 'classic' | 'blank' }) =>
     request<Board>('POST', '/boards', input),
   boardState: (boardId: string) => request<BoardState>('GET', `/boards/${boardId}/state`),
+  card: (cardId: string) => request<Card>('GET', `/cards/${cardId}`),
   activity: (boardId: string, cursor?: string) =>
     request<Page<EventDto>>(
       'GET',

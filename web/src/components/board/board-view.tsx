@@ -2,10 +2,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
 import type { BoardState, Caller, Card, Column } from '../../api/types';
 import { t } from '../../i18n';
+import { applyCardFrame, cardIdOf, envelopeOf, dropCard, isCardEvent } from '../../data/boards';
+import { connectBoardStream, type LiveStatus } from '../../data/live';
 import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
@@ -38,13 +40,48 @@ export function BoardView({ boardId }: { boardId: string }) {
   const [announcement, setAnnouncement] = useState('');
   const queryClient = useQueryClient();
 
+  // While the stream is down the board stays usable: a 15 s poll is the
+  // fallback, and an open stream means no polling at all
+  // (docs/features/realtime.md §2.3).
+  const [live, setLive] = useState<LiveStatus>('connecting');
+
   const state = useQuery({
     queryKey: queryKeys.board(boardId),
     queryFn: () => api.boardState(boardId),
-    // Polling stands in for the SSE subscription until it lands (K2-06).
-    refetchInterval: 20_000,
+    refetchInterval: live === 'open' ? false : 15_000,
     retry: false,
   });
+
+  useEffect(() => {
+    const handle = connectBoardStream({
+      boardIds: [boardId],
+      onStatus: setLive,
+      onReconnect: () => {
+        // Replay closes small gaps; it is not a substitute for the truth.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+      },
+      onEvent: (event) => {
+        const envelope = envelopeOf(event.data);
+        if (event.type === 'resync' || event.type === 'board.closed') {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+          return;
+        }
+        const cardId = cardIdOf(envelope);
+        if (isCardEvent(event.type) && cardId !== null) {
+          if (event.type === 'card.deleted') {
+            queryClient.setQueryData<BoardState>(queryKeys.board(boardId), (previous) =>
+              previous === undefined ? previous : dropCard(previous, cardId),
+            );
+            return;
+          }
+          void applyCardFrame({ queryClient, boardId, cardId });
+          return;
+        }
+        void queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+      },
+    });
+    return () => handle.close();
+  }, [boardId, queryClient]);
 
   const move = useMutation({
     mutationFn: (request: MoveRequest) =>
@@ -152,6 +189,7 @@ export function BoardView({ boardId }: { boardId: string }) {
       onOpenCard={(card) => setComposer({ kind: 'read', cardId: card.id })}
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
+      live={live}
       onMove={requestMove}
       onMoveTo={(cardId, columnId) =>
         requestMove({ cardId, column: columnId, before: null, after: null })
@@ -214,6 +252,7 @@ function BoardFrame({
   onOpenCard,
   onAddCard,
   onOpenActivity,
+  live,
   onMove,
   onMoveTo,
   onDeleteCard,
@@ -228,6 +267,7 @@ function BoardFrame({
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
+  live: LiveStatus;
   onMove: (request: MoveRequest) => void;
   onMoveTo: (cardId: string, columnId: string) => void;
   onDeleteCard: (cardId: string) => void;
@@ -255,6 +295,11 @@ function BoardFrame({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Chip>{t(`board.visibility.${board.visibility}`)}</Chip>
+          {live === 'closed' ? (
+            <span className="font-mono text-mono-sm text-ink-subtle" data-testid="board-live">
+              {t('common.label.reconnecting')}
+            </span>
+          ) : null}
           <BoardFilters
             filters={filters}
             onChange={onFiltersChange}

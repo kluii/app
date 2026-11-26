@@ -22,11 +22,21 @@ export type Subscriber = {
   close: () => void;
 };
 
+/**
+ * Replay is deliberately three-valued: `none` means "nothing to say", `events`
+ * closes a small gap, and `resync` says the id is older than the buffer, so the
+ * client must refetch instead of guessing (docs/features/realtime.md §1).
+ */
+export type ReplayResult =
+  { kind: 'none' } | { kind: 'events'; events: HubEvent[] } | { kind: 'resync' };
+
 export type Hub = {
   subscribe: (subscriber: Subscriber) => () => void;
   publish: (event: HubEvent) => void;
-  replay: (boardId: string, lastEventId: string | null) => HubEvent[];
+  replay: (boardId: string, lastEventId: string | null) => ReplayResult;
   size: () => number;
+  /** Tell every open stream the process is going down, then forget it. */
+  closeAll: () => void;
 };
 
 const RING_LIMIT = 1000;
@@ -59,13 +69,20 @@ export function createHub(): Hub {
       }
     },
     replay(boardId, lastEventId) {
-      if (!lastEventId) return [];
+      if (!lastEventId) return { kind: 'none' };
       const index = ring.findIndex((event) => event.id === lastEventId);
-      if (index === -1) return [];
-      return ring.slice(index + 1).filter((event) => event.boardId === boardId);
+      if (index === -1) return { kind: 'resync' };
+      return {
+        kind: 'events',
+        events: ring.slice(index + 1).filter((event) => event.boardId === boardId),
+      };
     },
     size() {
       return subscribers.size;
+    },
+    closeAll() {
+      for (const subscriber of subscribers) subscriber.close();
+      subscribers.clear();
     },
   };
 }

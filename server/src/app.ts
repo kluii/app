@@ -15,6 +15,7 @@ import {
 } from './settings/static.js';
 import type { Secrets } from './lib/secrets.js';
 import { createHub, type Hub } from './realtime/events.js';
+import { registerRealtimeRoutes } from './realtime/routes.js';
 import { resolveActor } from './auth/actor.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { CSRF_EXEMPT_PATHS, csrfMatches } from './auth/sessions.js';
@@ -128,10 +129,17 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerActivityRoutes(scoped, { ...context, hub });
     registerResetRoutes(scoped, { ...context, hub });
     registerAdminRoutes(scoped, { ...context, hub });
+    registerRealtimeRoutes(scoped, { ...context, hub });
   });
 
   app.register(async (scoped) => {
     registerHealth(scoped, context.db);
+  });
+
+  // A shutting-down process says so on every open stream, so clients reconnect
+  // with backoff instead of waiting for a dead socket (docs/features/realtime.md §1).
+  app.addHook('onClose', async () => {
+    hub.closeAll();
   });
 
   app.setErrorHandler<FastifyError>((error, request, reply) => {
