@@ -42,6 +42,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # A stale or missing Prisma client fakes a type error; generate before tsc.
+      - name: Generate the Prisma client
+        run: npm run db:generate --workspace server
+
       - name: Apply migrations
         run: npm run db:deploy --workspace server
 
