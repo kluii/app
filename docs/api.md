@@ -158,6 +158,10 @@ next request is `401` and the next login answers `403 banned`.
 
 **URL semantics.** `private` and `public` boards answer on `/<username>/<slug>`; `link` boards on `/<username>/<slug>-<suffix>`. The API is id-based, so a URL never grants anything by itself.
 
+| Method | Path | Contract |
+|---|---|---|
+| `GET` | `/users/:username/boards/:slug` | Resolves a public URL to the page. `301` to `/<owner>/<slug>` (or the suffixed URL for a `link` board) **only for an actor who can read the board**; anything else, including a bare slug on a link board, a suffix that does not match, and a credential-less request, answers the same `404` an unknown slug answers. Renames inside their 90-day reservation redirect too, but only after that readability check. |
+
 ---
 
 ## 5. Links

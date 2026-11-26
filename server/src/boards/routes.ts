@@ -3,14 +3,16 @@ import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../app.js';
 import type { Db } from '../db.js';
 import { requireActor } from '../auth/request.js';
-import { AppError, fromZod } from '../lib/errors.js';
+import { AppError, boardNotFound, fromZod } from '../lib/errors.js';
 import { newId } from '../lib/ids.js';
 import { RANK_STEP } from '../lib/ranks.js';
 import { recordEvent } from '../lib/events.js';
 import { commitEvent } from '../realtime/events.js';
 import {
   assertAllowed,
+  humanBoardPath,
   loadBoardFor,
+  resolvePublicBoard,
   toBoardDto,
   toPolicy,
   uniqueSlug,
@@ -22,7 +24,6 @@ import { createBoardSchema, patchBoardSchema } from '../contracts/boards.js';
 import type { BoardStateDto, CallerDto } from '../contracts/dto.js';
 import { toCardDto, toColumnDto, boardTagColors } from '../cards/service.js';
 import { toBoardMembers } from '../boards/members.js';
-import { slugRedirect, usernameRedirect } from '../auth/profile.js';
 import { conflictIfStale } from '../lib/concurrency.js';
 
 export function registerBoardRoutes(app: FastifyInstance, context: AppContext): void {
@@ -301,30 +302,28 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
     return { items: await toBoardMembers(db, id) };
   });
 
-  // A username or slug that was renamed away redirects for 90 days, then the
-  // name is free again (D-13). The 301 is the whole point: a shared link that
-  // silently lands on a stranger's board is worse than a broken one.
+  /**
+   * The human URL for a board. It answers `301` to `/<owner>/<slug>` only for an
+   * actor who can read the board: this route used to hand an anonymous caller
+   * the real id of a private board (a 301 to `/api/v1/boards/brd_…`), which is
+   * board enumeration and a broken redirect at once (PROMPT.md §3.4).
+   */
   app.get('/api/v1/users/:username/boards/:slug', async (request, reply) => {
     const db = database();
     const { username, slug } = request.params as { username: string; slug: string };
-    const owner = username.toLowerCase();
-    const board = await db.board.findFirst({
-      where: { slug, owner: { username: owner } },
-      select: { id: true },
-    });
-    if (board) return reply.redirect(`/api/v1/boards/${board.id}`, 301);
 
-    const renamedUser = await usernameRedirect(db, owner);
-    if (renamedUser && renamedUser !== owner) {
-      return reply.redirect(`/api/v1/users/${renamedUser}/boards/${slug}`, 301);
-    }
-    const renamedSlug = await slugRedirect(db, owner, slug);
-    if (renamedSlug) {
-      return reply.redirect(`/api/v1/users/${owner}/boards/${renamedSlug}`, 301);
-    }
-    return reply.code(404).send({
-      error: { code: 'board_not_found', message: 'Board not found.', hint: null },
-    });
+    // No credential is not a 401 on a public URL: an anonymous caller gets the
+    // same 404 an unknown slug gets, so the route cannot be used to enumerate.
+    const actor = request.actor;
+    if (!actor) throw boardNotFound();
+
+    const target = await resolvePublicBoard(db, username, slug);
+    if (!target) throw boardNotFound();
+
+    const loaded = await loadBoardFor(db, actor, target.id, 'board.read');
+    assertAllowed(loaded.decision);
+
+    return reply.redirect(humanBoardPath(loaded.board), 301);
   });
 
   app.get('/api/v1/boards/:id/tag-colors', async (request) => {

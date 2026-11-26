@@ -314,6 +314,90 @@ describe('cards and moves', () => {
   });
 });
 
+describe('the public board URL', () => {
+  const publicUrl = (username: string, slug: string) => `/api/v1/users/${username}/boards/${slug}`;
+
+  it('gives an anonymous caller the same 404 for a private board as for one that never existed', async () => {
+    const owner = harness.client();
+    const { board } = await boardWithColumns(owner);
+    const anonymous = harness.client();
+
+    const real = await anonymous.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    const ghost = await anonymous.request(
+      'GET',
+      publicUrl(`owner-${owner.suffix}`, 'never-existed'),
+    );
+    expect(real.statusCode).toBe(404);
+    expect(ghost.statusCode).toBe(404);
+    // Byte-identical: the body must not tell an enumerator which board exists.
+    expect(real.json()).toEqual(ghost.json());
+    expect(real.body).toBe(ghost.body);
+  });
+
+  it('redirects a member to the human URL, never to an API path', async () => {
+    const owner = harness.client();
+    const { board } = await boardWithColumns(owner);
+
+    const member = harness.client();
+    const user = await member.signup(`viewer-${member.suffix}`);
+    await harness.db.boardMember.create({
+      data: {
+        id: `bmb_${member.suffix}xxxxxxxxxxxxxx`,
+        board_id: board.id,
+        user_id: user.id,
+        role: 'viewer',
+      },
+    });
+
+    const response = await member.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    expect(response.statusCode).toBe(301);
+    expect(response.headers.location).toBe(`/owner-${owner.suffix}/${board.slug}`);
+  });
+
+  it('requires the suffix on a link board, and redirects to the suffixed human URL', async () => {
+    const owner = harness.client();
+    const { board } = await boardWithColumns(owner);
+    const patched = await owner.request('PATCH', `/api/v1/boards/${board.id}`, {
+      visibility: 'link',
+      link_role: 'read',
+    });
+    expect(patched.statusCode).toBe(200);
+    const linkBoard = patched.json() as { slug: string; link_suffix: string | null };
+    expect(linkBoard.link_suffix).toHaveLength(4);
+
+    // The bare slug is not a URL for a link board, for anyone.
+    const bare = await owner.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    expect(bare.statusCode).toBe(404);
+
+    const suffixed = await owner.request(
+      'GET',
+      publicUrl(`owner-${owner.suffix}`, `${board.slug}-${linkBoard.link_suffix ?? ''}`),
+    );
+    expect(suffixed.statusCode).toBe(301);
+    expect(suffixed.headers.location).toBe(
+      `/owner-${owner.suffix}/${board.slug}-${linkBoard.link_suffix ?? ''}`,
+    );
+  });
+
+  it('redirects a renamed slug only when the board is readable', async () => {
+    const owner = harness.client();
+    const { board } = await boardWithColumns(owner);
+    const renamed = await owner.request('PATCH', `/api/v1/boards/${board.id}`, {
+      slug: `${board.slug}-renamed`,
+    });
+    expect(renamed.statusCode).toBe(200);
+
+    const anonymous = harness.client();
+    // A private board that was renamed leaks neither the new slug nor a 301.
+    const hidden = await anonymous.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    expect(hidden.statusCode).toBe(404);
+
+    const readable = await owner.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    expect(readable.statusCode).toBe(301);
+    expect(readable.headers.location).toBe(`/owner-${owner.suffix}/${board.slug}-renamed`);
+  });
+});
+
 describe('bulk create', () => {
   const bulk = (c: TestClient, boardId: string, body: unknown) =>
     c.request('POST', `/api/v1/boards/${boardId}/cards/bulk`, body);
@@ -338,7 +422,11 @@ describe('bulk create', () => {
 
     // One RANK_STEP apart, in the order the batch arrived.
     const positions = created.map((card) => Number(card.position));
-    expect(positions).toEqual([positions[0], (positions[0] ?? 0) + 1024, (positions[0] ?? 0) + 2048]);
+    expect(positions).toEqual([
+      positions[0],
+      (positions[0] ?? 0) + 1024,
+      (positions[0] ?? 0) + 2048,
+    ]);
 
     const events = await harness.db.event.findMany({
       where: { board_id: board.id, type: 'card_created' },
