@@ -20,7 +20,7 @@ import {
   linkSuffix,
 } from './service.js';
 import { can } from '../lib/authz.js';
-import { createBoardSchema, patchBoardSchema } from '../contracts/boards.js';
+import { createBoardSchema, patchBoardSchema, sharePolicyConflict } from '../contracts/boards.js';
 import type { BoardStateDto, CallerDto } from '../contracts/dto.js';
 import { toCardDto, toColumnDto, boardTagColors } from '../cards/service.js';
 import { toBoardMembers } from '../boards/members.js';
@@ -140,6 +140,28 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
       input.expected_updated_at,
       toBoardDto(loaded.board, context.env.KLUI_PUBLIC_URL),
     );
+
+    // The rule is about the state the request produces, not the payload it
+    // carries: `{link_role}` alone has no `visibility` to check against.
+    // `visibility: 'private'` coerces both fields in the same request, so the
+    // requested values are what count here.
+    const nextVisibility = input.visibility ?? loaded.board.visibility;
+    const nextLinkRole =
+      input.link_role ?? (input.visibility === 'private' ? 'none' : loaded.board.link_role);
+    const nextAnonWrite =
+      input.anon_write ?? (input.visibility === 'private' ? 'off' : loaded.board.anon_write);
+    const conflict = sharePolicyConflict({
+      visibility: nextVisibility,
+      link_role: nextLinkRole,
+      anon_write: nextAnonWrite,
+    });
+    if (conflict) {
+      throw new AppError('validation_failed', {
+        message: conflict.message,
+        hint: 'A private board has no share policy. Change visibility in the same request.',
+        details: [{ path: conflict.field, code: 'custom', message: conflict.message }],
+      });
+    }
 
     const changes: Record<string, [unknown, unknown]> = {};
     const data: Record<string, unknown> = {};

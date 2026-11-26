@@ -23,18 +23,39 @@ export const patchBoardSchema = z
     anon_write: anonWriteSchema.optional(),
     expected_updated_at: expectedUpdatedAt,
   })
-  .strict()
-  .refine(
-    (value) =>
-      value.visibility !== 'private' ||
-      ((value.link_role === undefined || value.link_role === 'none') &&
-        (value.anon_write === undefined || value.anon_write === 'off')),
-    {
+  .strict();
+
+/**
+ * The one rule for "private means no share policy", applied to the **merged**
+ * next state by the route (docs/permissions.md §4.3).
+ *
+ * A payload-only refinement was not enough: `PATCH {"link_role":"edit"}` has no
+ * `visibility`, so the guard never ran and the board accepted a link role it can
+ * never honour. `visibility: 'private'` coerces both fields in the same request;
+ * naming a value that contradicts it is a 400 rather than a silent rewrite.
+ */
+export function sharePolicyConflict(next: {
+  visibility: string;
+  link_role: string;
+  anon_write: string;
+}): { field: 'link_role' | 'anon_write'; message: string } | null {
+  if (next.visibility !== 'private') return null;
+  if (next.link_role !== 'none') {
+    return {
+      field: 'link_role',
       message:
-        'a private board cannot have a link role or anonymous writes; set both to none/off in the same request',
-      path: ['visibility'],
-    },
-  );
+        'a private board cannot have a link role: set visibility to link or public first, or send link_role: "none"',
+    };
+  }
+  if (next.anon_write !== 'off') {
+    return {
+      field: 'anon_write',
+      message:
+        'a private board cannot accept anonymous writes: set visibility to link or public first, or send anon_write: "off"',
+    };
+  }
+  return null;
+}
 
 export const boardIdParam = z.object({ id: idSchema('brd') });
 

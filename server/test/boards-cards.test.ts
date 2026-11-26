@@ -314,6 +314,56 @@ describe('cards and moves', () => {
   });
 });
 
+describe('a private board share policy', () => {
+  const patchBoard = (c: TestClient, boardId: string, body: unknown) =>
+    c.request('PATCH', `/api/v1/boards/${boardId}`, body);
+
+  it('refuses a link role or anonymous writes on a private board, and leaves the row alone', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+
+    // The refinement only fired when `visibility` was in the body, so a bare
+    // `link_role` patch walked straight through it.
+    const linkRole = await patchBoard(c, board.id, { link_role: 'edit' });
+    expect(linkRole.statusCode).toBe(400);
+    expect((linkRole.json() as { error: { code: string } }).error.code).toBe('validation_failed');
+
+    const anon = await patchBoard(c, board.id, { anon_write: 'open' });
+    expect(anon.statusCode).toBe(400);
+
+    const row = await harness.db.board.findUniqueOrThrow({ where: { id: board.id } });
+    expect({ link_role: row.link_role, anon_write: row.anon_write }).toEqual({
+      link_role: 'none',
+      anon_write: 'off',
+    });
+  });
+
+  it('accepts the same fields when the board is link or public in the same request', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+
+    const link = await patchBoard(c, board.id, { visibility: 'link', link_role: 'edit' });
+    expect(link.statusCode).toBe(200);
+    expect((link.json() as { link_role: string }).link_role).toBe('edit');
+
+    const back = await patchBoard(c, board.id, { visibility: 'private', link_role: 'edit' });
+    expect(back.statusCode).toBe(400);
+
+    const kept = await harness.db.board.findUniqueOrThrow({ where: { id: board.id } });
+    expect(kept.link_role).toBe('edit');
+    expect(kept.visibility).toBe('link');
+  });
+
+  it('is backed by a CHECK constraint, so a direct insert cannot break it either', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+
+    await expect(
+      harness.db.$executeRawUnsafe(`UPDATE boards SET link_role = 'edit' WHERE id = '${board.id}'`),
+    ).rejects.toThrow(/boards_private_has_no_share_policy/);
+  });
+});
+
 describe('the public board URL', () => {
   const publicUrl = (username: string, slug: string) => `/api/v1/users/${username}/boards/${slug}`;
 

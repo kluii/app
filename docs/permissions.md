@@ -147,7 +147,7 @@ A link holder is not anonymous (they hold a secret), but they are still unattrib
 | `comment.create` | — | — | — |
 | everything else | — | — | — |
 
-`private` forces `link_role: none` and `anon_write: off`; the API rejects a PATCH that tries to set either.
+`private` forces `link_role: none` and `anon_write: off`. The API rejects a PATCH that would leave a private board with either set — the check runs on the merged next state, so a payload that never mentions `visibility` cannot slip past it — and the database refuses it too, through the `boards_private_has_no_share_policy` CHECK constraint. Sending `visibility: "private"` in the same request coerces both fields to `none`/`off`; naming a value that contradicts it is a `400` rather than a silent rewrite.
 
 Moderated writes produce a `PendingCard` and a `pending.created` event visible only to owner/admin. Approval creates the card with the anon label preserved and records `pending.approved` with the approver as actor.
 

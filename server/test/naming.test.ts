@@ -111,13 +111,20 @@ describe('renaming an account', () => {
     const me = await c.request('GET', '/api/v1/me');
     expect((me.json() as Me).username).toBe(newName);
 
+    // A reader gets the human URL of the board, not an API path: the old
+    // username redirects through the resolver, the new username resolves.
     const oldLink = await c.request('GET', `/api/v1/users/${oldName}/boards/${board.slug}`);
     expect(oldLink.statusCode).toBe(301);
-    expect(oldLink.headers.location).toBe(`/api/v1/users/${newName}/boards/${board.slug}`);
+    expect(oldLink.headers.location).toBe(`/${newName}/${board.slug}`);
 
     const newLink = await c.request('GET', `/api/v1/users/${newName}/boards/${board.slug}`);
     expect(newLink.statusCode).toBe(301);
-    expect(newLink.headers.location).toBe(`/api/v1/boards/${board.id}`);
+    expect(newLink.headers.location).toBe(`/${newName}/${board.slug}`);
+
+    // A stranger with no credential learns nothing: not the id, not the slug.
+    const anonymous = new TestClient(harness.app, harness.db);
+    const hidden = await anonymous.request('GET', `/api/v1/users/${newName}/boards/${board.slug}`);
+    expect(hidden.statusCode).toBe(404);
 
     // The old name stays reserved: a stranger cannot take it during the window.
     const squatter = harness.client();
@@ -172,11 +179,11 @@ describe('renaming a board slug', () => {
     const username = `slugger-${c.suffix}`;
     const oldSlug = await c.request('GET', `/api/v1/users/${username}/boards/${board.slug}`);
     expect(oldSlug.statusCode).toBe(301);
-    expect(oldSlug.headers.location).toBe(`/api/v1/users/${username}/boards/sprint-42`);
+    expect(oldSlug.headers.location).toBe(`/${username}/sprint-42`);
 
     const newSlug = await c.request('GET', `/api/v1/users/${username}/boards/sprint-42`);
     expect(newSlug.statusCode).toBe(301);
-    expect(newSlug.headers.location).toBe(`/api/v1/boards/${board.id}`);
+    expect(newSlug.headers.location).toBe(`/${username}/sprint-42`);
   });
 
   it('refuses a reserved slug and a slug that is too short', () => {
