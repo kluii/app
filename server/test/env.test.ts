@@ -22,8 +22,6 @@ describe('environment validation', () => {
         'KLUI_SESSION_SECRET',
         'KLUI_TOTP_POLICY',
         'KLUI_PUBLIC_URL',
-        'KLUI_TOKEN_PEPPER',
-        'KLUI_ENCRYPTION_KEY',
       ]),
     );
     expect(result.message).toContain('Klui cannot start:');
@@ -32,6 +30,29 @@ describe('environment validation', () => {
     }
     expect(result.message).toContain('expected');
     expect(result.message).toContain('problem');
+  });
+
+  it('accepts the documented loopback quickstart in production and nothing else on http', () => {
+    const secrets = {
+      KLUI_SESSION_SECRET: 'a'.repeat(40),
+      KLUI_TOKEN_PEPPER: 'b'.repeat(32),
+      KLUI_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
+    };
+    const loopback = loadEnv({
+      KLUI_ENV: 'production',
+      DATABASE_URL: 'postgresql://klui:klui@db:5432/klui',
+      KLUI_PUBLIC_URL: 'http://localhost:8099',
+      ...secrets,
+    });
+    expect(loopback.ok).toBe(true);
+
+    const publicHttp = loadEnv({
+      KLUI_ENV: 'production',
+      DATABASE_URL: 'postgresql://klui:klui@db:5432/klui',
+      KLUI_PUBLIC_URL: 'http://boards.example.com',
+      ...secrets,
+    });
+    expect(publicHttp.ok).toBe(false);
   });
 
   it('accepts a development boot with only DATABASE_URL', () => {
@@ -44,7 +65,16 @@ describe('environment validation', () => {
     expect(result.env.KLUI_ANALYTICS_URL).toBeNull();
   });
 
-  it('refuses production without https, secrets or a public URL', () => {
+  it('leaves secret persistence to lib/secrets.ts and checks only the shape here', () => {
+    const result = loadEnv({
+      KLUI_ENV: 'production',
+      DATABASE_URL: 'postgresql://klui:klui@db:5432/klui',
+      KLUI_PUBLIC_URL: 'https://boards.example.com',
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('refuses production without https or a public URL', () => {
     const result = loadEnv({
       KLUI_ENV: 'production',
       DATABASE_URL: 'postgresql://klui:klui@db:5432/klui',

@@ -212,7 +212,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): EnvResult {
 
 /**
  * Production refuses anything a self-hoster cannot verify from the outside:
- * https in the public URL, no generated secrets (docs/security.md §3, §8).
+ * a public URL, and https unless the origin is loopback (docs/security.md §8).
  */
 function productionProblems(env: Env): EnvProblem[] {
   if (env.KLUI_ENV !== 'production') return [];
@@ -223,27 +223,41 @@ function productionProblems(env: Env): EnvProblem[] {
       expected: EXAMPLES.KLUI_PUBLIC_URL ?? '',
       problem: 'required in production: links, Open Graph and OIDC redirects are absolute',
     });
-  } else if (!env.KLUI_PUBLIC_URL.startsWith('https://')) {
+  } else if (
+    !env.KLUI_PUBLIC_URL.startsWith('https://') &&
+    !isLoopbackOrigin(env.KLUI_PUBLIC_URL)
+  ) {
     problems.push({
       variable: 'KLUI_PUBLIC_URL',
       expected: 'an https:// URL',
-      problem: 'production requires https: secure cookies and HSTS depend on it',
+      problem:
+        'production requires https: secure cookies and HSTS depend on it (a loopback origin is the only exception, for the local quickstart)',
     });
   }
-  for (const variable of [
-    'KLUI_SESSION_SECRET',
-    'KLUI_TOKEN_PEPPER',
-    'KLUI_ENCRYPTION_KEY',
-  ] as const) {
-    if (env[variable] === null) {
-      problems.push({
-        variable,
-        expected: EXAMPLES[variable] ?? '',
-        problem: 'required in production: never generated silently (D-41)',
-      });
-    }
-  }
+  // Secret *presence* is not an env-shape problem: a secret may be generated on
+  // first boot and persisted in KLUI_SECRETS_DIR (D-41). lib/secrets.ts owns
+  // that decision and fails closed when the directory cannot be written.
   return problems;
+}
+
+/**
+ * `http://localhost` is the only non-https origin accepted in production: a
+ * browser treats it as a secure context, which is what the quickstart needs and
+ * what a public deployment must never rely on.
+ */
+export function isLoopbackOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:') return false;
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
+/** Secure cookies only when the public origin is https (a loopback http origin cannot set them). */
+export function isSecureOrigin(env: Env): boolean {
+  return env.KLUI_PUBLIC_URL !== null && env.KLUI_PUBLIC_URL.startsWith('https://');
 }
 
 export function formatProblems(problems: EnvProblem[]): string {

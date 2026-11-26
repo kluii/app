@@ -66,28 +66,35 @@ export function resolveSecrets(
     return null;
   };
 
-  const create = (name: SecretName): string => {
+  /**
+   * Generation is allowed when it can be persisted: a secret regenerated on the
+   * next boot signs everyone out and reads as "accounts are broken". A read-only
+   * KLUI_SECRETS_DIR is therefore fatal (D-41); a writable volume is the
+   * documented first-boot path in docs/deployment.md §1.
+   */
+  const create = (name: SecretName): string | null => {
     const value =
       name === 'encryptionKey'
         ? randomBytes(32).toString('base64')
         : randomBytes(32).toString('base64url');
-    generated.push(ENV_NAMES[name]);
     if (options.persist) {
-      mkdirSync(dir, { recursive: true, mode: 0o700 });
-      const path = join(dir, FILE_NAMES[name]);
-      writeFileSync(path, `${value}\n`, { mode: 0o600 });
-      chmodSync(path, 0o600);
+      try {
+        mkdirSync(dir, { recursive: true, mode: 0o700 });
+        const path = join(dir, FILE_NAMES[name]);
+        writeFileSync(path, `${value}\n`, { mode: 0o600 });
+        chmodSync(path, 0o600);
+      } catch {
+        missing.push(ENV_NAMES[name]);
+        return null;
+      }
     }
+    generated.push(ENV_NAMES[name]);
     return value;
   };
 
   const resolve = (name: SecretName): string | null => {
     const existing = read(name);
     if (existing) return existing;
-    if (env.KLUI_ENV === 'production') {
-      missing.push(ENV_NAMES[name]);
-      return null;
-    }
     return create(name);
   };
 
@@ -98,7 +105,7 @@ export function resolveSecrets(
   if (!sessionSecret || !tokenPepper || !encryptionKeyRaw) {
     const list = missing.map(
       (variable) =>
-        `  ${variable}\n    expected  openssl rand -base64 32\n    problem   missing in production (D-41: never generated silently)`,
+        `  ${variable}\n    expected  openssl rand -base64 32\n    problem   not in the environment and KLUI_SECRETS_DIR is not writable (D-41)`,
     );
     return {
       ok: false,
