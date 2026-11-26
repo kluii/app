@@ -104,6 +104,7 @@ Positions are serialized as **strings** (`"1024"`, `"1536"`) because they are `D
 | `POST` | `/auth/recovery-codes` | `{password}` regenerates; returns the new set once and invalidates the old. |
 | `POST` | `/auth/reset/request` | `{email}`. Always `202`, whether or not the account exists. `503 email_not_configured` when SMTP is unset (fail closed, never a fake success). |
 | `POST` | `/auth/reset/confirm` | `{token, password}`. Single-use; revokes every session on success. |
+| `POST` | `/admin/users/:id/reset` | Instance admin only. `201` `{url, expires_at}`: a one-time link for out-of-band delivery, the documented path when SMTP is unset. The link is a credential and is never logged. |
 | `GET` | `/auth/oidc/:provider/start` | `302` to the provider; `state` + PKCE in a signed cookie. |
 | `GET` | `/auth/oidc/:provider/callback` | Creates or links, then `302` to `/boards`. Linking requires an authenticated local session. |
 | `POST` | `/auth/oidc/:provider/link` | Explicit link for an already-signed-in user. |

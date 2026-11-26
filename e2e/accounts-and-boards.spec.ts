@@ -87,3 +87,16 @@ test('a second account gets the same answer for a foreign board as for one that 
   await owner.close();
   await stranger.close();
 });
+
+test('the reset page fails closed when the instance cannot send mail', async ({ page }) => {
+  await page.goto('/reset', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1, name: 'Reset your password' })).toBeVisible();
+
+  await page.getByLabel('Email').fill('someone@klui.test');
+  await page.getByRole('button', { name: 'Send the link' }).click();
+
+  // No SMTP in the e2e server: the page says so instead of faking a send.
+  await expect(page.getByRole('alert')).toHaveText(
+    'This instance cannot send mail. Ask an instance admin for a link.',
+  );
+});
