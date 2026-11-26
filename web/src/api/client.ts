@@ -81,6 +81,11 @@ export const api = {
     request<Me>('POST', '/auth/signup', input),
   logout: () => request<void>('POST', '/auth/logout'),
 
+  requestPasswordReset: (email: string) =>
+    request<{ status: 'accepted' }>('POST', '/auth/reset/request', { email }),
+  confirmPasswordReset: (input: { token: string; password: string }) =>
+    request<{ status: 'reset' }>('POST', '/auth/reset/confirm', input),
+
   enrollTotp: () =>
     request<{ secret: string; otpauth_url: string; recovery_codes: string[] }>(
       'POST',

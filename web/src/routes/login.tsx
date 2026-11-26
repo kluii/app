@@ -146,11 +146,21 @@ function LoginPage() {
           </button>
         </p>
       ) : (
-        <p className="mt-6 text-center text-body-sm text-ink-muted">
-          <Link to="/signup" className="text-ink underline-offset-4 hover:underline">
-            {t('auth.signIn.toSignUp')}
-          </Link>
-        </p>
+        <>
+          <p className="mt-6 text-center text-body-sm text-ink-muted">
+            <Link to="/signup" className="text-ink underline-offset-4 hover:underline">
+              {t('auth.signIn.toSignUp')}
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-body-sm">
+            <Link
+              to="/reset"
+              className="text-ink-subtle underline-offset-4 hover:text-ink hover:underline"
+            >
+              {t('auth.signIn.forgot')}
+            </Link>
+          </p>
+        </>
       )}
     </AuthPage>
   );
