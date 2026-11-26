@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import { z } from 'zod';
+
+/**
+ * One validation module for usernames, used by REST, MCP and the UI
+ * (docs/permissions.md §6, K1-08). The UI mirrors these rules in
+ * web/src/lib/validation.ts and a test asserts the same error codes.
+ */
+export const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,30})[a-z0-9]$/;
+export const USERNAME_MIN = 3;
+export const USERNAME_MAX = 32;
+export const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/;
+export const SLUG_MIN = 3;
+export const SLUG_MAX = 40;
+
+export const usernameSchema = z
+  .string()
+  .min(USERNAME_MIN)
+  .max(USERNAME_MAX)
+  .regex(USERNAME_PATTERN, 'lowercase letters, digits and single hyphens, no hyphen at either end');
+
+export const slugSchema = z
+  .string()
+  .min(SLUG_MIN)
+  .max(SLUG_MAX)
+  .regex(SLUG_PATTERN, 'lowercase letters, digits and single hyphens, no hyphen at either end');
+
+export const emailSchema = z.string().trim().toLowerCase().max(254).email();
+
+export const passwordSchema = z.string().min(12).max(256);
+
+export const signupSchema = z.object({
+  email: emailSchema,
+  username: usernameSchema,
+  password: passwordSchema,
+  invite_token: z.string().max(200).optional(),
+});
+
+export const loginSchema = z.object({
+  email_or_username: z.string().min(1).max(254),
+  password: z.string().min(1).max(256),
+  totp: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
+});
+
+export const meSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  username: z.string(),
+  display_name: z.string().nullable(),
+  totp_enabled: z.boolean(),
+  is_instance_admin: z.boolean(),
+  created_at: z.string(),
+});
+
+export const sessionCookieName = 'klui_session';
+export const csrfCookieName = 'klui_csrf';
+export const csrfHeaderName = 'x-klui-csrf';
+
+export type SignupInput = z.infer<typeof signupSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+export type Me = z.infer<typeof meSchema>;
