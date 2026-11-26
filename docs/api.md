@@ -246,6 +246,7 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 | `board.created` | `{board_id, name, visibility}` |
 | `board.updated` | `{board_id, changes:{field: [old, new]}}` |
 | `board.closed` | `{board_id, summary_id}` |
+| `board.deleted` | `{board_id, name, slug, owner, counts:{columns, cards, comments}}` — written twice in the delete transaction: once board-scoped (dies with the cascade, carries the SSE payload) and once with `board_id: null`, which is the durable record (D-54) |
 | `member.added` | `{board_id, user_id, role}` |
 | `member.updated` | `{board_id, user_id, from, to}` |
 | `member.removed` | `{board_id, user_id}` |

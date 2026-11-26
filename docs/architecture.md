@@ -117,7 +117,7 @@ Required by the decisions register; each one is an ADR item, not an improvisatio
 ### 3.4 Events
 
 - One helper, `recordEvent(tx, {boardId, actor, type, payload})`, called inside the same transaction as the mutation it describes. A mutation without an event is a defect; an event without a mutation is a lie.
-- Closed enum of types: `board.created`, `board.updated`, `board.closed`, `member.added`, `member.updated`, `member.removed`, `column.created`, `column.updated`, `column.deleted`, `card.created`, `card.updated`, `card.moved`, `card.completed`, `card.reopened`, `card.deleted`, `comment.created`, `comment.updated`, `link.created`, `link.revoked`, `pending.approved`, `pending.rejected`, `agent_key.created`, `agent_key.revoked`, `import.completed`.
+- Closed enum of types: `board.created`, `board.updated`, `board.closed`, `board.deleted`, `member.added`, `member.updated`, `member.removed`, `column.created`, `column.updated`, `column.deleted`, `card.created`, `card.updated`, `card.moved`, `card.completed`, `card.reopened`, `card.deleted`, `comment.created`, `comment.updated`, `link.created`, `link.revoked`, `pending.approved`, `pending.rejected`, `agent_key.created`, `agent_key.revoked`, `import.completed`.
 - `payload` shapes are documented in `docs/api.md` §Events and reused verbatim by the digest, the activity feed and the close-out summary. Adding a key is backward compatible; renaming one is a migration.
 - Activity, digest and close-out **read events only**. They may join cards/columns for labels, but they may not reconstruct "what happened" from current state.
 

@@ -673,3 +673,49 @@ describe('rank planning', () => {
     expect(planRank({ before: 1024, after: 1024.5, min: 1024, max: 4096 }).kind).toBe('renumber');
   });
 });
+
+describe('deleting a board', () => {
+  it('records what was deleted, in an event that outlives the board', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const first = columns[0];
+    expect(first).toBeDefined();
+    await addCard(c, board.id, first?.id ?? '', 'one');
+    await addCard(c, board.id, first?.id ?? '', 'two');
+
+    const removed = await c.request('DELETE', `/api/v1/boards/${board.id}`, { confirm: true });
+    expect(removed.statusCode).toBe(204);
+
+    // The board-scoped row is written in the same transaction, so a crash
+    // between the two inserts cannot leave a deletion unrecorded — but it dies
+    // with the cascade. The instance row is the durable one.
+    const surviving = await harness.db.event.findMany({
+      where: { board_id: null, type: 'board_deleted' },
+      orderBy: { created_at: 'desc' },
+    });
+    const record = surviving.find(
+      (row) => (row.payload as { board_id?: string }).board_id === board.id,
+    );
+    expect(record, 'an instance-scoped board.deleted event').toBeDefined();
+    expect(record?.actor_kind).toBe('user');
+    // A user actor is named by id; the readable name is in the payload.
+    expect(record?.actor_user_id).not.toBeNull();
+    expect(record?.payload).toMatchObject({
+      board_id: board.id,
+      name: 'Retro S2',
+      owner: `owner-${c.suffix}`,
+      counts: { columns: 3, cards: 2, comments: 0 },
+    });
+  });
+
+  it('still answers 404 for a board that is gone, with no trace left behind', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+    expect(
+      (await c.request('DELETE', `/api/v1/boards/${board.id}`, { confirm: true })).statusCode,
+    ).toBe(204);
+    const again = await c.request('GET', `/api/v1/boards/${board.id}`);
+    expect(again.statusCode).toBe(404);
+    expect(await harness.db.event.count({ where: { board_id: board.id } })).toBe(0);
+  });
+});

@@ -78,6 +78,7 @@ enum EventType {
   board_created
   board_updated
   board_closed
+  board_deleted
   member_added
   member_updated
   member_removed

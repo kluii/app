@@ -60,6 +60,7 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 | D-29 | **SSE is the only push channel.** One stream per session, `Last-Event-ID` replay from a 5-minute ring buffer, heartbeat every 25 s. | WebSockets buy nothing here; SSE survives proxies and reconnects with `EventSource`. | ADR-0015 |
 | D-30 | **The client merges by server id on every path**, including the mutation's own response. | Echo-before-response is real and produces duplicated cards that look like a server bug. | ADR-0015 |
 | D-31 | **OpenAPI 3.1 is generated from the Zod schemas**, and the web client is generated from that document. | A hand-written client is a second contract waiting to drift. | ADR-0014 |
+| D-54 | **Deleting a board writes two `board.deleted` events in the delete transaction**: one board-scoped (it dies with the cascade and carries the SSE payload) and one with `board_id: null`, which survives. | D-23 says every mutation records itself, and the one mutation that destroys the audit trail is exactly the one that must not be able to lose its record. The instance row also keeps the deleted board's name, owner and counts for an operator after the board is gone. | ADR-0013 |
 
 ## Agents and MCP
 

@@ -12,6 +12,7 @@ export type EventTypeName =
   | 'board.created'
   | 'board.updated'
   | 'board.closed'
+  | 'board.deleted'
   | 'member.added'
   | 'member.updated'
   | 'member.removed'

@@ -244,7 +244,28 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
         details: [{ path: 'confirm', code: 'invalid_literal', message: 'expected true' }],
       });
     }
-    await db.board.delete({ where: { id } });
+    // D-23 and D-54: the one mutation that destroys the audit trail records it
+    // itself. Counts are read and both events written inside the same
+    // transaction as the delete, so a failure leaves neither a deletion nor a
+    // record of one. The board-scoped row is what the SSE payload describes and
+    // it dies with the cascade; the instance-scoped row is the durable record.
+    await db.$transaction(async (tx) => {
+      const [columns, cards, comments] = await Promise.all([
+        tx.column.count({ where: { board_id: id } }),
+        tx.card.count({ where: { board_id: id } }),
+        tx.comment.count({ where: { board: { id } } }),
+      ]);
+      const payload = {
+        board_id: id,
+        name: loaded.board.name,
+        slug: loaded.board.slug,
+        owner: loaded.board.owner?.username ?? null,
+        counts: { columns, cards, comments },
+      };
+      await recordEvent(tx, { boardId: id, actor, type: 'board.deleted', payload });
+      await recordEvent(tx, { boardId: null, actor, type: 'board.deleted', payload });
+      await tx.board.delete({ where: { id } });
+    });
     commitEvent(context.hub, {
       boardId: id,
       type: 'board.deleted',
