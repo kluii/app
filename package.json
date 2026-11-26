@@ -27,6 +27,7 @@
     "db:generate": "npm run db:generate --workspace server"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.1",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.65.1",
     "concurrently": "10.0.7",
