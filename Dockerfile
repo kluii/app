@@ -8,7 +8,9 @@ ENV npm_config_update_notifier=false
 COPY package.json package-lock.json ./
 COPY server/package.json server/package.json
 COPY web/package.json web/package.json
-RUN npm ci --ignore-scripts=false
+# No scripts yet: the server's postinstall runs `prisma generate`, and the schema
+# only arrives with the source copy below. Generation happens in `npm run build`.
+RUN npm ci --ignore-scripts
 
 COPY . .
 RUN npm run build
