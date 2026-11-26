@@ -23,5 +23,7 @@ export function t(key: string, params: Record<string, string | number> = {}): st
   if (template === undefined) {
     return key;
   }
-  return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(params[name] ?? `{${name}}`));
+  return template.replace(/\{(\w+)\}/g, (_match, name: string) =>
+    String(params[name] ?? `{${name}}`),
+  );
 }
