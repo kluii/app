@@ -2,7 +2,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../app.js';
 import { requireUser } from './request.js';
-import { login, logout, logoutAll, signup, toAuthenticated } from './service.js';
+import {
+  login,
+  logout,
+  logoutAll,
+  signup,
+  toAuthenticated,
+  type AuthenticatedUser,
+} from './service.js';
 import {
   clearSessionCookie,
   issueSession,
@@ -26,7 +33,7 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
     const { user, session } = await signup(context.db, context.env, pepper, request.body, meta);
     setSessionCookie(reply, session.raw, { secure, expires_at: session.expires_at });
     rotateCsrfCookie(reply, secure);
-    return reply.code(201).send(toMe(user));
+    return reply.code(201).send(await meFor(context.db, user));
   });
 
   app.post('/api/v1/auth/login', async (request, reply) => {
@@ -39,7 +46,7 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
     });
     setSessionCookie(reply, session.raw, { secure, expires_at: session.expires_at });
     rotateCsrfCookie(reply, secure);
-    return reply.code(200).send(toMe(user));
+    return reply.code(200).send(await meFor(context.db, user));
   });
 
   app.post('/api/v1/auth/logout', async (request, reply) => {
@@ -133,7 +140,12 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
   registerTotpRoutes(app, context);
 }
 
-function toMe(user: ReturnType<typeof toAuthenticated>, totpEnabled = false): Me {
+/**
+ * The row as it is. `created_at` comes from the account, never from the clock,
+ * and `totp_enabled` is the confirmed factor — a login body that says otherwise
+ * makes the security page lie about its own state.
+ */
+function toMe(user: ReturnType<typeof toAuthenticated>, totpEnabled: boolean): Me {
   return {
     id: user.id,
     email: user.email,
@@ -141,6 +153,12 @@ function toMe(user: ReturnType<typeof toAuthenticated>, totpEnabled = false): Me
     display_name: user.display_name,
     totp_enabled: totpEnabled,
     is_instance_admin: user.is_instance_admin,
-    created_at: new Date().toISOString(),
+    created_at: user.created_at.toISOString(),
   };
+}
+
+/** Signup and login answer with the account state, factor included. */
+async function meFor(db: NonNullable<AppContext['db']>, user: AuthenticatedUser): Promise<Me> {
+  const factor = await db.totpSecret.findUnique({ where: { user_id: user.id } });
+  return toMe(user, Boolean(factor?.confirmed_at));
 }

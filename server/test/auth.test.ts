@@ -108,6 +108,22 @@ describe('login', () => {
     expect(wrong.body).toBe(unknown.body);
   });
 
+  it('reports the account creation date, not the time of the request', async () => {
+    const c = client();
+    const user = await c.signup(`dated-${c.suffix}`);
+
+    const first = await c.request('GET', '/api/v1/me');
+    const firstBody = first.json() as { created_at: string };
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const second = await c.request('GET', '/api/v1/me');
+    const secondBody = second.json() as { created_at: string };
+
+    // Two calls a second apart used to differ: `created_at` was `new Date()`.
+    expect(secondBody.created_at).toBe(firstBody.created_at);
+    const row = await harness.db.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(firstBody.created_at).toBe(row.created_at.toISOString());
+  });
+
   it('issues a session cookie and a CSRF cookie that survive a /me call', async () => {
     const c = client();
     const username = `session-${c.suffix}`;

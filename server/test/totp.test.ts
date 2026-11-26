@@ -124,6 +124,8 @@ describe('TOTP through the API', () => {
       totp: nextCode,
     });
     expect(withFactor.statusCode).toBe(200);
+    // The login body must describe the account as it is, factor included.
+    expect((withFactor.json() as { totp_enabled: boolean }).totp_enabled).toBe(true);
 
     const replayed = await new TestClient(harness.app, harness.db).request(
       'POST',

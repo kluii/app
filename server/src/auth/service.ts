@@ -24,6 +24,8 @@ export type AuthenticatedUser = {
   display_name: string | null;
   is_instance_admin: boolean;
   locale: string;
+  /** The row's creation date, so `/me` never invents one. */
+  created_at: Date;
 };
 
 export async function ensureInstanceSettings(db: Db, env: Env): Promise<void> {
@@ -243,6 +245,7 @@ export function toAuthenticated(user: {
   display_name: string | null;
   is_instance_admin: boolean;
   locale: string;
+  created_at: Date;
 }): AuthenticatedUser {
   return {
     id: user.id,
@@ -251,6 +254,7 @@ export function toAuthenticated(user: {
     display_name: user.display_name,
     is_instance_admin: user.is_instance_admin,
     locale: user.locale,
+    created_at: user.created_at,
   };
 }
 
