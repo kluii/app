@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.DS_Store
+
+# local configuration and secrets
+.env
+.env.local
+.env.*.local
+server/.env
+web/.env
+
+# test and tooling output
+playwright-report/
+test-results/
+.vite/
+*.tsbuildinfo
+
+# generated artifacts that must not drift into git
+server/prisma/*.db
