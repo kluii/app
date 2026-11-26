@@ -47,11 +47,12 @@ export function registerStatic(app: FastifyInstance, assets: StaticAssets): void
     },
   });
 
-  app.get('/', async (_request, reply) => {
+  // D-01: the app contains no marketing route. `/` answers with a redirect,
+  // decided by the credential that was actually presented.
+  app.get('/', async (request, reply) => {
     return reply
       .header('cache-control', 'no-store')
-      .type('text/html; charset=utf-8')
-      .send(assets.indexHtml);
+      .redirect(request.actor ? '/boards' : '/login', 302);
   });
 }
 

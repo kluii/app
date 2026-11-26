@@ -39,6 +39,9 @@ export default defineConfig({
       KLUI_PORT: String(PORT),
       KLUI_LOG_LEVEL: 'warn',
       KLUI_SECRETS_DIR: '/tmp/klui-e2e-secrets',
+      // Explicit, so an inherited .env or shell variable cannot make the CSRF
+      // origin check compare the browser's origin with a different host.
+      KLUI_PUBLIC_URL: `http://127.0.0.1:${PORT}`,
       DATABASE_URL: E2E_DATABASE_URL,
     },
   },

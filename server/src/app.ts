@@ -69,10 +69,7 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.addHook('onSend', async (_request, reply, payload) => {
     reply.header('content-security-policy', csp);
     reply.header('x-content-type-options', 'nosniff');
-    reply.header(
-      'permissions-policy',
-      'camera=(), microphone=(), geolocation=(), interest-cohort=()',
-    );
+    reply.header('permissions-policy', 'camera=(), microphone=(), geolocation=()');
     return payload;
   });
 
