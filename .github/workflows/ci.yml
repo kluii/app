@@ -77,3 +77,97 @@ jobs:
             npm-debug.log*
           retention-days: 7
           if-no-files-found: ignore
+
+  # The gate used to stop at `npm run build`, so a server bug that only the
+  # browser journeys reach (and only a real container exposes) shipped green
+  # six times. Both jobs below are required.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: klui
+          POSTGRES_PASSWORD: klui
+          POSTGRES_DB: klui_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U klui -d klui_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate the Prisma client
+        run: npm run db:generate --workspace server
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      # test:e2e builds the server and the SPA, resets the `e2e` schema, then
+      # runs the journeys against the built server on port 8123 (D-52).
+      - name: Browser journeys
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose file for the run
+        run: |
+          cat > .env <<'ENV'
+          KLUI_PUBLIC_URL=http://127.0.0.1:8080
+          KLUI_PORT=8080
+          POSTGRES_PASSWORD=ci-only-not-a-secret
+          ENV
+
+      - name: Build the image
+        run: docker compose build
+
+      - name: Boot it
+        run: docker compose up -d --wait --wait-timeout 180
+
+      - name: Assert the instance is healthy
+        run: |
+          for attempt in $(seq 1 60); do
+            body=$(curl -fsS http://127.0.0.1:8080/healthz || true)
+            if printf '%s' "$body" | grep -q '"db":"up"'; then
+              printf '%s\n' "$body"
+              printf '%s' "$body" | grep -q '"status":"ok"'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'healthz never reported db:up' >&2
+          docker compose logs --no-color >&2
+          exit 1
+
+      - name: Show the logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
