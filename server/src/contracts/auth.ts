@@ -64,6 +64,15 @@ export const recoveryCodesSchema = z.object({
   password: z.string().min(1).max(256),
 });
 
+export const resetRequestSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetConfirmSchema = z.object({
+  token: z.string().min(20).max(200),
+  password: passwordSchema,
+});
+
 export const meSchema = z.object({
   id: z.string(),
   email: z.string(),

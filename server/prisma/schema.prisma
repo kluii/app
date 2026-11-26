@@ -128,14 +128,15 @@ model User {
   created_at        DateTime  @default(now())
   updated_at        DateTime  @default(now()) @updatedAt
 
-  sessions       Session[]
-  recovery_codes RecoveryCode[]
-  totp_secret    TotpSecret?
-  oauth_accounts OAuthAccount[]
-  digest_pref    DigestPref?
-  notifications  Notification[]
+  sessions        Session[]
+  recovery_codes  RecoveryCode[]
+  password_resets PasswordResetToken[]
+  totp_secret     TotpSecret?
+  oauth_accounts  OAuthAccount[]
+  digest_pref     DigestPref?
+  notifications   Notification[]
 
-  boards_owned Board[]       @relation("BoardOwner")
+  boards_owned Board[]               @relation("BoardOwner")
   memberships  BoardMember[]
   comments     Comment[]
   agent_keys   AgentKey[]
@@ -174,6 +175,21 @@ model TotpSecret {
   @@map("totp_secrets")
 }
 
+/// A reset token is 32 random bytes, stored as sha256 with the pepper, valid
+/// 30 minutes, single use, and retired by the next request (docs/features/auth.md §6).
+model PasswordResetToken {
+  id         String    @id
+  user_id    String
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("password_reset_tokens")
+}
+
 model RecoveryCode {
   id         String    @id
   user_id    String
@@ -203,29 +219,29 @@ model OAuthAccount {
 
 /// Singleton row, id = 1. Branding, registration, TOTP policy, captcha.
 model InstanceSettings {
-  id                  Int        @id @default(1)
-  instance_name       String     @default("Klui")
-  tab_title           String?
-  logo_url            String?
-  accent_color        String?
-  registration_open   Boolean    @default(true)
-  totp_policy         TotpPolicy @default(available)
-  captcha_enabled     Boolean    @default(false)
-  analytics_url       String?
-  metrics_enabled     Boolean    @default(false)
-  created_at          DateTime   @default(now())
-  updated_at          DateTime   @default(now()) @updatedAt
+  id                Int        @id @default(1)
+  instance_name     String     @default("Klui")
+  tab_title         String?
+  logo_url          String?
+  accent_color      String?
+  registration_open Boolean    @default(true)
+  totp_policy       TotpPolicy @default(available)
+  captcha_enabled   Boolean    @default(false)
+  analytics_url     String?
+  metrics_enabled   Boolean    @default(false)
+  created_at        DateTime   @default(now())
+  updated_at        DateTime   @default(now()) @updatedAt
 
   @@map("instance_settings")
 }
 
 /// A username renamed away stays reserved for 90 days and 301s to its owner (D-13).
 model UsernameReservation {
-  username           String   @id
-  user_id            String
+  username            String   @id
+  user_id             String
   redirect_to_user_id String
-  reserved_until     DateTime
-  created_at         DateTime @default(now())
+  reserved_until      DateTime
+  created_at          DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
@@ -264,18 +280,18 @@ model Board {
   created_at    DateTime   @default(now())
   updated_at    DateTime   @default(now()) @updatedAt
 
-  owner          User                   @relation("BoardOwner", fields: [owner_id], references: [id], onDelete: Cascade)
-  members        BoardMember[]
-  links          BoardLink[]
-  tag_colors     BoardTagColor[]
-  columns        Column[]
-  cards          Card[]
-  comments       Comment[]
-  events         Event[]
-  pending_cards  PendingCard[]
-  jobs           Job[]
-  agent_keys     AgentKey[]
-  slug_history   BoardSlugReservation[]
+  owner         User                   @relation("BoardOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  members       BoardMember[]
+  links         BoardLink[]
+  tag_colors    BoardTagColor[]
+  columns       Column[]
+  cards         Card[]
+  comments      Comment[]
+  events        Event[]
+  pending_cards PendingCard[]
+  jobs          Job[]
+  agent_keys    AgentKey[]
+  slug_history  BoardSlugReservation[]
 
   @@unique([owner_id, slug])
   @@index([owner_id])
@@ -360,8 +376,8 @@ model Card {
   created_at     DateTime  @default(now())
   updated_at     DateTime  @default(now()) @updatedAt
 
-  board    Board    @relation(fields: [board_id], references: [id], onDelete: Cascade)
-  column   Column   @relation(fields: [column_id], references: [id], onDelete: Cascade)
+  board    Board     @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  column   Column    @relation(fields: [column_id], references: [id], onDelete: Cascade)
   tags     CardTag[]
   comments Comment[]
 
@@ -392,8 +408,8 @@ model Comment {
   created_at   DateTime  @default(now())
   updated_at   DateTime  @default(now()) @updatedAt
 
-  board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
-  card  Card  @relation(fields: [card_id], references: [id], onDelete: Cascade)
+  board  Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  card   Card  @relation(fields: [card_id], references: [id], onDelete: Cascade)
   author User? @relation(fields: [author_id], references: [id], onDelete: SetNull)
 
   @@index([card_id, created_at])

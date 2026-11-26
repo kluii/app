@@ -2,6 +2,7 @@
 import { buildApp } from '../../src/app.js';
 import { testEnv, type Env } from '../../src/env.js';
 import type { Db } from '../../src/db.js';
+import type { Mailer } from '../../src/lib/mail.js';
 
 export const TEST_SECRETS = {
   sessionSecret: 'test-session-secret-that-is-long-enough',
@@ -9,10 +10,13 @@ export const TEST_SECRETS = {
   encryptionKey: Buffer.alloc(32, 7),
 };
 
-export function makeApp(options: { env?: Partial<Env>; db?: Db | null } = {}) {
+export function makeApp(
+  options: { env?: Partial<Env>; db?: Db | null; mail?: Mailer | null } = {},
+) {
   return buildApp({
     env: testEnv(options.env),
     db: options.db ?? null,
     secrets: TEST_SECRETS,
+    ...(options.mail === undefined ? {} : { mail: options.mail }),
   });
 }

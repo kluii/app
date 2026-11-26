@@ -48,7 +48,17 @@ if (secretsResult.generated.length > 0 && env.KLUI_ENV !== 'test') {
 }
 
 // Only now may anything import the Prisma client.
-const [{ buildApp }, { createDb }] = await Promise.all([import('./app.js'), import('./db.js')]);
+const [{ buildApp }, { createDb }, { createMailer }] = await Promise.all([
+  import('./app.js'),
+  import('./db.js'),
+  import('./lib/mail.js'),
+]);
+const mail = createMailer(env);
+if (!mail && env.KLUI_ENV !== 'test') {
+  process.stderr.write(
+    'klui: SMTP is not configured; POST /api/v1/auth/reset/request will answer 503 email_not_configured.\n',
+  );
+}
 
 const db = createDb(env.DATABASE_URL);
 try {
@@ -61,7 +71,7 @@ try {
   process.exit(1);
 }
 
-const app = buildApp({ env, db, secrets });
+const app = buildApp({ env, db, secrets, mail });
 await app.listen({ port: env.KLUI_PORT, host: '0.0.0.0' });
 app.log.info({ port: env.KLUI_PORT, env: env.KLUI_ENV }, 'klui listening');
 

@@ -23,6 +23,8 @@ import { registerBoardRoutes } from './boards/routes.js';
 import { registerColumnRoutes } from './columns/routes.js';
 import { registerCardRoutes } from './cards/routes.js';
 import { registerActivityRoutes } from './activity/routes.js';
+import { registerResetRoutes } from './auth/reset-routes.js';
+import type { Mailer } from './lib/mail.js';
 
 export type AppContext = {
   env: Env;
@@ -30,6 +32,8 @@ export type AppContext = {
   secrets: Secrets;
   /** In-process SSE hub; publishing happens after commit (D-29). */
   hub?: Hub;
+  /** Null when SMTP is unconfigured: the reset endpoint then fails closed. */
+  mail?: Mailer | null;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
@@ -112,6 +116,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerColumnRoutes(scoped, { ...context, hub });
     registerCardRoutes(scoped, { ...context, hub });
     registerActivityRoutes(scoped, { ...context, hub });
+    registerResetRoutes(scoped, { ...context, hub });
   });
 
   app.register(async (scoped) => {

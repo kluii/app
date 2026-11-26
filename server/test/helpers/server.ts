@@ -5,6 +5,7 @@ import { testEnv } from '../../src/env.js';
 import { createHub } from '../../src/realtime/events.js';
 import { testDatabaseUrl, testDb } from './db.js';
 import type { Db } from '../../src/db.js';
+import type { Mailer } from '../../src/lib/mail.js';
 
 export const TEST_SECRETS = {
   sessionSecret: 'test-session-secret-that-is-long-enough',
@@ -12,7 +13,7 @@ export const TEST_SECRETS = {
   encryptionKey: Buffer.alloc(32, 9),
 };
 
-export async function startServer(): Promise<{
+export async function startServer(options: { mail?: Mailer | null } = {}): Promise<{
   app: ReturnType<typeof buildApp>;
   db: Db;
   client: () => TestClient;
@@ -24,6 +25,7 @@ export async function startServer(): Promise<{
     db,
     secrets: TEST_SECRETS,
     hub: createHub(),
+    ...(options.mail === undefined ? {} : { mail: options.mail }),
   });
   await app.ready();
   return {
