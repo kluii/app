@@ -14,11 +14,22 @@ import {
   registerStatic,
 } from './settings/static.js';
 import type { Secrets } from './lib/secrets.js';
+import { createHub, type Hub } from './realtime/events.js';
+import { resolveActor } from './auth/actor.js';
+import { registerAuthRoutes } from './auth/routes.js';
+import { CSRF_EXEMPT_PATHS, csrfMatches } from './auth/sessions.js';
+import { sessionCookieName } from './contracts/auth.js';
+import { registerBoardRoutes } from './boards/routes.js';
+import { registerColumnRoutes } from './columns/routes.js';
+import { registerCardRoutes } from './cards/routes.js';
+import { registerActivityRoutes } from './activity/routes.js';
 
 export type AppContext = {
   env: Env;
   db: Db | null;
   secrets: Secrets;
+  /** In-process SSE hub; publishing happens after commit (D-29). */
+  hub?: Hub;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
@@ -35,6 +46,7 @@ function resolveRequestId(header: string | string[] | undefined): string {
  */
 export function buildApp(context: AppContext): FastifyInstance {
   const hops = context.env.KLUI_TRUSTED_PROXY_HOPS;
+  const hub = context.hub ?? createHub();
   const assets = loadStaticAssets(new URL('../../web/dist', import.meta.url).pathname);
   const csp = contentSecurityPolicy(assets?.bootstrapHash ?? null);
 
@@ -67,6 +79,43 @@ export function buildApp(context: AppContext): FastifyInstance {
   if (assets) {
     registerStatic(app, assets);
   }
+
+  // 7. Authentication: resolve the credential into an actor before any handler.
+  app.addHook('onRequest', async (request, reply) => {
+    if (!context.db) return;
+    await resolveActor(context.db, context.secrets.tokenPepper, request, reply);
+  });
+
+  // 8. CSRF double submit for cookie-authenticated writes; bearer is exempt.
+  app.addHook('preHandler', async (request) => {
+    const method = request.method.toUpperCase();
+    if (method !== 'POST' && method !== 'PATCH' && method !== 'PUT' && method !== 'DELETE') return;
+    const path = request.url.split('?')[0] ?? request.url;
+    if (CSRF_EXEMPT_PATHS.has(path)) return;
+    if (request.headers.authorization) return;
+    if (!request.cookies[sessionCookieName]) return;
+    if (!csrfMatches(request)) {
+      throw new AppError('csrf_failed', {
+        message: 'The request could not be verified.',
+        hint: 'Reload the page: the CSRF cookie and the X-Klui-CSRF header must match.',
+      });
+    }
+    const origin = request.headers.origin;
+    if (origin && context.env.KLUI_PUBLIC_URL && !origin.startsWith(context.env.KLUI_PUBLIC_URL)) {
+      throw new AppError('forbidden_origin', {
+        message: 'The request came from an unexpected origin.',
+        hint: null,
+      });
+    }
+  });
+
+  app.register(async (scoped) => {
+    registerAuthRoutes(scoped, { ...context, hub });
+    registerBoardRoutes(scoped, { ...context, hub });
+    registerColumnRoutes(scoped, { ...context, hub });
+    registerCardRoutes(scoped, { ...context, hub });
+    registerActivityRoutes(scoped, { ...context, hub });
+  });
 
   app.register(async (scoped) => {
     registerHealth(scoped, context.db);
