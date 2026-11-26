@@ -1,0 +1,57 @@
+# One image, one database, one volume. `docker compose up -d` and nothing else.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: klui:2.0.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${KLUI_PORT:-8080}:8080"
+    environment:
+      KLUI_ENV: production
+      DATABASE_URL: postgresql://klui:${POSTGRES_PASSWORD}@db:5432/klui
+      KLUI_PUBLIC_URL: ${KLUI_PUBLIC_URL}
+      KLUI_SECRETS_DIR: /data/secrets
+      KLUI_TRUSTED_PROXY_HOPS: ${KLUI_TRUSTED_PROXY_HOPS:-0}
+      KLUI_REGISTRATION_OPEN: ${KLUI_REGISTRATION_OPEN:-true}
+      KLUI_TOTP_POLICY: ${KLUI_TOTP_POLICY:-available}
+      KLUI_LOG_LEVEL: ${KLUI_LOG_LEVEL:-info}
+    volumes:
+      - klui_secrets:/data/secrets
+    healthcheck:
+      # 127.0.0.1, never localhost: a container that resolves localhost to ::1
+      # on an IPv4-only host is unhealthy forever while serving perfectly.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: klui
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: klui
+    volumes:
+      - klui_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U klui -d klui"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  klui_pgdata:
+  klui_secrets:
