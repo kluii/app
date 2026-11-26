@@ -8,19 +8,25 @@ test.describe('the shell', () => {
     expect(await response.json()).toEqual({ status: 'ok', version: '0.1.0', db: 'up' });
   });
 
+  test('answers / with a redirect, never a marketing page', async ({ request }) => {
+    const response = await request.get('/', { maxRedirects: 0 });
+    expect(response.status()).toBe(302);
+    expect(response.headers()['location']).toBe('/login');
+  });
+
   test('serves the SPA with the theme applied before paint', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
     const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
     expect(['dark', 'light']).toContain(theme);
 
     const heading = await page.getByRole('heading', { level: 1 }).textContent();
-    expect(heading?.trim()).toBe('Klui');
+    expect(heading?.trim()).toBe('Sign in');
   });
 
   test('authorises the theme bootstrap with a CSP hash, not unsafe-inline', async ({ page }) => {
-    const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
+    const response = await page.goto('/login', { waitUntil: 'domcontentloaded' });
     const csp = response?.headers()['content-security-policy'] ?? '';
     expect(csp).toMatch(/script-src 'self' 'sha256-[A-Za-z0-9+/=]+'/);
     expect(csp).toContain("frame-ancestors 'none'");
