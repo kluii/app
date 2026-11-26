@@ -8,6 +8,7 @@ import { Field } from '../components/ui/field';
 import { Input } from '../components/ui/input';
 import { t } from '../i18n';
 import { queryClient, queryKeys } from '../lib/query-client';
+import { RESERVED_MESSAGE, checkUsername } from '../lib/validation';
 import { rootRoute } from './root';
 
 export const signupRoute = createRoute({
@@ -36,6 +37,12 @@ function SignupPage() {
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === 'conflict') {
         setError(t('auth.signUp.error.conflict'));
+      } else if (
+        caught instanceof ApiError &&
+        caught.details?.some((detail) => detail.message === RESERVED_MESSAGE)
+      ) {
+        // The same rule the form checks locally, in case the server list moved.
+        setError(t('auth.signUp.error.reserved'));
       } else if (caught instanceof ApiError && caught.code === 'validation_failed') {
         setError(t('auth.signUp.error.weak'));
       } else {
@@ -67,6 +74,7 @@ function SignupPage() {
           label={t('auth.signUp.username')}
           htmlFor="username"
           hint={t('auth.signUp.usernameHint')}
+          error={checkUsername(username) === 'reserved' ? t('auth.signUp.error.reserved') : null}
         >
           <Input
             id="username"
