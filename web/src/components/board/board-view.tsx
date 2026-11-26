@@ -15,6 +15,7 @@ import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from '
 import { CardDialog } from './card-dialog';
 import { CardRow } from './card-row';
 import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
+import { useKeyboardDrag } from './use-keyboard-drag';
 
 type Composer =
   { kind: 'closed' } | { kind: 'create'; columnId: string } | { kind: 'edit'; card: Card };
@@ -28,6 +29,7 @@ export function BoardView({ boardId }: { boardId: string }) {
   const [composer, setComposer] = useState<Composer>({ kind: 'closed' });
   const [activityOpen, setActivityOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [announcement, setAnnouncement] = useState('');
   const queryClient = useQueryClient();
 
   const state = useQuery({
@@ -50,6 +52,7 @@ export function BoardView({ boardId }: { boardId: string }) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
     },
     onError: async () => {
+      setAnnouncement('');
       await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
     },
   });
@@ -66,6 +69,38 @@ export function BoardView({ boardId }: { boardId: string }) {
       },
     });
   };
+
+  const keyboard = useKeyboardDrag({
+    cards: state.data?.cards ?? [],
+    columns: state.data?.columns ?? [],
+    onMove: requestMove,
+    announce: setAnnouncement,
+    messages: {
+      lifted: (input) =>
+        t('board.drag.lifted', {
+          card: input.card,
+          column: input.column,
+          index: input.index,
+          total: input.total,
+        }),
+      position: (input) =>
+        t('board.drag.position', {
+          card: input.card,
+          column: input.column,
+          index: input.index,
+          total: input.total,
+        }),
+      moved: (input) =>
+        t('board.drag.moved', {
+          card: input.card,
+          column: input.column,
+          index: input.index,
+          total: input.total,
+        }),
+    },
+    describeCard: (card) => card.title,
+    describeColumn: (column) => column.name,
+  });
 
   if (state.isPending) {
     return <p className="px-6 py-8 text-body-sm text-ink-subtle">{t('common.label.loading')}</p>;
@@ -93,6 +128,8 @@ export function BoardView({ boardId }: { boardId: string }) {
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
       onMove={requestMove}
+      keyboard={keyboard}
+      announcement={announcement}
     >
       <CardDialog
         boardId={boardId}
@@ -131,6 +168,8 @@ function BoardFrame({
   onAddCard,
   onOpenActivity,
   onMove,
+  keyboard,
+  announcement,
   children,
 }: {
   boardState: BoardState;
@@ -140,6 +179,8 @@ function BoardFrame({
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
   onMove: (request: MoveRequest) => void;
+  keyboard: ReturnType<typeof useKeyboardDrag>;
+  announcement: string;
   children?: ReactNode;
 }) {
   const { board, columns, cards, caller, members } = boardState;
@@ -194,12 +235,17 @@ function BoardFrame({
                 onOpenCard={onOpenCard}
                 onAddCard={onAddCard}
                 onMove={onMove}
+                keyboard={keyboard}
               />
             ))}
             {caller.can_write ? <AddColumn boardId={board.id} /> : null}
           </div>
         </div>
       )}
+
+      <p aria-live="polite" className="sr-only" data-testid="drag-announcement">
+        {announcement}
+      </p>
 
       {children}
     </div>
@@ -235,6 +281,7 @@ function ColumnSection({
   onOpenCard,
   onAddCard,
   onMove,
+  keyboard,
 }: {
   column: Column;
   cards: Card[];
@@ -244,6 +291,7 @@ function ColumnSection({
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
   onMove: (request: MoveRequest) => void;
+  keyboard: ReturnType<typeof useKeyboardDrag>;
 }) {
   const droppable = useColumnDroppable({
     columnId: column.id,
@@ -276,8 +324,10 @@ function ColumnSection({
               cards={allCards}
               canWrite={caller.can_write}
               readOnly={!caller.can_write}
+              lifted={keyboard.drag?.cardId === card.id}
               onOpen={() => onOpenCard(card)}
               onMove={onMove}
+              onKeyDown={keyboard.onKeyDown}
             />
           ))}
         </ul>
