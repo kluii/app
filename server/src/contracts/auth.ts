@@ -36,13 +36,32 @@ export const signupSchema = z.object({
   invite_token: z.string().max(200).optional(),
 });
 
-export const loginSchema = z.object({
-  email_or_username: z.string().min(1).max(254),
+export const loginSchema = z
+  .object({
+    email_or_username: z.string().min(1).max(254),
+    password: z.string().min(1).max(256),
+    totp: z
+      .string()
+      .regex(/^\d{6}$/)
+      .optional(),
+    recovery_code: z.string().min(20).max(32).optional(),
+  })
+  .refine((value) => !(value.totp && value.recovery_code), {
+    message: 'send a TOTP code or a recovery code, not both',
+    path: ['recovery_code'],
+  });
+
+export const totpVerifySchema = z.object({
+  code: z.string().regex(/^\d{6}$/),
+});
+
+export const totpDisableSchema = z.object({
   password: z.string().min(1).max(256),
-  totp: z
-    .string()
-    .regex(/^\d{6}$/)
-    .optional(),
+  code: z.string().regex(/^\d{6}$/),
+});
+
+export const recoveryCodesSchema = z.object({
+  password: z.string().min(1).max(256),
 });
 
 export const meSchema = z.object({

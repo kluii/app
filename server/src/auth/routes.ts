@@ -11,6 +11,8 @@ import {
   setSessionCookie,
 } from './sessions.js';
 import { isSecureOrigin } from '../env.js';
+import { totpPolicy } from './totp.js';
+import { registerTotpRoutes } from './totp-routes.js';
 import type { Me } from '../contracts/auth.js';
 
 export function registerAuthRoutes(app: FastifyInstance, context: AppContext): void {
@@ -29,7 +31,11 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
   app.post('/api/v1/auth/login', async (request, reply) => {
     if (!context.db) throw new Error('database is required');
     const meta = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
-    const { user, session } = await login(context.db, pepper, request.body, meta);
+    const policy = await totpPolicy(context.db, context.env);
+    const { user, session } = await login(context.db, pepper, request.body, meta, {
+      encryptionKey: context.secrets.encryptionKey,
+      policy,
+    });
     setSessionCookie(reply, session.raw, { secure, expires_at: session.expires_at });
     rotateCsrfCookie(reply, secure);
     return reply.code(200).send(toMe(user));
@@ -58,8 +64,9 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
     if (!user) throw new Error('session points at a missing user');
     // Refreshing the CSRF cookie on /me keeps a reloaded tab able to write.
     if (!request.cookies['klui_csrf']) rotateCsrfCookie(reply, secure);
+    const factor = await context.db.totpSecret.findUnique({ where: { user_id: userId } });
     reply.header('cache-control', 'no-store');
-    return reply.code(200).send(toMe(toAuthenticated(user)));
+    return reply.code(200).send(toMe(toAuthenticated(user), Boolean(factor?.confirmed_at)));
   });
 
   app.get('/api/v1/me/sessions', async (request) => {
@@ -111,15 +118,17 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
     setSessionCookie(reply, session.raw, { secure, expires_at: session.expires_at });
     return reply.code(204).send();
   });
+
+  registerTotpRoutes(app, context);
 }
 
-function toMe(user: ReturnType<typeof toAuthenticated>): Me {
+function toMe(user: ReturnType<typeof toAuthenticated>, totpEnabled = false): Me {
   return {
     id: user.id,
     email: user.email,
     username: user.username,
     display_name: user.display_name,
-    totp_enabled: false,
+    totp_enabled: totpEnabled,
     is_instance_admin: user.is_instance_admin,
     created_at: new Date().toISOString(),
   };

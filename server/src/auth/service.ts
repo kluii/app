@@ -13,6 +13,7 @@ import { hashPassword, assertPasswordPolicy, verifyPassword } from '../lib/passw
 import { recordEvent } from '../lib/events.js';
 import { loginSchema, signupSchema, type LoginInput } from '../contracts/auth.js';
 import { issueSession, revokeAllSessions, type IssuedSession } from './sessions.js';
+import { checkSecondFactor, type TotpPolicy } from './totp.js';
 
 export type AuthMeta = { ip: string | null; userAgent: string | null };
 
@@ -124,11 +125,18 @@ async function dummyHash(): Promise<string> {
   return DUMMY_HASH_CACHE.value;
 }
 
+export type SecondFactorConfig = {
+  encryptionKey: Buffer;
+  policy: TotpPolicy;
+  /** `available` never blocks a password-only login; `required` does. */
+};
+
 export async function login(
   db: Db,
   pepper: string,
   rawInput: unknown,
   meta: AuthMeta,
+  secondFactor: SecondFactorConfig,
 ): Promise<{ user: AuthenticatedUser; session: IssuedSession }> {
   const input: LoginInput = parse(loginSchema, rawInput);
   const identifier = input.email_or_username.trim().toLowerCase();
@@ -148,6 +156,9 @@ export async function login(
     });
   }
 
+  // The password matched; the factor decides whether a session exists at all.
+  const factor = await checkSecondFactor(db, secondFactor, user, input, secondFactor.policy);
+
   const session = await issueSession(db, {
     userId: user.id,
     pepper,
@@ -159,7 +170,7 @@ export async function login(
       boardId: null,
       actor: { kind: 'user', userId: user.id },
       type: 'security.login',
-      payload: { method: 'password' },
+      payload: { method: factor.method ?? 'password' },
     });
   });
   return { user: toAuthenticated(user), session };
