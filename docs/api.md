@@ -95,7 +95,7 @@ Positions are serialized as **strings** (`"1024"`, `"1536"`) because they are `D
 | Method | Path | Notes |
 |---|---|---|
 | `POST` | `/auth/signup` | `{email, username, password, invite_token?}`. `201` + session cookie. `409` if the username is taken (case-insensitive) — the only endpoint allowed to reveal that a username exists, because the user chose it. |
-| `POST` | `/auth/login` | `{email_or_username, password, totp?}`. Same body and timing for unknown account and wrong password. If TOTP is required and absent → `401 totp_required` with no other information. |
+| `POST` | `/auth/login` | `{email_or_username, password, totp?, recovery_code?}`. Same body and timing for unknown account and wrong password. If TOTP is required and absent → `401 totp_required` with no other information. `recovery_code` is the second way through the same gate: a code works once, and sending both fields answers `400 validation_failed`. |
 | `POST` | `/auth/logout` | Revokes the current session. `204`. |
 | `POST` | `/auth/logout-all` | Revokes every session of the actor. `204`. |
 | `POST` | `/auth/totp/enroll` | `201` `{secret, otpauth_url, recovery_codes[]}` — the **only** time these are returned. |
