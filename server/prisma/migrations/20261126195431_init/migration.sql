@@ -42,7 +42,7 @@ CREATE TABLE "users" (
     "is_instance_admin" BOOLEAN NOT NULL DEFAULT false,
     "email_verified_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -108,7 +108,7 @@ CREATE TABLE "instance_settings" (
     "analytics_url" TEXT,
     "metrics_enabled" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "instance_settings_pkey" PRIMARY KEY ("id")
 );
@@ -149,7 +149,7 @@ CREATE TABLE "boards" (
     "closed_at" TIMESTAMP(3),
     "close_summary" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "boards_pkey" PRIMARY KEY ("id")
 );
@@ -161,7 +161,7 @@ CREATE TABLE "board_members" (
     "user_id" TEXT NOT NULL,
     "role" "MemberRole" NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "board_members_pkey" PRIMARY KEY ("id")
 );
@@ -197,7 +197,7 @@ CREATE TABLE "columns" (
     "name" TEXT NOT NULL,
     "position" DECIMAL(30,10) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "columns_pkey" PRIMARY KEY ("id")
 );
@@ -216,7 +216,7 @@ CREATE TABLE "cards" (
     "position" DECIMAL(30,10) NOT NULL,
     "anon_actor_id" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "cards_pkey" PRIMARY KEY ("id")
 );
@@ -240,7 +240,7 @@ CREATE TABLE "comments" (
     "body" TEXT NOT NULL,
     "edited_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "comments_pkey" PRIMARY KEY ("id")
 );
@@ -305,7 +305,7 @@ CREATE TABLE "digest_prefs" (
     "rss_token_hash" TEXT,
     "last_sent_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "digest_prefs_pkey" PRIMARY KEY ("user_id")
 );
@@ -345,7 +345,7 @@ CREATE TABLE "jobs" (
     "result" JSONB,
     "error" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "jobs_pkey" PRIMARY KEY ("id")
 );
