@@ -116,6 +116,21 @@ Positions are serialized as **strings** (`"1024"`, `"1536"`) because they are `D
 
 ---
 
+## 3b. Instance administration
+
+Every route here requires `is_instance_admin`. That role is operational: it
+never grants board content. An admin who is not a board member gets the same
+`404` as a stranger, and the authz matrix asserts it.
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/admin/users` | `{items:[{id, username, email, is_instance_admin, created_at, banned, banned_until}], next_cursor}`, 50 per page, newest last, `?q=` filters on username or email. |
+| `POST` | `/admin/users/:id/ban` | `{confirm:true, reason?, expires_at?}` → `201 {banned_until}`. Revokes every session of the target. An instance admin cannot be banned (`403`). |
+| `DELETE` | `/admin/users/:id/ban` | `204`; lifts every active ban for that account. |
+
+A ban is enforced before authorization: the credential stops resolving, so the
+next request is `401` and the next login answers `403 banned`.
+
 ## 4. Boards
 
 | Method | Path | Notes |

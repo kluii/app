@@ -77,6 +77,7 @@ Password + TOTP + optional OIDC + break-glass. Nothing here is a checkbox: every
 | `security.password_reset` | Reset confirmed |
 | `security.totp_enabled` / `_disabled` | |
 | `security.session_revoked` | By the user, or by logout-all |
+| `security.user_banned` / `_unbanned` | Instance admin decision, with the expiry in the payload |
 | `security.oidc_linked` / `_unlinked` | |
 
 These are instance-level events (no `board_id`), retained 365 days, visible to the user in account settings and to the instance admin in an audit view.
