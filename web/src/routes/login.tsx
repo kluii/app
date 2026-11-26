@@ -16,10 +16,14 @@ export const loginRoute = createRoute({
   component: LoginPage,
 });
 
+type Factor = { kind: 'totp'; value: string } | { kind: 'recovery'; value: string } | null;
+
 function LoginPage() {
   const navigate = useNavigate();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [factor, setFactor] = useState<Factor>(null);
+  const [useRecovery, setUseRecovery] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -29,11 +33,27 @@ function LoginPage() {
     setPending(true);
     setError(null);
     try {
-      await api.login({ email_or_username: identifier, password });
+      await api.login({
+        email_or_username: identifier,
+        password,
+        ...(factor?.value
+          ? factor.kind === 'totp'
+            ? { totp: factor.value }
+            : { recovery_code: factor.value }
+          : {}),
+      });
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       await navigate({ to: '/boards' });
     } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 401) {
+      // The password was right and the factor is missing: ask for it, and keep
+      // the password in the form so the second submit is one field.
+      if (caught instanceof ApiError && caught.code === 'totp_required') {
+        setFactor((current) => current ?? { kind: 'totp', value: '' });
+        setError(null);
+      } else if (caught instanceof ApiError && caught.code === 'invalid_code') {
+        setError(t('auth.signIn.error.invalidCode'));
+      } else if (caught instanceof ApiError && caught.status === 401) {
+        setFactor(null);
         setError(t('auth.signIn.error.invalid'));
       } else {
         setError(t('common.error.generic'));
@@ -42,6 +62,8 @@ function LoginPage() {
       setPending(false);
     }
   };
+
+  const needsFactor = factor !== null;
 
   return (
     <AuthPage>
@@ -54,33 +76,82 @@ function LoginPage() {
             id="identifier"
             name="email_or_username"
             autoComplete="username"
-            autoFocus
+            autoFocus={!needsFactor}
             required
+            readOnly={needsFactor}
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
           />
         </Field>
-        <Field label={t('auth.signIn.password')} htmlFor="password" error={error}>
+        <Field
+          label={t('auth.signIn.password')}
+          htmlFor="password"
+          error={needsFactor ? null : error}
+        >
           <Input
             id="password"
             name="password"
             type="password"
             autoComplete="current-password"
             required
+            readOnly={needsFactor}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
         </Field>
+
+        {needsFactor ? (
+          <Field
+            label={useRecovery ? t('auth.signIn.recoveryCode') : t('auth.signIn.totp')}
+            htmlFor="factor"
+            hint={useRecovery ? undefined : t('auth.signIn.totpHint')}
+            error={error}
+          >
+            <Input
+              id="factor"
+              name="factor"
+              autoFocus
+              autoComplete="one-time-code"
+              inputMode={useRecovery ? 'text' : 'numeric'}
+              maxLength={useRecovery ? 32 : 6}
+              required
+              value={factor?.value ?? ''}
+              onChange={(event) =>
+                setFactor({
+                  kind: useRecovery ? 'recovery' : 'totp',
+                  value: event.target.value.trim(),
+                })
+              }
+            />
+          </Field>
+        ) : null}
+
         <Button type="submit" variant="primary" size="lg" loading={pending} className="mt-2 w-full">
           {t('auth.signIn.submit')}
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-body-sm text-ink-muted">
-        <Link to="/signup" className="text-ink underline-offset-4 hover:underline">
-          {t('auth.signIn.toSignUp')}
-        </Link>
-      </p>
+      {needsFactor ? (
+        <p className="mt-4 text-center text-body-sm">
+          <button
+            type="button"
+            className="text-ink-muted underline-offset-4 hover:text-ink hover:underline"
+            onClick={() => {
+              setUseRecovery(!useRecovery);
+              setFactor({ kind: useRecovery ? 'totp' : 'recovery', value: '' });
+              setError(null);
+            }}
+          >
+            {useRecovery ? t('auth.signIn.useTotp') : t('auth.signIn.useRecovery')}
+          </button>
+        </p>
+      ) : (
+        <p className="mt-6 text-center text-body-sm text-ink-muted">
+          <Link to="/signup" className="text-ink underline-offset-4 hover:underline">
+            {t('auth.signIn.toSignUp')}
+          </Link>
+        </p>
+      )}
     </AuthPage>
   );
 }

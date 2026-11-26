@@ -71,11 +71,26 @@ async function request<T>(
 
 export const api = {
   me: () => request<Me>('GET', '/me'),
-  login: (input: { email_or_username: string; password: string }) =>
-    request<Me>('POST', '/auth/login', input),
+  login: (input: {
+    email_or_username: string;
+    password: string;
+    totp?: string;
+    recovery_code?: string;
+  }) => request<Me>('POST', '/auth/login', input),
   signup: (input: { email: string; username: string; password: string }) =>
     request<Me>('POST', '/auth/signup', input),
   logout: () => request<void>('POST', '/auth/logout'),
+
+  enrollTotp: () =>
+    request<{ secret: string; otpauth_url: string; recovery_codes: string[] }>(
+      'POST',
+      '/auth/totp/enroll',
+    ),
+  verifyTotp: (code: string) => request<{ enabled: true }>('POST', '/auth/totp/verify', { code }),
+  disableTotp: (input: { password: string; code: string }) =>
+    request<{ enabled: false }>('POST', '/auth/totp/disable', input),
+  regenerateRecoveryCodes: (password: string) =>
+    request<{ recovery_codes: string[] }>('POST', '/auth/recovery-codes', { password }),
 
   boards: () => request<{ items: Board[] }>('GET', '/boards'),
   createBoard: (input: { name: string; template?: 'classic' | 'blank' }) =>

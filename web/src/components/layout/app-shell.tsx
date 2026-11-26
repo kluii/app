@@ -63,6 +63,12 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
           </Button>
           {me.data ? (
             <>
+              <Link
+                to="/settings"
+                className="rounded-sm px-2 text-label text-ink-muted underline-offset-4 hover:text-ink hover:underline"
+              >
+                {t('nav.account')}
+              </Link>
               <span className="font-mono text-mono-sm text-ink-muted">{me.data.username}</span>
               <Button
                 variant="ghost"
