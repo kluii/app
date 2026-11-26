@@ -11,6 +11,7 @@ import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Input } from '../ui/input';
 import { ActivityDialog } from './activity-dialog';
+import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from './board-filters';
 import { CardDialog } from './card-dialog';
 import { CardRow } from './card-row';
 
@@ -25,6 +26,7 @@ type Composer =
 export function BoardView({ boardId }: { boardId: string }) {
   const [composer, setComposer] = useState<Composer>({ kind: 'closed' });
   const [activityOpen, setActivityOpen] = useState(false);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
 
   const state = useQuery({
     queryKey: queryKeys.board(boardId),
@@ -54,6 +56,8 @@ export function BoardView({ boardId }: { boardId: string }) {
   return (
     <BoardFrame
       boardState={state.data}
+      filters={filters}
+      onFiltersChange={setFilters}
       onOpenCard={(card) => setComposer({ kind: 'edit', card })}
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
@@ -89,21 +93,27 @@ function Unreadable() {
 
 function BoardFrame({
   boardState,
+  filters,
+  onFiltersChange,
   onOpenCard,
   onAddCard,
   onOpenActivity,
   children,
 }: {
   boardState: BoardState;
+  filters: Filters;
+  onFiltersChange: (next: Filters) => void;
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
   children?: ReactNode;
 }) {
-  const { board, columns, cards, caller } = boardState;
+  const { board, columns, cards, caller, members } = boardState;
+  const visible = cards.filter((card) => matches(card, filters));
   const cardsByColumn = new Map<string, Card[]>();
   for (const column of columns) cardsByColumn.set(column.id, []);
-  for (const card of cards) cardsByColumn.get(card.column_id)?.push(card);
+  for (const card of visible) cardsByColumn.get(card.column_id)?.push(card);
+  const filtering = visible.length !== cards.length;
 
   return (
     <div className="flex h-full flex-col">
@@ -115,10 +125,22 @@ function BoardFrame({
           </span>
           <Chip>{callerLabel(caller)}</Chip>
         </div>
-        <Button size="sm" variant="secondary" onClick={onOpenActivity}>
-          {t('board.activity.title')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Chip>{t(`board.visibility.${board.visibility}`)}</Chip>
+          <BoardFilters
+            filters={filters}
+            onChange={onFiltersChange}
+            cards={cards}
+            members={members}
+            shown={visible.length}
+          />
+          <Button size="sm" variant="secondary" onClick={onOpenActivity}>
+            {t('board.activity.title')}
+          </Button>
+        </div>
       </div>
+
+      <ActiveFilters filters={filters} onChange={onFiltersChange} />
 
       {columns.length === 0 ? (
         <div className="px-4 py-6">
@@ -133,6 +155,7 @@ function BoardFrame({
                 column={column}
                 cards={cardsByColumn.get(column.id) ?? []}
                 caller={caller}
+                filtering={filtering}
                 onOpenCard={onOpenCard}
                 onAddCard={onAddCard}
               />
@@ -171,12 +194,14 @@ function ColumnSection({
   column,
   cards,
   caller,
+  filtering,
   onOpenCard,
   onAddCard,
 }: {
   column: Column;
   cards: Card[];
   caller: Caller;
+  filtering: boolean;
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
 }) {
@@ -191,7 +216,9 @@ function ColumnSection({
       </header>
 
       {cards.length === 0 ? (
-        <p className="px-1 pb-1 text-body-sm text-ink-subtle">{t('board.column.empty')}</p>
+        <p className="px-1 pb-1 text-body-sm text-ink-subtle">
+          {filtering ? t('board.column.emptyFiltered') : t('board.column.empty')}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {cards.map((card) => (
