@@ -74,6 +74,55 @@ export async function nextAppendPosition(db: Db | Tx, columnId: string): Promise
 }
 
 /**
+ * The insertion point, expressed as the two cards that will actually end up
+ * around it. A named neighbour that was deleted, or that lives in another
+ * column, falls back to the stored neighbour on that side: a stale client must
+ * never be able to place a card *past* a card it never saw (K2-05).
+ */
+async function resolveNeighbours(
+  tx: Tx,
+  input: { cardId: string; columnId: string; before: string | null; after: string | null },
+): Promise<{ before: number | null; after: number | null }> {
+  const named = await tx.card.findMany({
+    where: {
+      id: { in: [input.before, input.after].filter((id): id is string => id !== null) },
+      column_id: input.columnId,
+    },
+    select: { id: true, position: true },
+  });
+  const byId = new Map(named.map((row) => [row.id, Number(row.position)]));
+
+  let before = input.before === null ? null : (byId.get(input.before) ?? null);
+  let after = input.after === null ? null : (byId.get(input.after) ?? null);
+
+  if (before === null && after === null) return { before: null, after: null };
+
+  // Keep only what is genuinely adjacent to the insertion point.
+  if (before !== null) {
+    const next = await tx.card.findFirst({
+      where: { column_id: input.columnId, position: { gt: before }, id: { not: input.cardId } },
+      orderBy: { position: 'asc' },
+      select: { position: true },
+    });
+    const nextPosition = next ? Number(next.position) : null;
+    if (after === null || (nextPosition !== null && nextPosition < after)) after = nextPosition;
+  }
+  if (after !== null) {
+    const previous = await tx.card.findFirst({
+      where: { column_id: input.columnId, position: { lt: after }, id: { not: input.cardId } },
+      orderBy: { position: 'desc' },
+      select: { position: true },
+    });
+    const previousPosition = previous ? Number(previous.position) : null;
+    if (before === null || (previousPosition !== null && previousPosition > before)) {
+      before = previousPosition;
+    }
+  }
+
+  return { before, after };
+}
+
+/**
  * Resolves `{column, before, after}` into a concrete rank, renumbering the
  * target column when the gap between the neighbours is exhausted. A neighbour
  * that is missing, or that lives in another column, counts as absent.
@@ -82,44 +131,28 @@ export async function planMove(
   tx: Tx,
   input: { cardId: string; columnId: string; before: string | null; after: string | null },
 ): Promise<{ position: number; renumber: boolean; before: string | null; after: string | null }> {
-  const neighbours = await tx.card.findMany({
-    where: {
-      id: { in: [input.before, input.after].filter((id): id is string => id !== null) },
-      column_id: input.columnId,
-    },
-    select: { id: true, position: true },
-  });
-  const byId = new Map(neighbours.map((row) => [row.id, Number(row.position)]));
-  const before = input.before && byId.has(input.before) ? Number(byId.get(input.before)) : null;
-  const after = input.after && byId.has(input.after) ? Number(byId.get(input.after)) : null;
-
   const bounds = await tx.card.aggregate({
     where: { column_id: input.columnId, id: { not: input.cardId } },
-    _min: { position: true },
     _max: { position: true },
   });
-  const min = bounds._min.position === null ? null : Number(bounds._min.position);
   const max = bounds._max.position === null ? null : Number(bounds._max.position);
 
-  const plan = planRank({ before, after, min, max });
+  const neighbours = await resolveNeighbours(tx, input);
+  const plan = planRank({ before: neighbours.before, after: neighbours.after, min: null, max });
+
   if (plan.kind === 'renumber') {
     await renumberColumn(tx, input.columnId);
-    const refreshed = await tx.card.findMany({
-      where: {
-        id: { in: [input.before, input.after].filter((id): id is string => id !== null) },
-        column_id: input.columnId,
-      },
-      select: { id: true, position: true },
-    });
-    const positions = new Map(refreshed.map((row) => [row.id, Number(row.position)]));
+    const refreshed = await resolveNeighbours(tx, input);
     const replanned = planRank({
-      before: input.before ? (positions.get(input.before) ?? null) : null,
-      after: input.after ? (positions.get(input.after) ?? null) : null,
+      before: refreshed.before,
+      after: refreshed.after,
       min: null,
       max,
     });
     return {
-      position: replanned.kind === 'place' ? replanned.position : RANK_STEP,
+      // After a renumber the gaps are exactly one step, so `planRank` always
+      // places; the append is the defensive tail for an unreachable plan.
+      position: replanned.kind === 'place' ? replanned.position : (max ?? 0) + RANK_STEP,
       renumber: true,
       before: input.before,
       after: input.after,

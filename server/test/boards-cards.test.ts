@@ -311,11 +311,22 @@ describe('rank planning', () => {
       kind: 'place',
       position: 1536,
     });
-    expect(planRank({ before: null, after: 1024, min: 1024, max: 4096 }).kind).toBe('place');
+    // A head insertion steps up, then halves: it never walks below zero, so a
+    // column that is prepended to forever still has a floor and renumbers
+    // (K2-05). 1024 - 1024 would be 0, so the first head drop lands on 512.
     expect(planRank({ before: null, after: 1024, min: 1024, max: 4096 })).toEqual({
       kind: 'place',
-      position: 0,
+      position: 512,
     });
+    expect(planRank({ before: null, after: 1536, min: 1024, max: 4096 })).toEqual({
+      kind: 'place',
+      position: 512,
+    });
+    expect(planRank({ before: null, after: 2, min: 2, max: 4096 })).toEqual({
+      kind: 'place',
+      position: 1,
+    });
+    expect(planRank({ before: null, after: 1, min: 1, max: 4096 }).kind).toBe('renumber');
     expect(planRank({ before: 4096, after: null, min: 1024, max: 4096 })).toEqual({
       kind: 'place',
       position: 5120,

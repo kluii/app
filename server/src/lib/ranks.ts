@@ -12,8 +12,13 @@ export type RankPlan =
   { kind: 'place'; position: number } | { kind: 'renumber'; then: 'place'; position: number };
 
 /**
- * `before` sits above the insertion point, `after` below it. Either may be null
- * because the client rendered a filtered list, or the card was deleted.
+ * `before` sits above the insertion point, `after` below it. Both are the
+ * *effective* immediate neighbours: `planMove` resolves them against the stored
+ * column before asking, so a client that names a deleted card, or only one of
+ * the two, cannot land on the wrong side of a card it never saw.
+ *
+ * The plan is total: a head insertion halves towards the floor and asks for a
+ * renumber rather than drifting below zero forever.
  */
 export function planRank(input: {
   before: number | null;
@@ -21,28 +26,22 @@ export function planRank(input: {
   min: number | null;
   max: number | null;
 }): RankPlan {
-  const { before, after, min, max } = input;
+  const { before, after, max } = input;
 
   if (before !== null && after !== null) {
-    if (before < after) {
-      const gap = after - before;
-      return gap >= 1
-        ? { kind: 'place', position: before + gap / 2 }
-        : { kind: 'renumber', then: 'place', position: before + 0.5 };
-    }
-    // The named neighbours disagree with the stored order (a stale client):
-    // treat the higher one as absent and append after `before`.
-    return { kind: 'place', position: before + RANK_STEP };
+    const gap = after - before;
+    if (gap >= 2) return { kind: 'place', position: before + gap / 2 };
+    return { kind: 'renumber', then: 'place', position: before + gap / 2 };
   }
 
+  // Below the last card of the column: one step down the ladder.
+  if (before !== null) return { kind: 'place', position: before + RANK_STEP };
+
+  // Above the first card: one step up, then halve, then renumber.
   if (after !== null) {
-    if (min === null || after <= min) return { kind: 'place', position: after - RANK_STEP };
-    return { kind: 'place', position: after - RANK_STEP / 2 };
-  }
-
-  if (before !== null) {
-    if (max === null || before >= max) return { kind: 'place', position: before + RANK_STEP };
-    return { kind: 'place', position: before + RANK_STEP / 2 };
+    if (after - RANK_STEP >= 1) return { kind: 'place', position: after - RANK_STEP };
+    if (after / 2 >= 1) return { kind: 'place', position: after / 2 };
+    return { kind: 'renumber', then: 'place', position: RANK_STEP / 2 };
   }
 
   return { kind: 'place', position: (max ?? 0) + RANK_STEP };
