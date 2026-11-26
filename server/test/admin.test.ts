@@ -175,7 +175,10 @@ describe('registration and administration', () => {
     );
     expect(login.statusCode).toBe(403);
 
-    const listedAfter = await admin.request('GET', '/api/v1/admin/users');
+    const listedAfter = await admin.request(
+      'GET',
+      `/api/v1/admin/users?q=${encodeURIComponent(`member-${member.suffix}`)}`,
+    );
     const bannedRow = (
       listedAfter.json() as { items: { id: string; banned: boolean }[] }
     ).items.find((item) => item.id === target.id);
