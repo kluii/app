@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClient } from '@tanstack/react-query';
+
+/** One client for the app; a failed read never blanks the last good board. */
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        const status = (error as { status?: number }).status;
+        if (status && status >= 400 && status < 500) return false;
+        return failureCount < 2;
+      },
+      staleTime: 5_000,
+      refetchOnWindowFocus: true,
+    },
+  },
+});
+
+export const queryKeys = {
+  me: ['me'] as const,
+  boards: ['boards'] as const,
+  board: (id: string) => ['board', id] as const,
+  activity: (id: string) => ['activity', id] as const,
+};
