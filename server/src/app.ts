@@ -24,6 +24,7 @@ import { registerColumnRoutes } from './columns/routes.js';
 import { registerCardRoutes } from './cards/routes.js';
 import { registerActivityRoutes } from './activity/routes.js';
 import { registerResetRoutes } from './auth/reset-routes.js';
+import { registerAdminRoutes } from './admin/routes.js';
 import type { Mailer } from './lib/mail.js';
 
 export type AppContext = {
@@ -117,6 +118,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerCardRoutes(scoped, { ...context, hub });
     registerActivityRoutes(scoped, { ...context, hub });
     registerResetRoutes(scoped, { ...context, hub });
+    registerAdminRoutes(scoped, { ...context, hub });
   });
 
   app.register(async (scoped) => {

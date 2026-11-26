@@ -110,6 +110,8 @@ enum EventType {
   security_session_revoked
   security_oidc_linked
   security_oidc_unlinked
+  security_user_banned
+  security_user_unbanned
 }
 
 // ── Identity ─────────────────────────────────────────────────────────────────

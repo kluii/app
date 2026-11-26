@@ -44,6 +44,17 @@ export async function resolveActor(
     return;
   }
 
+  // A ban is enforced before authorization: it leaks nothing about any board.
+  const ban = await db.ban.findFirst({
+    where: {
+      subject: session.user_id,
+      subject_kind: 'user',
+      OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+    },
+    select: { id: true },
+  });
+  if (ban) throw new AppError('banned');
+
   request.actor = { kind: 'user', userId: session.user_id } satisfies Actor;
   request.sessionId = session.id;
   request.userId = session.user_id;

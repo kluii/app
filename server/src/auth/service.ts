@@ -156,6 +156,17 @@ export async function login(
     });
   }
 
+  // Checked after the password, so a ban is not an oracle for a wrong guess.
+  const ban = await db.ban.findFirst({
+    where: {
+      subject: user.id,
+      subject_kind: 'user',
+      OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+    },
+    select: { id: true },
+  });
+  if (ban) throw new AppError('banned');
+
   // The password matched; the factor decides whether a session exists at all.
   const factor = await checkSecondFactor(db, secondFactor, user, input, secondFactor.policy);
 

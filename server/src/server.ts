@@ -71,6 +71,11 @@ try {
   process.exit(1);
 }
 
+// The instance settings row exists before the first request, so a policy read
+// never depends on a signup having happened.
+const { ensureInstanceSettings } = await import('./auth/service.js');
+await ensureInstanceSettings(db, env);
+
 const app = buildApp({ env, db, secrets, mail });
 await app.listen({ port: env.KLUI_PORT, host: '0.0.0.0' });
 app.log.info({ port: env.KLUI_PORT, env: env.KLUI_ENV }, 'klui listening');

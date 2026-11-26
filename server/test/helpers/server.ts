@@ -3,6 +3,7 @@ import type { LightMyRequestResponse } from 'fastify';
 import { buildApp } from '../../src/app.js';
 import { testEnv } from '../../src/env.js';
 import { createHub } from '../../src/realtime/events.js';
+import { ensureInstanceSettings } from '../../src/auth/service.js';
 import { testDatabaseUrl, testDb } from './db.js';
 import type { Db } from '../../src/db.js';
 import type { Mailer } from '../../src/lib/mail.js';
@@ -20,6 +21,8 @@ export async function startServer(options: { mail?: Mailer | null } = {}): Promi
   close: () => Promise<void>;
 }> {
   const db = testDb();
+  // The boot creates the settings row; the test harness must mirror the boot.
+  await ensureInstanceSettings(db, testEnv({ DATABASE_URL: testDatabaseUrl() }));
   const app = buildApp({
     env: testEnv({ DATABASE_URL: testDatabaseUrl(), KLUI_PUBLIC_URL: 'http://localhost:8099' }),
     db,
