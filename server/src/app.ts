@@ -78,6 +78,15 @@ export function buildApp(context: AppContext): FastifyInstance {
     return payload;
   });
 
+  // D-01: the app contains no marketing route, and `/` answers with a redirect
+  // decided by the credential that was actually presented. It is registered
+  // outside the static plugin so it works before the SPA is built.
+  app.get('/', async (request, reply) => {
+    return reply
+      .header('cache-control', 'no-store')
+      .redirect(request.actor ? '/boards' : '/login', 302);
+  });
+
   if (assets) {
     registerStatic(app, assets);
   }

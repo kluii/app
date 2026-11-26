@@ -46,14 +46,6 @@ export function registerStatic(app: FastifyInstance, assets: StaticAssets): void
       }
     },
   });
-
-  // D-01: the app contains no marketing route. `/` answers with a redirect,
-  // decided by the credential that was actually presented.
-  app.get('/', async (request, reply) => {
-    return reply
-      .header('cache-control', 'no-store')
-      .redirect(request.actor ? '/boards' : '/login', 302);
-  });
 }
 
 /** Any non-API GET that is not a file falls through to the SPA shell. */
