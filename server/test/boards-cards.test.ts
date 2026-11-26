@@ -20,7 +20,14 @@ afterAll(async () => {
 
 type Board = { id: string; name: string; slug: string; updated_at: string };
 type Column = { id: string; name: string; position: string };
-type Card = { id: string; title: string; column_id: string; position: string; done: boolean };
+type Card = {
+  id: string;
+  title: string;
+  column_id: string;
+  position: string;
+  done: boolean;
+  updated_at: string;
+};
 
 async function boardWithColumns(c: TestClient): Promise<{ board: Board; columns: Column[] }> {
   await c.signup(`owner-${c.suffix}`);
@@ -302,6 +309,88 @@ describe('cards and moves', () => {
     expect(read.statusCode).toBe(200);
     const caller = (read.json() as { caller: { can_write: boolean } }).caller;
     expect(caller.can_write).toBe(false);
+  });
+});
+
+describe('the done flag', () => {
+  it('toggles done in place, keeps the column, and refuses a stale write', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const todo = columns[0];
+    if (!todo) return;
+    const card = await addCard(c, board.id, todo.id, 'Ship it');
+
+    const completed = await c.request('PATCH', `/api/v1/cards/${card.id}`, { done: true });
+    expect(completed.statusCode).toBe(200);
+    const done = completed.json() as Card;
+    expect(done.done).toBe(true);
+    // A done card never leaves its column (K2-08).
+    expect(done.column_id).toBe(todo.id);
+    expect(done.position).toBe(card.position);
+
+    const events = await harness.db.event.findMany({
+      where: { board_id: board.id, type: 'card_completed' },
+    });
+    expect(events).toHaveLength(1);
+
+    // The write the client rendered against is stale by now: 409, and done is
+    // untouched, so a lost race cannot silently reopen a finished card.
+    const stale = await c.request('PATCH', `/api/v1/cards/${card.id}`, {
+      title: 'Renamed',
+      expected_updated_at: card.updated_at,
+    });
+    expect(stale.statusCode).toBe(409);
+    const after = await harness.db.card.findUniqueOrThrow({ where: { id: card.id } });
+    expect({ done: after.done, title: after.title }).toEqual({ done: true, title: 'Ship it' });
+
+    const reopened = await c.request('PATCH', `/api/v1/cards/${card.id}`, {
+      done: false,
+      expected_updated_at: (completed.json() as Card).updated_at,
+    });
+    expect(reopened.statusCode).toBe(200);
+    expect((reopened.json() as Card).done).toBe(false);
+    const reopenEvents = await harness.db.event.findMany({
+      where: { board_id: board.id, type: 'card_reopened' },
+    });
+    expect(reopenEvents).toHaveLength(1);
+  });
+
+  it('answers 403 to a reader who tries to tick a card done', async () => {
+    const owner = harness.client();
+    const { board, columns } = await boardWithColumns(owner);
+    const todo = columns[0];
+    if (!todo) return;
+    const card = await addCard(owner, board.id, todo.id, 'Not yours to finish');
+
+    const reader = harness.client();
+    const user = await reader.signup(`reader-${reader.suffix}`);
+    await harness.db.boardMember.create({
+      data: {
+        id: `bmb_${reader.suffix}xxxxxxxxxxxxxx`,
+        board_id: board.id,
+        user_id: user.id,
+        role: 'viewer',
+      },
+    });
+
+    // Readable, so the refusal is a 403 and not a pretend-404 (PROMPT.md §3.4).
+    const attempt = await reader.request('PATCH', `/api/v1/cards/${card.id}`, { done: true });
+    expect(attempt.statusCode).toBe(403);
+    const after = await harness.db.card.findUniqueOrThrow({ where: { id: card.id } });
+    expect(after.done).toBe(false);
+  });
+
+  it('reads a done card back from the board state', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const todo = columns[0];
+    if (!todo) return;
+    const card = await addCard(c, board.id, todo.id, 'Done stays done');
+    await c.request('PATCH', `/api/v1/cards/${card.id}`, { done: true });
+
+    const state = await c.request('GET', `/api/v1/boards/${board.id}/state`);
+    const cards = (state.json() as { cards: Card[] }).cards;
+    expect(cards.find((entry) => entry.id === card.id)?.done).toBe(true);
   });
 });
 

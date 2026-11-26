@@ -4,6 +4,7 @@ import type { KeyboardEvent } from 'react';
 import type { Card, Column } from '../../api/types';
 import { t } from '../../i18n';
 import { cn } from '../../lib/cn';
+import { Button } from '../ui/button';
 import { CardMenu } from './card-menu';
 import { TagChip } from './tag-chip';
 import { useCardDnd, type MoveRequest } from './use-card-dnd';
@@ -27,6 +28,7 @@ export function CardRow({
   onMove,
   onMoveTo,
   onDelete,
+  onToggleDone,
   onKeyDown,
 }: {
   card: Card;
@@ -38,13 +40,19 @@ export function CardRow({
   onMove: (request: MoveRequest) => void;
   onMoveTo: (columnId: string) => void;
   onDelete: () => void;
+  onToggleDone: () => void;
   onKeyDown: (card: Card, event: KeyboardEvent<HTMLButtonElement>) => boolean;
 }) {
   const due = card.due_at ? formatDue(card.due_at) : null;
   const { ref, dragging, consumeDragClick } = useCardDnd({ card, cards, canWrite, onMove });
 
   return (
-    <li className={cn('group relative', lifted && 'rounded-sm outline-2 outline-dashed outline-focus outline-offset-2')}>
+    <li
+      className={cn(
+        'group relative',
+        lifted && 'rounded-sm outline-2 outline-dashed outline-focus outline-offset-2',
+      )}
+    >
       <div
         className={cn(
           'flex w-full flex-col gap-2 rounded-sm border border-border bg-card px-3 py-2.5',
@@ -120,6 +128,19 @@ export function CardRow({
       </button>
 
       <div className="absolute right-1 top-1 z-10 flex items-center gap-0.5">
+        {card.done && canWrite ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label={t('board.card.reopen')}
+            data-testid={`card-reopen-${card.id}`}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onToggleDone}
+          >
+            <Check aria-hidden className="h-4 w-4" strokeWidth={1.75} />
+          </Button>
+        ) : null}
         <CardMenu
           card={card}
           columns={columns}

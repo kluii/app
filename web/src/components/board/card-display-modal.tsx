@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
-import { api, ApiError } from '../../api/client';
+import { ApiError } from '../../api/client';
 import type { BoardState, Caller, Card } from '../../api/types';
 import { t } from '../../i18n';
-import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
 import { TagChip } from './tag-chip';
+import { useToggleDone } from './use-toggle-done';
 
 /**
  * Read first (docs/features/board-interaction.md §2). The panel contains no
@@ -28,13 +27,7 @@ export function CardDisplayModal({
   onEdit: () => void;
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
-  const done = useMutation({
-    mutationFn: (value: boolean) => api.updateCard(card.id, { done: value }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
-    },
-  });
+  const done = useToggleDone(boardId);
 
   const assignee = card.assignee?.username ?? card.assignee_label;
   const due = card.due_at ? formatDate(card.due_at) : null;
@@ -51,7 +44,7 @@ export function CardDisplayModal({
             <Button
               variant="ghost"
               loading={done.isPending}
-              onClick={() => done.mutate(!card.done)}
+              onClick={() => done.mutate({ cardId: card.id, done: !card.done })}
             >
               {card.done ? t('board.card.reopen') : t('board.card.done')}
             </Button>

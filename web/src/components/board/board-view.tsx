@@ -18,6 +18,7 @@ import { CardEditorModal } from './card-editor-modal';
 import { CardRow } from './card-row';
 import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
 import { useKeyboardDrag } from './use-keyboard-drag';
+import { useToggleDone } from './use-toggle-done';
 
 type Composer =
   | { kind: 'closed' }
@@ -61,6 +62,8 @@ export function BoardView({ boardId }: { boardId: string }) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
     },
   });
+
+  const toggleDone = useToggleDone(boardId);
 
   const removeCard = useMutation({
     mutationFn: (cardId: string) => api.deleteCard(cardId),
@@ -150,8 +153,11 @@ export function BoardView({ boardId }: { boardId: string }) {
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
       onMove={requestMove}
-      onMoveTo={(cardId, columnId) => requestMove({ cardId, column: columnId, before: null, after: null })}
+      onMoveTo={(cardId, columnId) =>
+        requestMove({ cardId, column: columnId, before: null, after: null })
+      }
       onDeleteCard={(cardId) => removeCard.mutate(cardId)}
+      onToggleDone={(card) => toggleDone.mutate({ cardId: card.id, done: !card.done })}
       keyboard={keyboard}
       announcement={announcement}
     >
@@ -211,6 +217,7 @@ function BoardFrame({
   onMove,
   onMoveTo,
   onDeleteCard,
+  onToggleDone,
   keyboard,
   announcement,
   children,
@@ -224,6 +231,7 @@ function BoardFrame({
   onMove: (request: MoveRequest) => void;
   onMoveTo: (cardId: string, columnId: string) => void;
   onDeleteCard: (cardId: string) => void;
+  onToggleDone: (card: Card) => void;
   keyboard: ReturnType<typeof useKeyboardDrag>;
   announcement: string;
   children?: ReactNode;
@@ -282,6 +290,7 @@ function BoardFrame({
                 onMove={onMove}
                 onMoveTo={(cardId, columnId) => onMoveTo(cardId, columnId)}
                 onDeleteCard={onDeleteCard}
+                onToggleDone={onToggleDone}
                 columns={columns}
                 keyboard={keyboard}
               />
@@ -331,6 +340,7 @@ function ColumnSection({
   onMove,
   onMoveTo,
   onDeleteCard,
+  onToggleDone,
   columns,
   keyboard,
 }: {
@@ -344,6 +354,7 @@ function ColumnSection({
   onMove: (request: MoveRequest) => void;
   onMoveTo: (cardId: string, columnId: string) => void;
   onDeleteCard: (cardId: string) => void;
+  onToggleDone: (card: Card) => void;
   columns: Column[];
   keyboard: ReturnType<typeof useKeyboardDrag>;
 }) {
@@ -383,6 +394,7 @@ function ColumnSection({
               onMove={onMove}
               onMoveTo={(columnId) => onMoveTo(card.id, columnId)}
               onDelete={() => onDeleteCard(card.id)}
+              onToggleDone={() => onToggleDone(card)}
               onKeyDown={keyboard.onKeyDown}
             />
           ))}
