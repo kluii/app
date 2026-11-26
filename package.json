@@ -22,7 +22,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test --workspace server && npm run test --workspace web",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && node scripts/e2e-db.mjs && playwright test",
     "db:migrate": "npm run db:migrate --workspace server",
     "db:generate": "npm run db:generate --workspace server"
   },
