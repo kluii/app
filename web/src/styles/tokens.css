@@ -51,6 +51,13 @@
   --tag-violet: #a78bfa;
   --tag-pink: #f472b6;
 
+  /* geometry (DESIGN.md §4): the three off-scale sizes the app needs */
+  --size-column: 288px;
+  --size-card: 272px;
+  --size-dialog: 560px;
+  --size-dialog-wide: 640px;
+  --size-content: 1440px;
+
   /* one shadow, overlays only */
   --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.48);
   --scrim: rgba(0, 0, 0, 0.64);
@@ -134,16 +141,16 @@
   --radius-sm: 4px;
   --radius-md: 8px;
 
-  --width-column: 288px;
-  --width-card: 272px;
-  --width-dialog: 560px;
-  --width-dialog-wide: 640px;
-  --width-content: 1440px;
+  --width-column: var(--size-column);
+  --width-card: var(--size-card);
+  --width-dialog: var(--size-dialog);
+  --width-dialog-wide: var(--size-dialog-wide);
+  --width-content: var(--size-content);
 
   --font-sans: "Inter var", Inter, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  --container-content: 1440px;
+  --container-content: var(--size-content);
 
   /* Type scale (§3): text-display … text-mono-sm */
   --text-display: 32px;
@@ -223,6 +230,114 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0ms !important;
       scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ── Component-level rules that cannot be expressed as utilities ────────────
+ * A tint mix and a scrim are not Tailwind values; they live here, next to the
+ * tokens they are built from, rather than as an arbitrary value at a call site.
+ */
+@layer components {
+  /* D-21: any hue stays readable because the tint is capped and the label is ink. */
+  .tag-chip {
+    --tag-bg: color-mix(in srgb, var(--tag) var(--tag-tint), var(--card));
+    --tag-line: color-mix(in srgb, var(--tag) 45%, var(--border));
+    background-color: var(--tag-bg);
+    border: 1px solid var(--tag-line);
+    color: var(--ink);
+  }
+
+  .tag-chip__bar {
+    background-color: var(--tag);
+  }
+
+  .dialog-panel {
+    width: var(--size-dialog);
+    max-width: calc(100vw - 2rem);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .dialog-panel::backdrop {
+    background-color: var(--scrim);
+  }
+
+  /* Ten frames stacked in one cell; each is visible for 80 of 800 ms. */
+  .spinner {
+    position: relative;
+    width: 1ch;
+    height: 1.4em;
+  }
+
+  .spinner > span {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    animation: spinner-frame 800ms steps(1, end) infinite;
+  }
+
+  .spinner > span:nth-child(1) {
+    animation-delay: 0ms;
+  }
+
+  .spinner > span:nth-child(2) {
+    animation-delay: 80ms;
+  }
+
+  .spinner > span:nth-child(3) {
+    animation-delay: 160ms;
+  }
+
+  .spinner > span:nth-child(4) {
+    animation-delay: 240ms;
+  }
+
+  .spinner > span:nth-child(5) {
+    animation-delay: 320ms;
+  }
+
+  .spinner > span:nth-child(6) {
+    animation-delay: 400ms;
+  }
+
+  .spinner > span:nth-child(7) {
+    animation-delay: 480ms;
+  }
+
+  .spinner > span:nth-child(8) {
+    animation-delay: 560ms;
+  }
+
+  .spinner > span:nth-child(9) {
+    animation-delay: 640ms;
+  }
+
+  .spinner > span:nth-child(10) {
+    animation-delay: 720ms;
+  }
+
+  @keyframes spinner-frame {
+    0% {
+      opacity: 1;
+    }
+
+    10% {
+      opacity: 0;
+    }
+
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spinner > span {
+      animation: none;
+      opacity: 0;
+    }
+
+    .spinner > span:nth-child(1) {
+      opacity: 1;
     }
   }
 }
