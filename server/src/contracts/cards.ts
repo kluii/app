@@ -99,11 +99,17 @@ export const updateCardSchema = z
 
 const neighbourSchema = idSchema('crd').nullable().optional();
 
+/**
+ * A move is a write like any other: `expected_updated_at` is accepted so two
+ * people dragging the same card cannot silently overwrite each other (D-28).
+ * `index`/`position`/`order` stay rejected — the move takes neighbours.
+ */
 export const moveCardSchema = z
   .object({
     column: idSchema('col'),
     before: neighbourSchema,
     after: neighbourSchema,
+    expected_updated_at: expectedUpdatedAt,
   })
   .strict();
 

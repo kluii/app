@@ -310,7 +310,7 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
     if (!parsed.success) throw fromZod(parsed.error);
     const db = database();
 
-    const card = await db.card.findUnique({ where: { id } });
+    const card = await db.card.findUnique({ where: { id }, include: { tags: true } });
     if (!card) throw new AppError('card_not_found');
     const loaded = await loadBoardFor(db, actor, card.board_id, 'card.move');
     assertAllowed(loaded.decision);
@@ -319,6 +319,13 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
       where: { id: parsed.data.column, board_id: card.board_id },
     });
     if (!column) throw new AppError('column_not_found');
+
+    // Before the transaction: a stale move must not take the lock or the row.
+    conflictIfStale(
+      card.updated_at,
+      parsed.data.expected_updated_at,
+      toCardDto(card, null, new Map()),
+    );
 
     const moved = await db.$transaction(async (tx) => {
       const plan = await planMove(tx, {

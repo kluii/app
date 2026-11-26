@@ -206,6 +206,7 @@ next request is `401` and the next login answers `403 banned`.
 
 - `before` / `after` are card ids **the client actually rendered**. Both may be `null` (empty column or empty space).
 - The server resolves them **against the stored column**, not against any client list, ranks between their stored positions, renumbers the column when the gap is exhausted, and **appends** when a named neighbour no longer exists or is not in the target column.
+- `expected_updated_at` is optional and honoured like every other write: a stale value answers `409` with the current card and the card does not move. Two people dragging the same card therefore cannot silently overwrite each other (D-28).
 - A body containing `index`, `position` or `order` is rejected with `400 unknown_field` and a hint naming the accepted shape. This rejection is deliberate: accepting it would reintroduce the bug.
 - Response: `{card, column_id, position}`. The client uses the returned `position` to reconcile its optimistic placement.
 

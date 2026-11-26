@@ -79,6 +79,67 @@ async function assertNoDuplicates(columnId: string, step: number, seed: number):
   }
 }
 
+describe('a move is a writable resource', () => {
+  it('accepts expected_updated_at, and refuses a stale one with the current card', async () => {
+    const c = harness.client();
+    const { boardId, columns } = await board(c);
+    const todo = columns[0];
+    if (!todo) throw new Error('no column');
+    const first = await addCard(c, boardId, todo.id, 'First');
+    const second = await addCard(c, boardId, todo.id, 'Second');
+
+    const fresh = (await c.request('GET', `/api/v1/cards/${second.id}`)).json() as {
+      updated_at: string;
+    };
+
+    // Someone else writes the card first: the value we rendered against is old.
+    await c.request('PATCH', `/api/v1/cards/${second.id}`, { title: 'Second, renamed' });
+
+    const stale = await c.request('POST', `/api/v1/cards/${second.id}/move`, {
+      column: todo.id,
+      before: null,
+      after: first.id,
+      expected_updated_at: fresh.updated_at,
+    });
+    expect(stale.statusCode).toBe(409);
+    const current = (stale.json() as { error: { current: { id: string; title: string } } }).error
+      .current;
+    expect(current.id).toBe(second.id);
+    expect(current.title).toBe('Second, renamed');
+
+    const order = await storedOrder(todo.id);
+    expect(order.map((card) => card.title)).toEqual(['First', 'Second, renamed']);
+
+    const now = (await c.request('GET', `/api/v1/cards/${second.id}`)).json() as {
+      updated_at: string;
+    };
+    const accepted = await c.request('POST', `/api/v1/cards/${second.id}/move`, {
+      column: todo.id,
+      before: null,
+      after: first.id,
+      expected_updated_at: now.updated_at,
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect((await storedOrder(todo.id)).map((card) => card.title)).toEqual([
+      'Second, renamed',
+      'First',
+    ]);
+  });
+
+  it('still accepts a move with no expected_updated_at', async () => {
+    const c = harness.client();
+    const { boardId, columns } = await board(c);
+    const todo = columns[0];
+    if (!todo) throw new Error('no column');
+    const only = await addCard(c, boardId, todo.id, 'Only');
+
+    const moved = await c.request('POST', `/api/v1/cards/${only.id}/move`, {
+      column: todo.id,
+    });
+    expect(moved.statusCode).toBe(200);
+  });
+});
+
 describe('move planning', () => {
   it('survives 200 randomised in-column moves without a duplicate or out-of-order position', async () => {
     const seed = 0x5eed;
