@@ -68,6 +68,16 @@ export async function columnPositions(db: Db | Tx, columnId: string): Promise<nu
   return rows.map((row) => Number(row.position));
 }
 
+/**
+ * Serialises appends in one column (K2-05). Two creators in READ COMMITTED read
+ * the same `max(position)` and receive the same rank, so the row lock — not the
+ * transaction boundary — is what orders them. The lock is the column row, so a
+ * create in another column never waits.
+ */
+export async function lockColumnForAppend(tx: Tx, columnId: string): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM columns WHERE id = ${columnId} FOR UPDATE`;
+}
+
 export async function nextAppendPosition(db: Db | Tx, columnId: string): Promise<number> {
   const max = await db.card.aggregate({ where: { column_id: columnId }, _max: { position: true } });
   return Number(max._max.position ?? 0) + RANK_STEP;

@@ -13,6 +13,7 @@ import { assertAllowed, loadBoardFor } from '../boards/service.js';
 import {
   boardTagColors,
   createTagRows,
+  lockColumnForAppend,
   nextAppendPosition,
   planMove,
   toCardDto,
@@ -78,6 +79,7 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
 
     const createdIds = await db.$transaction(async (tx) => {
       const ids: string[] = [];
+      await lockColumnForAppend(tx, column.id);
       const base = await nextAppendPosition(tx, column.id);
       for (const [index, item] of parsed.data.items.entries()) {
         const assignee =
@@ -380,13 +382,16 @@ async function createCard(
     where: { id: input.input.column, board_id: input.boardId },
   });
   if (!column) throw new AppError('column_not_found');
-  const position = await nextAppendPosition(db, column.id);
   const assignee =
     input.input.assignee !== undefined
       ? await resolveAssignee(db, input.boardId, input.input.assignee)
       : null;
 
   const card = await db.$transaction(async (tx) => {
+    // Inside the transaction and behind the column lock: two creators must not
+    // read the same max(position).
+    await lockColumnForAppend(tx, column.id);
+    const position = await nextAppendPosition(tx, column.id);
     const created = await tx.card.create({
       data: {
         id: newId('crd'),

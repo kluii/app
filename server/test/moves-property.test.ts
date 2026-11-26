@@ -282,3 +282,39 @@ describe('move planning', () => {
     await assertNoDuplicates(todo.id, 0, 0);
   });
 });
+
+describe('concurrent creates', () => {
+  it('gives ten simultaneous creates in one column ten distinct positions', async () => {
+    const c = harness.client();
+    const { boardId, columns } = await board(c);
+    const column = columns[0];
+    expect(column).toBeDefined();
+    const columnId = column?.id ?? '';
+
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, (_unused, index) =>
+        c.request('POST', `/api/v1/boards/${boardId}/cards`, {
+          column: columnId,
+          title: `concurrent ${String(index)}`,
+        }),
+      ),
+    );
+    for (const response of responses) {
+      expect(response.statusCode, response.body).toBe(201);
+    }
+
+    const rows = await harness.db.card.findMany({
+      where: { column_id: columnId },
+      orderBy: { position: 'asc' },
+      select: { id: true, position: true },
+    });
+    expect(rows).toHaveLength(10);
+    const positions = rows.map((row) => Number(row.position));
+    expect(new Set(positions).size, `duplicate positions: ${positions.join(',')}`).toBe(10);
+    for (let index = 1; index < positions.length; index += 1) {
+      expect(positions[index], `not increasing: ${positions.join(',')}`).toBeGreaterThan(
+        positions[index - 1] ?? 0,
+      );
+    }
+  });
+});
