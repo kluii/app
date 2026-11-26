@@ -22,6 +22,7 @@ import { createBoardSchema, patchBoardSchema } from '../contracts/boards.js';
 import type { BoardStateDto, CallerDto } from '../contracts/dto.js';
 import { toCardDto, toColumnDto, boardTagColors } from '../cards/service.js';
 import { toBoardMembers } from '../boards/members.js';
+import { slugRedirect, usernameRedirect } from '../auth/profile.js';
 import { conflictIfStale } from '../lib/concurrency.js';
 
 export function registerBoardRoutes(app: FastifyInstance, context: AppContext): void {
@@ -300,15 +301,27 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
     return { items: await toBoardMembers(db, id) };
   });
 
-  // A slug that was renamed away redirects for 90 days and then expires (D-13).
+  // A username or slug that was renamed away redirects for 90 days, then the
+  // name is free again (D-13). The 301 is the whole point: a shared link that
+  // silently lands on a stranger's board is worse than a broken one.
   app.get('/api/v1/users/:username/boards/:slug', async (request, reply) => {
     const db = database();
     const { username, slug } = request.params as { username: string; slug: string };
+    const owner = username.toLowerCase();
     const board = await db.board.findFirst({
-      where: { slug, owner: { username: username.toLowerCase() } },
+      where: { slug, owner: { username: owner } },
       select: { id: true },
     });
     if (board) return reply.redirect(`/api/v1/boards/${board.id}`, 301);
+
+    const renamedUser = await usernameRedirect(db, owner);
+    if (renamedUser && renamedUser !== owner) {
+      return reply.redirect(`/api/v1/users/${renamedUser}/boards/${slug}`, 301);
+    }
+    const renamedSlug = await slugRedirect(db, owner, slug);
+    if (renamedSlug) {
+      return reply.redirect(`/api/v1/users/${owner}/boards/${renamedSlug}`, 301);
+    }
     return reply.code(404).send({
       error: { code: 'board_not_found', message: 'Board not found.', hint: null },
     });

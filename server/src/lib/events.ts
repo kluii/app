@@ -43,7 +43,8 @@ export type EventTypeName =
   | 'security.totp_disabled'
   | 'security.session_revoked'
   | 'security.user_banned'
-  | 'security.user_unbanned';
+  | 'security.user_unbanned'
+  | 'security.profile_updated';
 
 type Tx = Prisma.TransactionClient;
 

@@ -12,6 +12,7 @@ import {
 } from './sessions.js';
 import { isSecureOrigin } from '../env.js';
 import { totpPolicy } from './totp.js';
+import { updateProfile } from './profile.js';
 import { registerTotpRoutes } from './totp-routes.js';
 import type { Me } from '../contracts/auth.js';
 
@@ -67,6 +68,16 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
     const factor = await context.db.totpSecret.findUnique({ where: { user_id: userId } });
     reply.header('cache-control', 'no-store');
     return reply.code(200).send(toMe(toAuthenticated(user), Boolean(factor?.confirmed_at)));
+  });
+
+  app.patch('/api/v1/me', async (request) => {
+    if (!context.db) throw new Error('database is required');
+    const userId = requireUser(request);
+    const updated = await updateProfile(context.db, userId, request.body);
+    const user = await context.db.user.findUnique({ where: { id: userId } });
+    if (!user) throw new Error('session points at a missing user');
+    const factor = await context.db.totpSecret.findUnique({ where: { user_id: userId } });
+    return toMe({ ...toAuthenticated(user), ...updated }, Boolean(factor?.confirmed_at));
   });
 
   app.get('/api/v1/me/sessions', async (request) => {

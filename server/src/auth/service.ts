@@ -63,6 +63,16 @@ export async function signup(
   const username = input.username.toLowerCase();
   const passwordHash = await hashPassword(input.password);
 
+  // A renamed account keeps its old name for 90 days (D-13): someone who takes
+  // it would inherit every link still pointing at the old profile.
+  const reservation = await db.usernameReservation.findUnique({ where: { username } });
+  if (reservation && reservation.reserved_until.getTime() > Date.now()) {
+    throw new AppError('conflict', {
+      message: 'That username was used recently and is still reserved.',
+      hint: 'Pick another one; a renamed account keeps its old name for 90 days.',
+    });
+  }
+
   const existing = await db.user.findFirst({
     where: { OR: [{ email }, { username }] },
     select: { email: true, username: true },
