@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
 import type { BoardState, Caller, Card, Column } from '../../api/types';
 import { t } from '../../i18n';
@@ -14,6 +14,7 @@ import { ActivityDialog } from './activity-dialog';
 import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from './board-filters';
 import { CardDialog } from './card-dialog';
 import { CardRow } from './card-row';
+import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
 
 type Composer =
   { kind: 'closed' } | { kind: 'create'; columnId: string } | { kind: 'edit'; card: Card };
@@ -27,6 +28,7 @@ export function BoardView({ boardId }: { boardId: string }) {
   const [composer, setComposer] = useState<Composer>({ kind: 'closed' });
   const [activityOpen, setActivityOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const queryClient = useQueryClient();
 
   const state = useQuery({
     queryKey: queryKeys.board(boardId),
@@ -35,6 +37,35 @@ export function BoardView({ boardId }: { boardId: string }) {
     refetchInterval: 20_000,
     retry: false,
   });
+
+  const move = useMutation({
+    mutationFn: (request: MoveRequest) =>
+      api.moveCard(request.cardId, {
+        column: request.column,
+        before: request.before,
+        after: request.after,
+      }),
+    // A move is confirmed by the server's answer: the refetch is the truth.
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+    },
+    onError: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+    },
+  });
+
+  // One in-flight move per card (PROMPT.md §10.1): a second drop computed from
+  // a stale position would write the same card twice.
+  const inFlight = useRef(new Set<string>());
+  const requestMove = (request: MoveRequest): void => {
+    if (inFlight.current.has(request.cardId)) return;
+    inFlight.current.add(request.cardId);
+    move.mutate(request, {
+      onSettled: () => {
+        inFlight.current.delete(request.cardId);
+      },
+    });
+  };
 
   if (state.isPending) {
     return <p className="px-6 py-8 text-body-sm text-ink-subtle">{t('common.label.loading')}</p>;
@@ -61,6 +92,7 @@ export function BoardView({ boardId }: { boardId: string }) {
       onOpenCard={(card) => setComposer({ kind: 'edit', card })}
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
+      onMove={requestMove}
     >
       <CardDialog
         boardId={boardId}
@@ -98,6 +130,7 @@ function BoardFrame({
   onOpenCard,
   onAddCard,
   onOpenActivity,
+  onMove,
   children,
 }: {
   boardState: BoardState;
@@ -106,6 +139,7 @@ function BoardFrame({
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
+  onMove: (request: MoveRequest) => void;
   children?: ReactNode;
 }) {
   const { board, columns, cards, caller, members } = boardState;
@@ -154,10 +188,12 @@ function BoardFrame({
                 key={column.id}
                 column={column}
                 cards={cardsByColumn.get(column.id) ?? []}
+                allCards={cards}
                 caller={caller}
                 filtering={filtering}
                 onOpenCard={onOpenCard}
                 onAddCard={onAddCard}
+                onMove={onMove}
               />
             ))}
             {caller.can_write ? <AddColumn boardId={board.id} /> : null}
@@ -193,20 +229,32 @@ function ColumnRail({
 function ColumnSection({
   column,
   cards,
+  allCards,
   caller,
   filtering,
   onOpenCard,
   onAddCard,
+  onMove,
 }: {
   column: Column;
   cards: Card[];
+  allCards: Card[];
   caller: Caller;
   filtering: boolean;
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
+  onMove: (request: MoveRequest) => void;
 }) {
+  const droppable = useColumnDroppable({
+    columnId: column.id,
+    cards: allCards,
+    canWrite: caller.can_write,
+    onMove,
+  });
+
   return (
     <section
+      ref={droppable.ref}
       className="flex w-column shrink-0 flex-col gap-2 rounded-md bg-column p-2"
       data-testid={`column-${column.id}`}
     >
@@ -225,8 +273,11 @@ function ColumnSection({
             <CardRow
               key={card.id}
               card={card}
+              cards={allCards}
+              canWrite={caller.can_write}
               readOnly={!caller.can_write}
               onOpen={() => onOpenCard(card)}
+              onMove={onMove}
             />
           ))}
         </ul>

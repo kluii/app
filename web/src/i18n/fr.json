@@ -54,6 +54,7 @@
   "board.column.empty": "Aucune carte pour l’instant.",
   "board.column.emptyFiltered": "Aucune carte ne correspond aux filtres.",
   "board.column.new": "Nom de la colonne",
+  "board.drag.hint": "Appuyez sur Espace pour déplacer cette carte avec les flèches.",
   "board.empty.noColumns": "Aucune colonne",
   "board.empty.noColumnsBody": "Les colonnes sont les étapes du projet. Ajoutez la première.",
   "board.error.notFound": "Il n’existe pas, ou vous ne pouvez pas le lire.",

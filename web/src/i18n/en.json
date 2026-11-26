@@ -54,6 +54,7 @@
   "board.column.empty": "No cards yet.",
   "board.column.emptyFiltered": "No cards match the filters.",
   "board.column.new": "Column name",
+  "board.drag.hint": "Press Space to move this card with the arrow keys.",
   "board.empty.noColumns": "No columns yet",
   "board.empty.noColumnsBody": "Columns are the stages of the project. Add the first one.",
   "board.error.notFound": "It does not exist, or you cannot read it.",

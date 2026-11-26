@@ -2,7 +2,9 @@
 import { Check } from 'lucide-react';
 import type { Card } from '../../api/types';
 import { t } from '../../i18n';
+import { cn } from '../../lib/cn';
 import { TagChip } from './tag-chip';
+import { useCardDnd, type MoveRequest } from './use-card-dnd';
 
 /**
  * `--card`, 1 px `--border`, radius 4, padding 12. The tick renders only when
@@ -10,21 +12,37 @@ import { TagChip } from './tag-chip';
  */
 export function CardRow({
   card,
-  onOpen,
+  cards,
+  canWrite,
   readOnly,
+  onOpen,
+  onMove,
 }: {
   card: Card;
-  onOpen: () => void;
+  cards: Card[];
+  canWrite: boolean;
   readOnly: boolean;
+  onOpen: () => void;
+  onMove: (request: MoveRequest) => void;
 }) {
   const due = card.due_at ? formatDue(card.due_at) : null;
+  const { ref, dragging, consumeDragClick } = useCardDnd({ card, cards, canWrite, onMove });
+
   return (
     <li>
       <button
+        ref={ref}
         type="button"
-        onClick={onOpen}
+        onClick={() => {
+          if (consumeDragClick()) return;
+          onOpen();
+        }}
         data-testid={`card-${card.id}`}
-        className="group flex w-full flex-col gap-2 rounded-sm border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-border-strong"
+        data-dragging={dragging ? 'true' : undefined}
+        className={cn(
+          'group flex w-full flex-col gap-2 rounded-sm border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-border-strong',
+          dragging && 'opacity-40',
+        )}
       >
         <span className="flex items-start gap-1.5">
           {card.done ? (
@@ -36,6 +54,7 @@ export function CardRow({
             </span>
           ) : null}
           <span
+            data-testid="card-title"
             className={
               card.done
                 ? 'line-clamp-3 text-body-sm font-medium text-ink-subtle line-through'
