@@ -145,7 +145,12 @@ describe('registration and administration', () => {
     const asMember = await member.request('GET', '/api/v1/admin/users');
     expect(asMember.statusCode).toBe(403);
 
-    const listed = await admin.request('GET', '/api/v1/admin/users');
+    // Search, not page one: the listing is ordered by creation date and a full
+    // test run creates far more accounts than one page holds (K2 CI red).
+    const listed = await admin.request(
+      'GET',
+      `/api/v1/admin/users?q=${encodeURIComponent(`member-${member.suffix}`)}`,
+    );
     expect(listed.statusCode).toBe(200);
     const page = listed.json() as { items: { id: string; banned: boolean }[] };
     expect(page.items.some((item) => item.id === target.id)).toBe(true);
