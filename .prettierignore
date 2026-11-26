@@ -1,0 +1,13 @@
+node_modules
+dist
+build
+coverage
+server/prisma/migrations
+playwright-report
+test-results
+package-lock.json
+
+# Prose documents are contracts with a human author: prettier's markdown
+# reflow rewrites tables and emphasis in deliverables that nobody asked to
+# reformat. Code, CSS, JSON and YAML stay under the format gate.
+*.md
