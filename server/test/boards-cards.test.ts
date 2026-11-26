@@ -27,6 +27,8 @@ type Card = {
   position: string;
   done: boolean;
   updated_at: string;
+  assignee_label: string | null;
+  tags: { name: string; color: string | null }[];
 };
 
 async function boardWithColumns(c: TestClient): Promise<{ board: Board; columns: Column[] }> {
@@ -309,6 +311,112 @@ describe('cards and moves', () => {
     expect(read.statusCode).toBe(200);
     const caller = (read.json() as { caller: { can_write: boolean } }).caller;
     expect(caller.can_write).toBe(false);
+  });
+});
+
+describe('bulk create', () => {
+  const bulk = (c: TestClient, boardId: string, body: unknown) =>
+    c.request('POST', `/api/v1/boards/${boardId}/cards/bulk`, body);
+
+  it('creates the batch with increasing positions, one event each, and its tags', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const todo = columns[0];
+    if (!todo) return;
+
+    const response = await bulk(c, board.id, {
+      column: todo.id,
+      items: [
+        { title: 'First', tags: ['api'] },
+        { title: 'Second', description: 'with a description' },
+        { title: 'Third', done: true },
+      ],
+    });
+    expect(response.statusCode).toBe(201);
+    const created = (response.json() as { created: Card[] }).created;
+    expect(created.map((card) => card.title)).toEqual(['First', 'Second', 'Third']);
+
+    // One RANK_STEP apart, in the order the batch arrived.
+    const positions = created.map((card) => Number(card.position));
+    expect(positions).toEqual([positions[0], (positions[0] ?? 0) + 1024, (positions[0] ?? 0) + 2048]);
+
+    const events = await harness.db.event.findMany({
+      where: { board_id: board.id, type: 'card_created' },
+    });
+    expect(events).toHaveLength(3);
+
+    const tags = await harness.db.cardTag.findMany({
+      where: { card_id: created[0]?.id ?? '' },
+    });
+    expect(tags.map((tag) => tag.name)).toEqual(['api']);
+  });
+
+  it('refuses a column that belongs to another board, and writes nothing', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+    const other = harness.client();
+    const foreign = await boardWithColumns(other);
+    const foreignColumn = foreign.columns[0];
+    if (!foreignColumn) return;
+
+    const response = await bulk(c, board.id, {
+      column: foreignColumn.id,
+      items: [{ title: 'Smuggled' }],
+    });
+    // 404, not 400: `column_not_found` is a not-found in the error catalogue
+    // (server/src/lib/errors.ts) and docs/api.md §1 maps not-found to 404. The
+    // single-card path answers the same, and the code is what a client branches on.
+    expect(response.statusCode).toBe(404);
+    expect((response.json() as { error: { code: string } }).error.code).toBe('column_not_found');
+
+    const smuggled = await harness.db.card.count({ where: { board_id: board.id } });
+    const untouched = await harness.db.card.count({ where: { board_id: foreign.board.id } });
+    expect({ smuggled, untouched }).toEqual({ smuggled: 0, untouched: 0 });
+  });
+
+  it('is all-or-nothing when one item is invalid', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const todo = columns[0];
+    if (!todo) return;
+
+    const response = await bulk(c, board.id, {
+      column: todo.id,
+      items: [{ title: 'Fine' }, { title: '' }, { title: 'Also fine' }],
+    });
+    expect(response.statusCode).toBe(400);
+    const count = await harness.db.card.count({ where: { board_id: board.id } });
+    expect(count).toBe(0);
+  });
+
+  it('returns the same DTO shape as the single create', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const todo = columns[0];
+    if (!todo) return;
+
+    const viaSingle = await c.request('POST', `/api/v1/boards/${board.id}/cards`, {
+      column: todo.id,
+      title: 'Single',
+      assignee_label: 'visitor',
+      tags: ['api'],
+    });
+    expect(viaSingle.statusCode).toBe(201);
+
+    const response = await bulk(c, board.id, {
+      column: todo.id,
+      items: [{ title: 'Bulk', assignee_label: 'visitor', tags: ['api'] }],
+    });
+    expect(response.statusCode).toBe(201);
+    const bulkCard = (response.json() as { created: Card[] }).created[0];
+    const singleCard = viaSingle.json() as Card;
+    expect(bulkCard).toBeDefined();
+    if (!bulkCard) return;
+
+    // Same keys, same nullability: a bulk card is not a second shape.
+    expect(Object.keys(bulkCard).sort()).toEqual(Object.keys(singleCard).sort());
+    expect(bulkCard.assignee_label).toBe('visitor');
+    expect(bulkCard.tags.map((tag) => tag.name)).toEqual(['api']);
   });
 });
 

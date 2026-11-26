@@ -18,6 +18,7 @@ import {
   toCardDto,
 } from './service.js';
 import {
+  bulkCreateSchema,
   createCardSchema,
   moveCardSchema,
   updateCardSchema,
@@ -54,61 +55,74 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
   app.post('/api/v1/boards/:id/cards/bulk', async (request, reply) => {
     const actor = requireActor(request);
     const { id } = request.params as { id: string };
-    const body = request.body as { column?: string; items?: unknown[] } | undefined;
-    if (!body?.column || !Array.isArray(body.items)) {
-      throw new AppError('validation_failed', {
-        message: 'bulk create needs a column and items.',
-        hint: '{"column":"col_…","items":[{"title":"…"}]}',
-      });
-    }
-    if (body.items.length === 0 || body.items.length > 200) {
-      throw new AppError('validation_failed', {
-        message: 'bulk create accepts 1 to 200 items.',
-        hint: null,
-        details: [{ path: 'items', code: 'too_small', message: 'expected 1..200 items' }],
-      });
-    }
+    const parsed = bulkCreateSchema.safeParse(request.body);
+    if (!parsed.success) throw fromZod(parsed.error);
     const db = database();
+
     const loaded = await loadBoardFor(db, actor, id, 'card.create');
     assertAllowed(loaded.decision);
 
-    const created = await db.$transaction(async (tx) => {
-      const out = [];
-      const base = await nextAppendPosition(tx, body.column as string);
-      for (const [index, raw] of (body.items as unknown[]).entries()) {
-        const parsed = createCardSchema.omit({ column: true }).safeParse(raw);
-        if (!parsed.success) throw fromZod(parsed.error);
-        const cardId = newId('crd');
-        const position = base + index * RANK_STEP;
+    // The column must belong to *this* board: `card.create` on board A is not
+    // permission to write into a column of board B (PROMPT.md §3.3).
+    const column = await db.column.findFirst({
+      where: { id: parsed.data.column, board_id: id },
+    });
+    if (!column) throw new AppError('column_not_found');
+
+    const assignees = new Map<string, { id: string; username: string } | null>();
+    for (const item of parsed.data.items) {
+      if (item.assignee !== undefined && !assignees.has(item.assignee)) {
+        assignees.set(item.assignee, await resolveAssignee(db, id, item.assignee));
+      }
+    }
+
+    const createdIds = await db.$transaction(async (tx) => {
+      const ids: string[] = [];
+      const base = await nextAppendPosition(tx, column.id);
+      for (const [index, item] of parsed.data.items.entries()) {
+        const assignee =
+          item.assignee === undefined ? null : (assignees.get(item.assignee) ?? null);
         const card = await tx.card.create({
           data: {
-            id: cardId,
+            id: newId('crd'),
             board_id: id,
-            column_id: body.column as string,
-            title: parsed.data.title,
-            description: parsed.data.description ?? null,
-            due_at: parsed.data.due_at ? new Date(parsed.data.due_at) : null,
-            done: parsed.data.done ?? false,
-            position,
+            column_id: column.id,
+            title: item.title,
+            description: item.description ?? null,
+            assignee_id: assignee?.id ?? null,
+            assignee_label: assignee ? null : (item.assignee_label ?? null),
+            due_at: item.due_at ? new Date(item.due_at) : null,
+            done: item.done ?? false,
+            position: base + index * RANK_STEP,
+            anon_actor_id: actor.kind === 'anon' ? actor.anonId : null,
           },
           include: { tags: true },
         });
-        if (parsed.data.tags) {
-          await createTagRows(tx, card.id, parsed.data.tags);
-        }
+        if (item.tags) await createTagRows(tx, card.id, item.tags);
         await recordEvent(tx, {
           boardId: id,
           actor,
           type: 'card.created',
           payload: { board_id: id, card_id: card.id, column_id: card.column_id, title: card.title },
         });
-        out.push(card);
+        ids.push(card.id);
       }
-      return out;
+      return ids;
     });
 
+    const [rows, tagColors] = await Promise.all([
+      db.card.findMany({ where: { id: { in: createdIds } }, include: { tags: true } }),
+      boardTagColors(db, id),
+    ]);
+    const byId = new Map(rows.map((row) => [row.id, row]));
     return reply.code(201).send({
-      created: created.map((card) => toCardDto(card, null, new Map())),
+      created: parsed.data.items.map((item, index) => {
+        const cardId = createdIds[index] ?? '';
+        const row = byId.get(cardId);
+        const assignee =
+          item.assignee === undefined ? null : (assignees.get(item.assignee) ?? null);
+        return row ? toCardDto(row, assignee, tagColors) : null;
+      }),
     });
   });
 

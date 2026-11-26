@@ -39,9 +39,28 @@ export const tagsSchema = z
     ),
   );
 
-export const createCardSchema = z
+/**
+ * The one item shape, so `POST /cards` and `POST /cards/bulk` cannot drift.
+ *
+ * The refinement is applied with `superRefine` to each derived object rather
+ * than with `omit()` on a refined schema: Zod v4 refuses to `omit()` an object
+ * that carries a refinement, and that refusal was a 500 on every bulk call.
+ */
+function exclusiveAssignee(
+  value: { assignee?: string | undefined; assignee_label?: string | undefined },
+  context: z.RefinementCtx,
+): void {
+  if (value.assignee && value.assignee_label) {
+    context.addIssue({
+      code: 'custom',
+      message: 'assignee and assignee_label are exclusive: a member id, or a display name',
+      path: ['assignee'],
+    });
+  }
+}
+
+export const cardItemSchema = z
   .object({
-    column: idSchema('col'),
     title: cardTitleSchema,
     description: z.string().max(10_000).optional(),
     assignee: z.string().max(64).optional(),
@@ -50,11 +69,20 @@ export const createCardSchema = z
     tags: tagsSchema.optional(),
     done: z.boolean().optional(),
   })
-  .strict()
-  .refine((value) => !(value.assignee && value.assignee_label), {
-    message: 'assignee and assignee_label are exclusive: a member id, or a display name',
-    path: ['assignee'],
-  });
+  .strict();
+
+export const createCardSchema = cardItemSchema
+  .extend({ column: idSchema('col') })
+  .superRefine(exclusiveAssignee);
+
+export const bulkItemSchema = cardItemSchema.superRefine(exclusiveAssignee);
+
+export const bulkCreateSchema = z
+  .object({
+    column: idSchema('col'),
+    items: z.array(bulkItemSchema).min(1).max(200),
+  })
+  .strict();
 
 export const updateCardSchema = z
   .object({
@@ -105,6 +133,8 @@ export const deleteColumnSchema = z
   })
   .strict();
 
+export type CardItemInput = z.infer<typeof cardItemSchema>;
 export type CreateCardInput = z.infer<typeof createCardSchema>;
+export type BulkCreateInput = z.infer<typeof bulkCreateSchema>;
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 export type MoveCardInput = z.infer<typeof moveCardSchema>;

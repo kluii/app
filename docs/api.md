@@ -181,7 +181,7 @@ next request is `401` and the next login answers `403 banned`.
 | `PATCH` | `/columns/:id` | `{name?, position?, expected_updated_at?}`. |
 | `DELETE` | `/columns/:id` | `409 column_not_empty` unless `{move_cards_to:"<column id>"}` or `{delete_cards:true}`. |
 | `POST` | `/boards/:id/cards` | `{column, title, description?, assignee?, due_at?, tags?, done?}`. `column` is a column id, not a name. |
-| `POST` | `/boards/:id/cards/bulk` | `{column, items:[…]}` max 200; one transaction; returns `{created:[Card]}`. Partial failure rolls back everything. |
+| `POST` | `/boards/:id/cards/bulk` | `{column, items:[…]}` max 200; one transaction; returns `{created:[Card]}`. Partial failure rolls back everything. `column` must belong to this board, or `404 column_not_found` and no card is written. |
 | `GET` | `/cards/:id` | Card + `comments_count`. |
 | `PATCH` | `/cards/:id` | Any of `{title, description, assignee, assignee_label, due_at, tags, done, expected_updated_at}`. |
 | `DELETE` | `/cards/:id` | `204`. |
