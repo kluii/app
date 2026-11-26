@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { cn } from '../../lib/cn';
 
 /**
@@ -25,6 +25,7 @@ export function Dialog({
   footer?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -47,9 +48,9 @@ export function Dialog({
         'dialog-panel m-auto rounded-md border border-border bg-surface p-5 text-ink',
         className,
       )}
-      aria-labelledby="dialog-title"
+      aria-labelledby={titleId}
     >
-      <h2 id="dialog-title" className="text-h2">
+      <h2 id={titleId} className="text-h2">
         {title}
       </h2>
       {description ? <p className="mt-1 text-body-sm text-ink-muted">{description}</p> : null}

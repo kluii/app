@@ -1,74 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-
 /**
  * K2-04 and K2-06: the drag is a pointer gesture on a real board, and the
  * keyboard path is the same move through the same endpoint. The order is read
  * from the DOM after a reload, so an optimistic paint cannot pass this test.
  */
-const PASSWORD = 'a-long-passphrase-9';
-
-function uniqueUsername(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36).slice(-6)}`;
-}
-
-async function csrf(request: APIRequestContext): Promise<string> {
-  const state = await request.storageState();
-  const cookie = state.cookies.find((entry) => entry.name === 'klui_csrf');
-  if (!cookie) throw new Error('no CSRF cookie');
-  return cookie.value;
-}
-
-async function post<T>(request: APIRequestContext, path: string, data: unknown): Promise<T> {
-  const response = await request.post(path, {
-    headers: { 'x-klui-csrf': await csrf(request) },
-    data,
-  });
-  expect(response.ok(), `${path} answered ${response.status()}`).toBeTruthy();
-  return (await response.json()) as T;
-}
-
-type Column = { id: string; name: string };
-type Card = { id: string; title: string };
-
-async function seed(
-  request: APIRequestContext,
-  username: string,
-): Promise<{ boardId: string; columns: Column[]; cards: Card[] }> {
-  await request.post('/api/v1/auth/signup', {
-    data: { email: `${username}@klui.test`, username, password: PASSWORD },
-  });
-  const board = await post<{ id: string }>(request, '/api/v1/boards', { name: 'Drag proof' });
-  const state = (await (await request.get(`/api/v1/boards/${board.id}/state`)).json()) as {
-    columns: Column[];
-  };
-  const [toDo, doing] = state.columns;
-  if (!toDo || !doing) throw new Error('no columns');
-
-  const cards: Card[] = [];
-  for (const title of ['Alpha', 'Bravo', 'Charlie']) {
-    cards.push(
-      await post<Card>(request, `/api/v1/boards/${board.id}/cards`, {
-        column: toDo.id,
-        title,
-      }),
-    );
-  }
-  return { boardId: board.id, columns: state.columns, cards };
-}
-
-async function openBoard(page: Page, request: APIRequestContext, username: string) {
-  const seeded = await seed(request, username);
-  await page.context().addCookies((await request.storageState()).cookies);
-  await page.goto(`/boards/${seeded.boardId}`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { level: 1, name: 'Drag proof' })).toBeVisible();
-  return seeded;
-}
-
-async function titlesIn(page: Page, column: Column): Promise<string[]> {
-  const columnLocator = page.getByTestId(`column-${column.id}`);
-  return columnLocator.getByTestId('card-title').allTextContents();
-}
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { openBoard, titlesIn, uniqueUsername } from './support';
 
 /** pragmatic-dnd listens to pointer events: move, press, move in steps, release. */
 async function pointerDrag(page: Page, from: Locator, to: Locator, toLowerHalf: boolean) {

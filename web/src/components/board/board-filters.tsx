@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import type { Card, Member } from '../../api/types';
 import { t } from '../../i18n';
 import { Button } from '../ui/button';
@@ -58,6 +58,7 @@ export function BoardFilters({
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
   const active = filterCount(filters) > 0;
 
   const tagOptions = useMemo(
@@ -78,6 +79,7 @@ export function BoardFilters({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button
+        ref={trigger}
         variant={active ? 'secondary' : 'ghost'}
         size="sm"
         aria-expanded={open}
@@ -96,6 +98,7 @@ export function BoardFilters({
         open={open}
         onClose={() => setOpen(false)}
         labelledBy={panelId}
+        anchor={trigger}
         className="w-96 max-w-[calc(100vw-2rem)]"
       >
         <div className="flex flex-col gap-4">

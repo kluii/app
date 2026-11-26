@@ -12,13 +12,18 @@ import { Chip } from '../ui/chip';
 import { Input } from '../ui/input';
 import { ActivityDialog } from './activity-dialog';
 import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from './board-filters';
-import { CardDialog } from './card-dialog';
+import { CardCreateModal } from './card-create-modal';
+import { CardDisplayModal, cardFromState } from './card-display-modal';
+import { CardEditorModal } from './card-editor-modal';
 import { CardRow } from './card-row';
 import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
 import { useKeyboardDrag } from './use-keyboard-drag';
 
 type Composer =
-  { kind: 'closed' } | { kind: 'create'; columnId: string } | { kind: 'edit'; card: Card };
+  | { kind: 'closed' }
+  | { kind: 'create'; columnId: string }
+  | { kind: 'read'; cardId: string }
+  | { kind: 'edit'; cardId: string };
 
 /**
  * Board > column > card, nothing else (DESIGN.md §5). Columns size to their
@@ -53,6 +58,14 @@ export function BoardView({ boardId }: { boardId: string }) {
     },
     onError: async () => {
       setAnnouncement('');
+      await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+    },
+  });
+
+  const removeCard = useMutation({
+    mutationFn: (cardId: string) => api.deleteCard(cardId),
+    onSuccess: async () => {
+      setComposer({ kind: 'closed' });
       await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
     },
   });
@@ -102,6 +115,15 @@ export function BoardView({ boardId }: { boardId: string }) {
     describeColumn: (column) => column.name,
   });
 
+  const composerCard =
+    composer.kind === 'read' || composer.kind === 'edit'
+      ? cardFromState(state.data, composer.cardId)
+      : null;
+  const createColumn =
+    composer.kind === 'create'
+      ? (state.data?.columns.find((column) => column.id === composer.columnId) ?? null)
+      : null;
+
   if (state.isPending) {
     return <p className="px-6 py-8 text-body-sm text-ink-subtle">{t('common.label.loading')}</p>;
   }
@@ -124,21 +146,40 @@ export function BoardView({ boardId }: { boardId: string }) {
       boardState={state.data}
       filters={filters}
       onFiltersChange={setFilters}
-      onOpenCard={(card) => setComposer({ kind: 'edit', card })}
+      onOpenCard={(card) => setComposer({ kind: 'read', cardId: card.id })}
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
       onMove={requestMove}
+      onMoveTo={(cardId, columnId) => requestMove({ cardId, column: columnId, before: null, after: null })}
+      onDeleteCard={(cardId) => removeCard.mutate(cardId)}
       keyboard={keyboard}
       announcement={announcement}
     >
-      <CardDialog
-        boardId={boardId}
-        columns={state.data.columns}
-        mode={composer.kind === 'closed' ? null : composer.kind}
-        card={composer.kind === 'edit' ? composer.card : null}
-        columnId={composer.kind === 'create' ? composer.columnId : null}
-        onClose={() => setComposer({ kind: 'closed' })}
-      />
+      {composerCard ? (
+        composer.kind === 'read' ? (
+          <CardDisplayModal
+            boardId={boardId}
+            card={composerCard}
+            caller={state.data.caller}
+            onEdit={() => setComposer({ kind: 'edit', cardId: composerCard.id })}
+            onClose={() => setComposer({ kind: 'closed' })}
+          />
+        ) : (
+          <CardEditorModal
+            boardId={boardId}
+            card={composerCard}
+            onSaved={() => setComposer({ kind: 'read', cardId: composerCard.id })}
+            onClose={() => setComposer({ kind: 'read', cardId: composerCard.id })}
+          />
+        )
+      ) : null}
+      {createColumn ? (
+        <CardCreateModal
+          boardId={boardId}
+          column={createColumn}
+          onClose={() => setComposer({ kind: 'closed' })}
+        />
+      ) : null}
       <ActivityDialog
         boardId={boardId}
         open={activityOpen}
@@ -168,6 +209,8 @@ function BoardFrame({
   onAddCard,
   onOpenActivity,
   onMove,
+  onMoveTo,
+  onDeleteCard,
   keyboard,
   announcement,
   children,
@@ -179,6 +222,8 @@ function BoardFrame({
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
   onMove: (request: MoveRequest) => void;
+  onMoveTo: (cardId: string, columnId: string) => void;
+  onDeleteCard: (cardId: string) => void;
   keyboard: ReturnType<typeof useKeyboardDrag>;
   announcement: string;
   children?: ReactNode;
@@ -235,6 +280,9 @@ function BoardFrame({
                 onOpenCard={onOpenCard}
                 onAddCard={onAddCard}
                 onMove={onMove}
+                onMoveTo={(cardId, columnId) => onMoveTo(cardId, columnId)}
+                onDeleteCard={onDeleteCard}
+                columns={columns}
                 keyboard={keyboard}
               />
             ))}
@@ -281,6 +329,9 @@ function ColumnSection({
   onOpenCard,
   onAddCard,
   onMove,
+  onMoveTo,
+  onDeleteCard,
+  columns,
   keyboard,
 }: {
   column: Column;
@@ -291,6 +342,9 @@ function ColumnSection({
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
   onMove: (request: MoveRequest) => void;
+  onMoveTo: (cardId: string, columnId: string) => void;
+  onDeleteCard: (cardId: string) => void;
+  columns: Column[];
   keyboard: ReturnType<typeof useKeyboardDrag>;
 }) {
   const droppable = useColumnDroppable({
@@ -322,11 +376,13 @@ function ColumnSection({
               key={card.id}
               card={card}
               cards={allCards}
+              columns={columns}
               canWrite={caller.can_write}
-              readOnly={!caller.can_write}
               lifted={keyboard.drag?.cardId === card.id}
               onOpen={() => onOpenCard(card)}
               onMove={onMove}
+              onMoveTo={(columnId) => onMoveTo(card.id, columnId)}
+              onDelete={() => onDeleteCard(card.id)}
               onKeyDown={keyboard.onKeyDown}
             />
           ))}
