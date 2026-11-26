@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { LightMyRequestResponse } from 'fastify';
 import { buildApp } from '../../src/app.js';
-import { testEnv } from '../../src/env.js';
+import { testEnv, type Env } from '../../src/env.js';
 import { createHub } from '../../src/realtime/events.js';
 import { ensureInstanceSettings } from '../../src/auth/service.js';
 import { testDatabaseUrl, testDb } from './db.js';
@@ -14,7 +14,9 @@ export const TEST_SECRETS = {
   encryptionKey: Buffer.alloc(32, 9),
 };
 
-export async function startServer(options: { mail?: Mailer | null } = {}): Promise<{
+export async function startServer(
+  options: { mail?: Mailer | null; env?: Partial<Env> } = {},
+): Promise<{
   app: ReturnType<typeof buildApp>;
   db: Db;
   client: () => TestClient;
@@ -22,9 +24,14 @@ export async function startServer(options: { mail?: Mailer | null } = {}): Promi
 }> {
   const db = testDb();
   // The boot creates the settings row; the test harness must mirror the boot.
-  await ensureInstanceSettings(db, testEnv({ DATABASE_URL: testDatabaseUrl() }));
+  const env = testEnv({
+    DATABASE_URL: testDatabaseUrl(),
+    KLUI_PUBLIC_URL: 'http://localhost:8099',
+    ...options.env,
+  });
+  await ensureInstanceSettings(db, env);
   const app = buildApp({
-    env: testEnv({ DATABASE_URL: testDatabaseUrl(), KLUI_PUBLIC_URL: 'http://localhost:8099' }),
+    env,
     db,
     secrets: TEST_SECRETS,
     hub: createHub(),

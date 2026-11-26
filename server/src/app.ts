@@ -7,6 +7,7 @@ import type { Db } from './db.js';
 import { AppError, toWire } from './lib/errors.js';
 import { loggerOptions } from './lib/logger.js';
 import { registerHealth } from './settings/health.js';
+import { registerRateLimit } from './settings/ratelimit.js';
 import {
   contentSecurityPolicy,
   isSpaNavigation,
@@ -97,6 +98,10 @@ export function buildApp(context: AppContext): FastifyInstance {
     if (!context.db) return;
     await resolveActor(context.db, context.secrets.tokenPepper, request, reply);
   });
+
+  // 7b. Request buckets, after the actor is known and before any route exists
+  // (settings/ratelimit.ts explains why this is global rather than opt-in).
+  registerRateLimit(app, context.env);
 
   // 8. CSRF double submit for cookie-authenticated writes; bearer is exempt.
   app.addHook('preHandler', async (request) => {

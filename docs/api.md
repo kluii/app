@@ -36,19 +36,21 @@ Base path `/api/v1`. OpenAPI 3.1 is generated from the Zod schemas in `server/sr
 
 **Idempotency.** `POST` create endpoints accept an optional `Idempotency-Key` header (max 64 chars, scoped per actor per route, 24 h). A replay returns the original response with `200` instead of `201`. Agents are expected to use it for retries.
 
-**Rate limits.** Token bucket, `429` + `Retry-After`.
+**Rate limits.** Sliding window in memory per process (a restart forgives), `429` + `Retry-After`, body `{"error":{"code":"rate_limited"|"too_many_attempts",…}}`.
 
-| Bucket | Limit |
-|---|---|
-| Anonymous writes per board | 30 / hour (configurable per instance) |
-| Agent key writes | 60 / minute |
-| Agent key reads | 600 / minute |
-| Session writes | 120 / minute |
-| Session reads | 600 / minute |
-| Login attempts | 5 / 15 min per account, 20 / hour per IP |
-| Signup | 5 / hour per IP |
-| Import | 3 / hour per board |
-| Export | 10 / hour per board |
+| Bucket | Limit | Enforced |
+|---|---|---|---|
+| Session writes | 120 / minute per user, per IP while signed out | yes, `KLUI_RATE_LIMIT_WRITES` |
+| Session reads | 600 / minute per user, per IP while signed out | yes, `KLUI_RATE_LIMIT_READS` |
+| Login attempts | 5 / 15 min per account, 20 / hour per IP | yes |
+| Signup | 5 / hour per IP | yes |
+| Agent key writes | 60 / minute | with the agent surface (K3) |
+| Agent key reads | 600 / minute | with the agent surface (K3) |
+| Anonymous writes per board | 30 / hour (configurable per instance) | with anonymous write (K2-13) |
+| Import | 3 / hour per board | with import (K2-11) |
+| Export | 10 / hour per board | with export (K2-11) |
+
+The session buckets are one bucket per user across every route, not one per endpoint: a route added tomorrow is covered without being remembered. `GET /healthz` and the SSE stream are never counted. The login bucket counts failed attempts and is cleared by a successful one, so four typos then the right password is not a lockout. `KLUI_RATE_LIMIT=off` disables every bucket at once and is the default outside production.
 
 **Versioning.** The path carries the major version. Additive fields are not a breaking change; removing or renaming one is, and requires a new path version plus a deprecation window documented in the changelog.
 

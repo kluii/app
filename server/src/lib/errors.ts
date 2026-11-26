@@ -29,6 +29,7 @@ export type ErrorCode =
   | 'registration_closed'
   | 'email_not_configured'
   | 'rate_limited'
+  | 'too_many_attempts'
   | 'payload_too_large'
   | 'unsupported_media_type'
   | 'unknown_field'
@@ -76,6 +77,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   payload_too_large: 413,
   unsupported_media_type: 415,
   rate_limited: 429,
+  too_many_attempts: 429,
   internal: 500,
   service_unavailable: 503,
   email_not_configured: 503,
@@ -134,6 +136,8 @@ export function defaultMessage(code: ErrorCode): string {
       return 'The request body is invalid.';
     case 'rate_limited':
       return 'Too many requests.';
+    case 'too_many_attempts':
+      return 'Too many attempts.';
     case 'column_not_empty':
       return 'The column still holds cards.';
     case 'board_closed':

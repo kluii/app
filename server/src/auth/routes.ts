@@ -22,13 +22,51 @@ import { totpPolicy } from './totp.js';
 import { updateProfile } from './profile.js';
 import { registerTotpRoutes } from './totp-routes.js';
 import type { Me } from '../contracts/auth.js';
+import { AppError } from '../lib/errors.js';
+import {
+  credentialLimiter,
+  LOGIN_ACCOUNT,
+  LOGIN_IP,
+  SIGNUP_IP,
+  loginAccountKey,
+  loginIpKey,
+  signupIpKey,
+  submittedIdentifier,
+} from '../lib/ratelimit.js';
+
+/**
+ * The credential buckets (docs/api.md §1). Counted here rather than by
+ * `@fastify/rate-limit` because the login bucket counts *failures* and a
+ * success clears it, and because the answer must not depend on whether the
+ * account exists: the key is the submitted identifier and the body is the same
+ * 429 either way.
+ */
+function tooManyAttempts(retryAfter: number): AppError {
+  return new AppError('too_many_attempts', {
+    message: 'Too many attempts.',
+    hint: `Try again in ${retryAfter} seconds.`,
+  });
+}
+
+function spend(
+  reply: { header: (name: string, value: string) => unknown },
+  key: string,
+  options: { max: number; windowMs: number },
+): void {
+  const result = credentialLimiter.take(key, options);
+  if (result.allowed) return;
+  reply.header('retry-after', String(result.retryAfter));
+  throw tooManyAttempts(result.retryAfter);
+}
 
 export function registerAuthRoutes(app: FastifyInstance, context: AppContext): void {
   const secure = isSecureOrigin(context.env);
   const pepper = context.secrets.tokenPepper;
+  const limiting = context.env.KLUI_RATE_LIMIT === 'on';
 
   app.post('/api/v1/auth/signup', async (request, reply) => {
     if (!context.db) throw new Error('database is required');
+    if (limiting) spend(reply, signupIpKey(request.ip), SIGNUP_IP);
     const meta = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
     const { user, session } = await signup(context.db, context.env, pepper, request.body, meta);
     setSessionCookie(reply, session.raw, { secure, expires_at: session.expires_at });
@@ -39,11 +77,33 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
   app.post('/api/v1/auth/login', async (request, reply) => {
     if (!context.db) throw new Error('database is required');
     const meta = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
+    const identifier = submittedIdentifier(request.body);
+    const accountKey = identifier === null ? null : loginAccountKey(identifier);
+    if (limiting) {
+      // Peek both before spending either: a full account bucket must not burn
+      // an IP slot, and an exhausted IP bucket must not reveal the account.
+      const account =
+        accountKey === null ? null : credentialLimiter.peek(accountKey, LOGIN_ACCOUNT);
+      if (account && !account.allowed) {
+        reply.header('retry-after', String(account.retryAfter));
+        throw tooManyAttempts(account.retryAfter);
+      }
+      const ip = credentialLimiter.peek(loginIpKey(request.ip), LOGIN_IP);
+      if (!ip.allowed) {
+        reply.header('retry-after', String(ip.retryAfter));
+        throw tooManyAttempts(ip.retryAfter);
+      }
+      spend(reply, loginIpKey(request.ip), LOGIN_IP);
+      if (accountKey !== null) spend(reply, accountKey, LOGIN_ACCOUNT);
+    }
     const policy = await totpPolicy(context.db, context.env);
     const { user, session } = await login(context.db, pepper, request.body, meta, {
       encryptionKey: context.secrets.encryptionKey,
       policy,
     });
+    // A success clears the account bucket: four typos then the right password
+    // is not a lockout. The IP bucket is not cleared; that is documented.
+    if (limiting && accountKey !== null) credentialLimiter.reset(accountKey);
     setSessionCookie(reply, session.raw, { secure, expires_at: session.expires_at });
     rotateCsrfCookie(reply, secure);
     return reply.code(200).send(await meFor(context.db, user));

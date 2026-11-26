@@ -36,6 +36,10 @@ export type Env = {
   KLUI_OPENAPI: boolean;
   KLUI_DEMO_RESET: boolean;
   KLUI_LOG_LEVEL: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
+  /** `on` limits the API; the default is on in production and off elsewhere. */
+  KLUI_RATE_LIMIT: 'on' | 'off';
+  KLUI_RATE_LIMIT_WRITES: number;
+  KLUI_RATE_LIMIT_READS: number;
 };
 
 export type EnvProblem = { variable: string; expected: string; problem: string };
@@ -62,6 +66,9 @@ const EXAMPLES: Record<string, string> = {
   KLUI_METRICS_TOKEN: 'openssl rand -hex 24',
   KLUI_RETENTION_EVENTS_DAYS: '365',
   KLUI_LOG_LEVEL: 'info',
+  KLUI_RATE_LIMIT: 'on',
+  KLUI_RATE_LIMIT_WRITES: '120',
+  KLUI_RATE_LIMIT_READS: '600',
 };
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
@@ -200,6 +207,13 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): EnvResult {
     KLUI_OPENAPI: boolean('KLUI_OPENAPI', envName === 'production' ? false : true),
     KLUI_DEMO_RESET: boolean('KLUI_DEMO_RESET', false),
     KLUI_LOG_LEVEL: oneOf('KLUI_LOG_LEVEL', LOG_LEVELS, 'info'),
+    KLUI_RATE_LIMIT: oneOf(
+      'KLUI_RATE_LIMIT',
+      ['on', 'off'] as const,
+      envName === 'production' ? 'on' : 'off',
+    ),
+    KLUI_RATE_LIMIT_WRITES: integer('KLUI_RATE_LIMIT_WRITES', 120, 1, 100_000),
+    KLUI_RATE_LIMIT_READS: integer('KLUI_RATE_LIMIT_READS', 600, 1, 100_000),
   };
 
   problems.push(...productionProblems(env));
@@ -300,6 +314,9 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     KLUI_OPENAPI: false,
     KLUI_DEMO_RESET: false,
     KLUI_LOG_LEVEL: 'silent',
+    KLUI_RATE_LIMIT: 'off',
+    KLUI_RATE_LIMIT_WRITES: 120,
+    KLUI_RATE_LIMIT_READS: 600,
     ...overrides,
   };
 }
