@@ -7,6 +7,12 @@ import type { Db } from './db.js';
 import { AppError, toWire } from './lib/errors.js';
 import { loggerOptions } from './lib/logger.js';
 import { registerHealth } from './settings/health.js';
+import {
+  contentSecurityPolicy,
+  isSpaNavigation,
+  loadStaticAssets,
+  registerStatic,
+} from './settings/static.js';
 import type { Secrets } from './lib/secrets.js';
 
 export type AppContext = {
@@ -29,6 +35,9 @@ function resolveRequestId(header: string | string[] | undefined): string {
  */
 export function buildApp(context: AppContext): FastifyInstance {
   const hops = context.env.KLUI_TRUSTED_PROXY_HOPS;
+  const assets = loadStaticAssets(new URL('../../web/dist', import.meta.url).pathname);
+  const csp = contentSecurityPolicy(assets?.bootstrapHash ?? null);
+
   const app: FastifyInstance = Fastify({
     logger: loggerOptions(context.env.KLUI_LOG_LEVEL),
     bodyLimit: 1024 * 1024,
@@ -41,7 +50,23 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.register(helmet, {
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    hsts: context.env.KLUI_ENV === 'production',
   });
+
+  app.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('content-security-policy', csp);
+    reply.header('x-content-type-options', 'nosniff');
+    reply.header(
+      'permissions-policy',
+      'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+    );
+    return payload;
+  });
+
+  if (assets) {
+    registerStatic(app, assets);
+  }
 
   app.register(async (scoped) => {
     registerHealth(scoped, context.db);
@@ -66,6 +91,16 @@ export function buildApp(context: AppContext): FastifyInstance {
   });
 
   app.setNotFoundHandler((request, reply) => {
+    if (
+      assets &&
+      request.method === 'GET' &&
+      isSpaNavigation(request.url, request.headers.accept)
+    ) {
+      return reply
+        .header('cache-control', 'no-store')
+        .type('text/html; charset=utf-8')
+        .send(assets.indexHtml);
+    }
     const { status, body } = toWire(
       new AppError('not_found', { message: 'Not found.', hint: null, status: 404 }),
       String(request.id),

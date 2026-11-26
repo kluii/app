@@ -1,0 +1,75 @@
+# The gate, on every push to every branch. A workflow that exists but never ran
+# is not CI (docs/testing.md §11), so the run URL is recorded in docs/verify/.
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgresql://klui:klui@127.0.0.1:5432/klui_test
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: klui
+          POSTGRES_PASSWORD: klui
+          POSTGRES_DB: klui_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U klui -d klui_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Apply migrations
+        run: npm run db:deploy --workspace server
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Runtime dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ci-logs
+          path: |
+            server/*.log
+            web/*.log
+            npm-debug.log*
+          retention-days: 7
+          if-no-files-found: ignore

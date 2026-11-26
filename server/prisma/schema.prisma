@@ -126,7 +126,7 @@ model User {
   is_instance_admin Boolean   @default(false)
   email_verified_at DateTime?
   created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
+  updated_at        DateTime  @default(now()) @updatedAt
 
   sessions       Session[]
   recovery_codes RecoveryCode[]
@@ -214,7 +214,7 @@ model InstanceSettings {
   analytics_url       String?
   metrics_enabled     Boolean    @default(false)
   created_at          DateTime   @default(now())
-  updated_at          DateTime   @updatedAt
+  updated_at          DateTime   @default(now()) @updatedAt
 
   @@map("instance_settings")
 }
@@ -262,7 +262,7 @@ model Board {
   closed_at     DateTime?
   close_summary Json?
   created_at    DateTime   @default(now())
-  updated_at    DateTime   @updatedAt
+  updated_at    DateTime   @default(now()) @updatedAt
 
   owner          User                   @relation("BoardOwner", fields: [owner_id], references: [id], onDelete: Cascade)
   members        BoardMember[]
@@ -288,7 +288,7 @@ model BoardMember {
   user_id    String
   role       MemberRole
   created_at DateTime   @default(now())
-  updated_at DateTime   @updatedAt
+  updated_at DateTime   @default(now()) @updatedAt
 
   board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -336,7 +336,7 @@ model Column {
   name       String
   position   Decimal  @db.Decimal(30, 10)
   created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  updated_at DateTime @default(now()) @updatedAt
 
   board Board  @relation(fields: [board_id], references: [id], onDelete: Cascade)
   cards Card[]
@@ -358,7 +358,7 @@ model Card {
   position       Decimal   @db.Decimal(30, 10)
   anon_actor_id  String?
   created_at     DateTime  @default(now())
-  updated_at     DateTime  @updatedAt
+  updated_at     DateTime  @default(now()) @updatedAt
 
   board    Board    @relation(fields: [board_id], references: [id], onDelete: Cascade)
   column   Column   @relation(fields: [column_id], references: [id], onDelete: Cascade)
@@ -390,7 +390,7 @@ model Comment {
   body         String
   edited_at    DateTime?
   created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
+  updated_at   DateTime  @default(now()) @updatedAt
 
   board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
   card  Card  @relation(fields: [card_id], references: [id], onDelete: Cascade)
@@ -474,7 +474,7 @@ model DigestPref {
   rss_token_hash String?
   last_sent_at   DateTime?
   created_at     DateTime  @default(now())
-  updated_at     DateTime  @updatedAt
+  updated_at     DateTime  @default(now()) @updatedAt
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
@@ -519,7 +519,7 @@ model Job {
   result      Json?
   error       String?
   created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
+  updated_at  DateTime  @default(now()) @updatedAt
 
   board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
 
