@@ -55,7 +55,7 @@ function SignupPage() {
 
   return (
     <AuthPage>
-      <h1 className="text-display">{t('auth.signUp.title')}</h1>
+      <h1 className="font-display text-display">{t('auth.signUp.title')}</h1>
       <p className="mt-2 text-body-sm text-ink-muted">{t('auth.signUp.subtitle')}</p>
 
       <form className="mt-8 flex flex-col gap-4" onSubmit={(event) => void submit(event)}>

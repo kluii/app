@@ -309,7 +309,7 @@ function AnonymousEntry({ boardId }: { boardId: string }) {
 
   return (
     <div className="mx-auto flex min-h-96 w-full max-w-96 flex-col justify-center gap-3 px-6 py-8">
-      <h1 className="text-h2">{info.data.name}</h1>
+      <h1 className="font-display text-h2">{info.data.name}</h1>
       <p className="text-body-sm text-ink-muted">{t('board.anon.body')}</p>
       <form
         className="flex flex-col gap-2"
@@ -355,7 +355,7 @@ function AnonymousEntry({ boardId }: { boardId: string }) {
 function NoCredential() {
   return (
     <div className="mx-auto flex min-h-96 max-w-96 flex-col items-center justify-center gap-2 px-6 text-center">
-      <h1 className="text-h2">{t('board.error.title')}</h1>
+      <h1 className="font-display text-h2">{t('board.error.title')}</h1>
       <p className="text-body-sm text-ink-muted">{t('board.error.needCredential')}</p>
       <Link to="/login" className="mt-2 text-body-sm text-ink underline-offset-4 hover:underline">
         {t('common.action.signIn')}
@@ -367,7 +367,7 @@ function NoCredential() {
 function Unreadable() {
   return (
     <div className="mx-auto flex min-h-96 max-w-96 flex-col items-center justify-center gap-2 px-6 text-center">
-      <h1 className="text-h2">{t('board.error.title')}</h1>
+      <h1 className="font-display text-h2">{t('board.error.title')}</h1>
       <p className="text-body-sm text-ink-muted">{t('board.error.notFound')}</p>
       <Link to="/boards" className="mt-2 text-body-sm text-ink underline-offset-4 hover:underline">
         {t('notFound.action')}
@@ -422,7 +422,7 @@ function BoardFrame({
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex min-w-0 items-baseline gap-3">
-          <h1 className="truncate text-h1 text-ink">{board.name}</h1>
+          <h1 className="truncate font-display text-h1 text-ink">{board.name}</h1>
           <span className="font-mono text-mono-sm text-ink-subtle">
             {board.owner.username}/{board.slug}
           </span>
@@ -548,7 +548,7 @@ function ColumnRail({
   return (
     <div className={className}>
       <div className="flex flex-col items-center gap-2 rounded-md border border-border px-6 py-10 text-center">
-        <h2 className="text-h2">{t('board.empty.noColumns')}</h2>
+        <h2 className="font-display text-h2">{t('board.empty.noColumns')}</h2>
         <p className="max-w-72 text-body-sm text-ink-muted">
           {canWrite ? t('board.empty.noColumnsBody') : t('board.empty.noColumnsBodyReader')}
         </p>
@@ -601,7 +601,9 @@ function ColumnSection({
       data-testid={`column-${column.id}`}
     >
       <header className="flex items-center justify-between px-1 py-1">
-        <h2 className="truncate text-label font-medium text-ink-muted">{column.name}</h2>
+        <h2 className="truncate text-label uppercase tracking-caps text-ink-muted">
+          {column.name}
+        </h2>
         <span className="font-mono text-mono-sm text-ink-subtle">{cards.length}</span>
       </header>
 

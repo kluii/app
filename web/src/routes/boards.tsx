@@ -30,7 +30,7 @@ function BoardsPage() {
   return (
     <div className="mx-auto w-full max-w-content px-6 py-8">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-h1">{t('boards.title')}</h1>
+        <h1 className="font-display text-h1">{t('boards.title')}</h1>
         <Button variant="primary" onClick={() => setCreating(true)}>
           {t('boards.action.new')}
         </Button>
@@ -47,7 +47,7 @@ function BoardsPage() {
         </div>
       ) : boards.data.items.length === 0 ? (
         <div className="mt-16 flex flex-col items-center gap-2 text-center">
-          <h2 className="text-h2">{t('boards.empty.title')}</h2>
+          <h2 className="font-display text-h2">{t('boards.empty.title')}</h2>
           <p className="max-w-80 text-body-sm text-ink-muted">{t('boards.empty.body')}</p>
         </div>
       ) : (

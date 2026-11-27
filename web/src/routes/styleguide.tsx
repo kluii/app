@@ -36,7 +36,7 @@ function stateLabel(state: State): string {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-h2">{title}</h2>
+      <h2 className="font-display text-h2">{title}</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
     </section>
   );
@@ -65,7 +65,7 @@ function StyleguidePage() {
   return (
     <main id="main-content" className="mx-auto flex w-full max-w-content flex-col gap-8 px-6 py-8">
       <header className="flex flex-col gap-2">
-        <h1 className="text-h1">{t('styleguide.title')}</h1>
+        <h1 className="font-display text-h1">{t('styleguide.title')}</h1>
         <p className="max-w-140 text-body-sm text-ink-muted">{t('styleguide.intro')}</p>
       </header>
 

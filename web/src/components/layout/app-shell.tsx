@@ -12,7 +12,7 @@ import whiteLogo from '../../assets/klui-logo-white.png';
 import blackLogo from '../../assets/klui-logo-black.png';
 
 /**
- * 48 px bar, canvas ground, hairline bottom, no shadow (DESIGN.md §4).
+ * 56 px bar, canvas ground, hairline bottom, no shadow (DESIGN.md §4).
  * The footer is mandatory on every page (AGENTS.md §8).
  */
 export function AppShell({ children, actions }: { children?: ReactNode; actions?: ReactNode }) {
@@ -46,7 +46,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
 
       <header
         data-app-chrome="true"
-        className="flex h-12 items-center justify-between border-b border-border px-4"
+        className="flex h-14 items-center justify-between border-b border-border px-4"
       >
         <div className="flex items-center gap-3">
           <Link
