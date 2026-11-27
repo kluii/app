@@ -11,7 +11,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { api, ApiError } from '../../api/client';
+import { api } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import type { AgentKey, CreatedAgentKey, MemberRole } from '../../api/types';
 import { t } from '../../i18n';
 import { formatDay, relativeUnit } from '../../lib/format';
@@ -53,7 +54,7 @@ export function AgentsSettings() {
         : t('settings.agents.scope.boardCopy');
 
   const failure = (caught: unknown): void => {
-    setError(caught instanceof ApiError ? caught.message : t('common.error.generic'));
+    setError(failureMessage(caught));
   };
 
   const create = useMutation({
@@ -265,7 +266,7 @@ export function AgentsSettings() {
           <p className="text-body-sm text-ink-subtle">{t('common.label.loading')}</p>
         ) : keys.isError ? (
           <div className="flex items-center gap-3">
-            <p className="text-body-sm text-ink-muted">{t('common.error.generic')}</p>
+            <p className="text-body-sm text-ink-muted">{failureMessage(keys.error)}</p>
             <Button size="sm" variant="ghost" onClick={() => void keys.refetch()}>
               {t('common.action.retry')}
             </Button>

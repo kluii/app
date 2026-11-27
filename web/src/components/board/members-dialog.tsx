@@ -6,7 +6,8 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { api, ApiError } from '../../api/client';
+import { api } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import type { BoardState, Member, MemberRole } from '../../api/types';
 import { t } from '../../i18n';
 import { queryKeys } from '../../lib/query-client';
@@ -64,7 +65,7 @@ function MembersDialog({
     ]);
   };
   const failure = (error_: unknown): void => {
-    setError(error_ instanceof ApiError ? error_.message : t('common.error.generic'));
+    setError(failureMessage(error_));
   };
 
   const invite = useMutation({

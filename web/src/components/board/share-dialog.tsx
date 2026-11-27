@@ -8,7 +8,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy } from 'lucide-react';
 import { useState } from 'react';
-import { api, ApiError } from '../../api/client';
+import { api } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import type { AnonWrite, BoardLink, BoardState, LinkRole, Visibility } from '../../api/types';
 import { t } from '../../i18n';
 import { queryKeys } from '../../lib/query-client';
@@ -58,7 +59,7 @@ function ShareDialog({
   });
 
   const failure = (error_: unknown): void => {
-    setError(error_ instanceof ApiError ? error_.message : t('common.error.generic'));
+    setError(failureMessage(error_));
   };
   const refresh = async (): Promise<void> => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });

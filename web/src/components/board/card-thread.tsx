@@ -9,7 +9,8 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { api, ApiError, type CommentDto } from '../../api/client';
+import { api, type CommentDto } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import type { Caller } from '../../api/types';
 import { getLocale, t } from '../../i18n';
 import { queryKeys } from '../../lib/query-client';
@@ -221,5 +222,5 @@ function authorOf(comment: CommentDto): string {
 }
 
 function message(cause: unknown): string {
-  return cause instanceof ApiError ? (cause.hint ?? cause.message) : t('common.error.generic');
+  return failureMessage(cause);
 }

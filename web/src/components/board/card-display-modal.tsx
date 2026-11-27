@@ -2,6 +2,7 @@
 import { Check } from 'lucide-react';
 import { useRef } from 'react';
 import { ApiError } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import type { BoardState, Caller, Card } from '../../api/types';
 import { t } from '../../i18n';
 import { formatDate } from '../../lib/format';
@@ -129,7 +130,7 @@ export function errorMessage(error: unknown): string {
     if (error.code === 'conflict') return t('board.card.conflict');
     if (error.code === 'board_closed') return t('board.card.boardClosed');
   }
-  return t('common.error.generic');
+  return failureMessage(error);
 }
 
 /** The board state a modal needs, or nothing while the first fetch is in flight. */

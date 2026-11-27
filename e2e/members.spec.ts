@@ -75,3 +75,24 @@ test('invite, change role, remove and transfer', async ({ page, request }) => {
     return ((await response.json()) as { items: { username: string; role: string }[] }).items;
   }
 });
+
+/**
+ * The server explains a 4xx and the UI repeats it (docs/api.md §1).
+ *
+ * The dialog used to print "Something went wrong. Try again." — or the bare
+ * message — while the body carried a hint written for exactly this moment.
+ */
+test('a refusal shows the server explanation, not a generic apology', async ({ page, request }) => {
+  await openBoard(page, request, uniqueUsername('explain'), ['Alpha']);
+  await page.getByTestId('open-members').click();
+  const dialog = page.getByRole('dialog');
+
+  await dialog.getByLabel('Invite by username').fill('nobody-here');
+  await dialog.getByRole('button', { name: 'Add' }).click();
+
+  const alert = dialog.getByRole('alert');
+  await expect(alert).toContainText('No account with that username.');
+  // The hint is the half the old dialog dropped: the message is not the fix.
+  await expect(alert).toContainText('the person has to sign up first');
+  await expect(alert).not.toContainText('Something went wrong');
+});

@@ -6,7 +6,8 @@
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { api, ApiError } from '../../api/client';
+import { api } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import { t } from '../../i18n';
 import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
@@ -40,10 +41,7 @@ export function CloseBoardDialog({
       setError(null);
       onClosed();
     },
-    onError: (cause) =>
-      setError(
-        cause instanceof ApiError ? (cause.hint ?? cause.message) : t('common.error.generic'),
-      ),
+    onError: (cause) => setError(failureMessage(cause)),
   });
 
   return (

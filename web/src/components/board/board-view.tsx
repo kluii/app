@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import type { BoardState, Caller, Card, Column } from '../../api/types';
 import { t } from '../../i18n';
 import { applyCardFrame, cardIdOf, envelopeOf, dropCard, isCardEvent } from '../../data/boards';
@@ -183,7 +184,7 @@ export function BoardView({ boardId }: { boardId: string }) {
     if (status === 401) return <AnonymousEntry boardId={boardId} />;
     return (
       <div className="px-6 py-8">
-        <p className="text-body-sm text-ink-muted">{t('common.error.generic')}</p>
+        <p className="text-body-sm text-ink-muted">{failureMessage(state.error)}</p>
         <Button className="mt-3" size="sm" variant="ghost" onClick={() => void state.refetch()}>
           {t('common.action.retry')}
         </Button>
@@ -297,7 +298,7 @@ function AnonymousEntry({ boardId }: { boardId: string }) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
     },
     onError: (failure) => {
-      setError(failure instanceof ApiError ? failure.message : t('common.error.generic'));
+      setError(failureMessage(failure));
     },
   });
 

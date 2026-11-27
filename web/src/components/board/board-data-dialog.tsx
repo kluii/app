@@ -9,7 +9,8 @@
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { api, ApiError, type ImportResult } from '../../api/client';
+import { api, type ImportResult } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import { t } from '../../i18n';
 import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
@@ -44,9 +45,7 @@ export function BoardDataDialog({
     },
     onError: (cause) => {
       setResult(null);
-      setError(
-        cause instanceof ApiError ? (cause.hint ?? cause.message) : t('common.error.generic'),
-      );
+      setError(failureMessage(cause));
     },
   });
 
