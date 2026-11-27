@@ -7,6 +7,7 @@
  * HTTPS webhook for assignment and mention events. A broken or unconfigured
  * webhook logs a single failure and never enters a retry storm.
  */
+import { isIP } from 'node:net';
 import { Prisma } from '@prisma/client';
 import type { Db } from '../db.js';
 import { AppError } from '../lib/errors.js';
@@ -70,6 +71,107 @@ function parseMutedKinds(raw: unknown): NotificationKind[] {
   return [...unique];
 }
 
+function invalidWebhookUrl(message: string, detail: string): AppError {
+  return new AppError('validation_failed', {
+    message,
+    hint: 'Point the webhook at a public https endpoint you control.',
+    details: [{ path: 'webhook_url', code: 'custom', message: detail }],
+  });
+}
+
+/** Loopback, private, link-local and "this network": never a webhook target. */
+function isInternalIpv4(octets: readonly number[]): boolean {
+  const a = octets[0] ?? 0;
+  const b = octets[1] ?? 0;
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+/**
+ * IPv6 literal already canonicalized by the URL parser: zeros compressed and
+ * hex lowercased, so the textual prefixes below are stable.
+ */
+function isInternalIpv6(address: string): boolean {
+  if (address === '::' || address === '::1') return true;
+
+  const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u.exec(address);
+  if (mapped) {
+    const hi = Number.parseInt(mapped[1] ?? '0', 16);
+    const lo = Number.parseInt(mapped[2] ?? '0', 16);
+    return isInternalIpv4([hi >> 8, hi & 0xff, lo >> 8, lo & 0xff]);
+  }
+
+  const first = Number.parseInt(address.split(':')[0] ?? '', 16);
+  if (!Number.isInteger(first)) return true;
+  if ((first & 0xffc0) === 0xfe80) return true;
+  if ((first & 0xfe00) === 0xfc00) return true;
+  return false;
+}
+
+/**
+ * Refuse a webhook target that points inside the network.
+ *
+ * Called on write and again before every delivery, because a stored row can
+ * predate the rule. https only, no credentials in the URL, and no host that is a
+ * local name or an internal address literal.
+ *
+ * Residual risk, accepted by this change: the guard reads the URL, not the DNS
+ * answer, so a public hostname that resolves to a private address (a cooperating
+ * domain, or a rebinding record) is still reachable, and a public host can still
+ * redirect inward. Closing that needs a resolve-then-pin fetch — resolve, check
+ * every returned address, connect to the pinned address and refuse redirects —
+ * which is a separate change.
+ */
+export function assertPublicWebhookUrl(raw: string): void {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw invalidWebhookUrl('A webhook URL must be an absolute https URL.', 'unparseable URL');
+  }
+  if (url.protocol !== 'https:') {
+    throw invalidWebhookUrl('A webhook URL must be https.', 'expected the https scheme');
+  }
+  if (url.username !== '' || url.password !== '') {
+    throw invalidWebhookUrl('A webhook URL must not carry credentials.', 'credentials in the URL');
+  }
+
+  // The URL parser keeps a trailing root dot (`localhost.`) and the brackets
+  // around an IPv6 literal; the guard has to see the bare host.
+  const bracketed = url.hostname.toLowerCase();
+  const host = bracketed.endsWith('.') ? bracketed.slice(0, -1) : bracketed;
+  const bare = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+
+  const version = isIP(bare);
+  if (version !== 0) {
+    const internal =
+      version === 4 ? isInternalIpv4(bare.split('.').map(Number)) : isInternalIpv6(bare);
+    if (internal) {
+      throw invalidWebhookUrl(
+        'A webhook URL must not point at a loopback, private or link-local address.',
+        'internal address literal',
+      );
+    }
+    return;
+  }
+
+  if (
+    bare === 'localhost' ||
+    bare.endsWith('.localhost') ||
+    bare.endsWith('.local') ||
+    bare.endsWith('.internal') ||
+    !bare.includes('.')
+  ) {
+    throw invalidWebhookUrl(
+      'A webhook URL must name a public host.',
+      'local or single-label hostname',
+    );
+  }
+}
+
 function formatWebhookText(kind: NotificationKind, payload: Record<string, unknown>): string {
   const title = typeof payload.title === 'string' ? payload.title : null;
   const excerpt = typeof payload.body_excerpt === 'string' ? payload.body_excerpt : null;
@@ -109,6 +211,17 @@ export async function deliverNotificationWebhook(
     logger?.warn(
       { user_id: userId, kind: notification.kind },
       'notification webhook delivery skipped: webhook not configured',
+    );
+    return { delivered: false, attempts: 0 };
+  }
+
+  // A row written before the host rule existed must not become a request now.
+  try {
+    assertPublicWebhookUrl(pref.webhook_url);
+  } catch {
+    logger?.warn(
+      { user_id: userId, kind: notification.kind },
+      'notification webhook delivery skipped: target is not a public https URL',
     );
     return { delivered: false, attempts: 0 };
   }
@@ -313,13 +426,7 @@ export async function updateNotificationPrefs(
   input: { muted_kinds?: NotificationKind[]; webhook_url?: string | null },
 ): Promise<NotificationPrefDto> {
   if (input.webhook_url !== undefined && input.webhook_url !== null) {
-    if (!/^https:\/\//u.test(input.webhook_url)) {
-      throw new AppError('validation_failed', {
-        message: 'A webhook URL must be https.',
-        hint: 'Discord and Slack both accept https webhooks only.',
-        details: [{ path: 'webhook_url', code: 'custom', message: 'expected an https URL' }],
-      });
-    }
+    assertPublicWebhookUrl(input.webhook_url);
   }
   const muted = input.muted_kinds === undefined ? undefined : [...new Set(input.muted_kinds)];
   const data = {

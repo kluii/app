@@ -448,7 +448,7 @@
   "settings.sessions.unknownDevice": "Navigateur inconnu",
   "settings.sessions.unknownIp": "Adresse inconnue",
   "settings.subtitle": "{section} — une partie de votre compte.",
-  "settings.title": "Compte",
+  "settings.title": "Paramètres",
   "startup.loading": "Chargement",
   "styleguide.close": "Fermer",
   "styleguide.intro": "Chaque primitive dans chaque état, sur une page. Cette route n’est liée nulle part dans l’application ; elle existe pour que les états et axe soient vérifiables.",

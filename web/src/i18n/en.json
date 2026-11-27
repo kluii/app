@@ -448,7 +448,7 @@
   "settings.sessions.unknownDevice": "Unknown browser",
   "settings.sessions.unknownIp": "Unknown address",
   "settings.subtitle": "{section} — one part of your account.",
-  "settings.title": "Account",
+  "settings.title": "Settings",
   "startup.loading": "Loading",
   "styleguide.close": "Close",
   "styleguide.intro": "Every primitive in every state, on one page. This route is not linked from the app; it exists so the states and axe are checkable.",

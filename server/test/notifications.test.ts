@@ -180,3 +180,91 @@ describe('notifications (K5-04)', () => {
     }
   });
 });
+
+/**
+ * H2 — a webhook URL is an SSRF primitive if the server fetches it blindly: any
+ * signed-in account could aim it at an internal HTTPS service. The rule is
+ * applied on write and again at send time, because a stored row can predate it.
+ */
+describe('notification webhook targets (SSRF guard)', () => {
+  const INTERNAL_TARGETS = [
+    'http://hooks.example.com/insecure',
+    'https://localhost/hook',
+    'https://localhost./hook',
+    'https://api.localhost/hook',
+    'https://intranet/hook',
+    'https://printer.local/hook',
+    'https://metadata.internal/hook',
+    'https://127.0.0.1/hook',
+    'https://127.9.9.9/hook',
+    'https://[::1]/hook',
+    'https://10.1.2.3/hook',
+    'https://172.16.4.5/hook',
+    'https://192.168.0.10/hook',
+    'https://169.254.169.254/latest/meta-data/',
+    'https://[fe80::1]/hook',
+    'https://[fc00::1]/hook',
+    'https://0.0.0.0/hook',
+    'https://user:pass@hooks.example.com/hook',
+  ];
+
+  it('refuses a private, loopback, link-local or local-name target on PATCH /me/notifications/prefs', async () => {
+    const user = harness.client();
+    const created = await user.signup(`notif-ssrf-${user.suffix}`);
+
+    for (const target of INTERNAL_TARGETS) {
+      const refused = await user.request('PATCH', '/api/v1/me/notifications/prefs', {
+        webhook_url: target,
+      });
+      expect(refused.statusCode, target).toBe(400);
+      expect((refused.json() as { error: { code: string } }).error.code, target).toBe(
+        'validation_failed',
+      );
+    }
+
+    const stored = await harness.db.notificationPref.findUnique({
+      where: { user_id: created.id },
+    });
+    expect(stored?.webhook_url ?? null).toBeNull();
+
+    // A public https target is still accepted.
+    const accepted = await user.request('PATCH', '/api/v1/me/notifications/prefs', {
+      webhook_url: 'https://hooks.example.com/services/public',
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect((accepted.json() as { webhook_url: string }).webhook_url).toBe(
+      'https://hooks.example.com/services/public',
+    );
+  });
+
+  it('skips a stored row that points inside the network at send time, without a fetch', async () => {
+    const { deliverNotificationWebhook } = await import('../src/notifications/service.js');
+    const user = harness.client();
+    const created = await user.signup(`notif-stored-${user.suffix}`);
+
+    // Written straight to the table: the row predates the rule.
+    await harness.db.notificationPref.upsert({
+      where: { user_id: created.id },
+      create: { user_id: created.id, webhook_url: 'https://127.0.0.1:9000/internal' },
+      update: { webhook_url: 'https://127.0.0.1:9000/internal' },
+    });
+
+    const warnings: string[] = [];
+    const fetchSpy = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      const result = await deliverNotificationWebhook(
+        harness.db,
+        created.id,
+        { kind: 'assignment', payload: { title: 'Internal target' } },
+        { warn: (obj: unknown, msg?: string) => warnings.push(msg ?? JSON.stringify(obj)) },
+      );
+      expect(result.delivered).toBe(false);
+      expect(result.attempts).toBe(0);
+      expect(fetchSpy).toHaveBeenCalledTimes(0);
+      expect(warnings).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
