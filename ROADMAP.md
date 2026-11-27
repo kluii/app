@@ -320,7 +320,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Profile, password change, TOTP management, recovery codes, active sessions with revoke, digest preferences, delete account (with the documented cascade).
   **Exit:** revoking the current session signs out immediately; account deletion removes the user's memberships and anonymises their comments per `docs/security.md`.
 
-- [ ] **K5-09 — SSO behind a flag** `L` · dep: K1-03
+- [x] **K5-09 — SSO behind a flag** `L` · dep: K1-03 — verified in `docs/verify/k5.md` § K5-09
   OIDC provider framework: discovery, claim mapping, stable `provider_account_id`, admin UI with "test this provider", secrets encrypted at rest, per-provider enable flags, explicit account linking (never auto-link by email), break-glass local admin.
   **Exit:** a provider with a broken discovery URL shows a readable error in the admin UI and does not lock the instance out; an existing local account with the same email is not auto-linked.
 
