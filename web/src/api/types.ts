@@ -63,6 +63,7 @@ export type Caller = {
   can_write: boolean;
   can_manage: boolean;
   can_moderate: boolean;
+  can_close: boolean;
 };
 
 export type BoardState = {

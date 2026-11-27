@@ -2,6 +2,7 @@
 import { createRouter } from '@tanstack/react-router';
 import { authedRoute } from './authed';
 import { boardRoute } from './board';
+import { boardSummaryRoute } from './board-summary';
 import { boardsRoute } from './boards';
 import { indexRoute } from './index';
 import { loginRoute } from './login';
@@ -17,7 +18,7 @@ const routeTree = rootRoute.addChildren([
   signupRoute,
   resetRoute,
   styleguideRoute,
-  authedRoute.addChildren([boardsRoute, boardRoute, settingsRoute]),
+  authedRoute.addChildren([boardsRoute, boardRoute, boardSummaryRoute, settingsRoute]),
 ]);
 
 export const router = createRouter({

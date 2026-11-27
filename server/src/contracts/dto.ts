@@ -56,6 +56,8 @@ export type CallerDto = {
   can_write: boolean;
   can_manage: boolean;
   can_moderate: boolean;
+  /** `board.close`: owner or admin, and false once the board is closed. */
+  can_close: boolean;
 };
 
 export type BoardStateDto = {

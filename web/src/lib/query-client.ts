@@ -22,4 +22,5 @@ export const queryKeys = {
   board: (id: string) => ['board', id] as const,
   activity: (id: string, actorKind?: string) => ['activity', id, actorKind ?? 'all'] as const,
   comments: (cardId: string) => ['comments', cardId] as const,
+  summary: (boardId: string) => ['summary', boardId] as const,
 };

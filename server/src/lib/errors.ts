@@ -16,6 +16,7 @@ export type ErrorCode =
   | 'banned'
   | 'board_closed'
   | 'conflict'
+  | 'already_closed'
   | 'not_found'
   | 'board_not_found'
   | 'card_not_found'
@@ -75,6 +76,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   agent_key_not_found: 404,
   column_not_empty: 409,
   conflict: 409,
+  already_closed: 409,
   payload_too_large: 413,
   unsupported_schema: 400,
   unsupported_media_type: 415,
@@ -132,6 +134,8 @@ export function defaultMessage(code: ErrorCode): string {
       return 'You do not have permission to do that.';
     case 'csrf_failed':
       return 'The request could not be verified.';
+    case 'already_closed':
+      return 'This board is already closed.';
     case 'conflict':
       return 'This item changed while you were editing.';
     case 'validation_failed':

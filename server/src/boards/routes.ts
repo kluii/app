@@ -328,6 +328,7 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
       can_write: can(actor, 'card.create', policy, loaded.membership).allow,
       can_manage: can(actor, 'board.update', policy, loaded.membership).allow,
       can_moderate: can(actor, 'moderation.decide', policy, loaded.membership).allow,
+      can_close: can(actor, 'board.close', policy, loaded.membership).allow,
     };
 
     const body: BoardStateDto = {

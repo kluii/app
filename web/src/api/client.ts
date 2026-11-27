@@ -102,6 +102,22 @@ export type CommentDto = {
   updated_at: string;
 };
 
+export type BoardSummary = {
+  id: string;
+  board: { name: string; owner: string };
+  closed_at: string;
+  first_event_at: string | null;
+  last_event_at: string | null;
+  span_days: number;
+  counts: { cards: number; done: number; columns: number; members: number; agents: number };
+  done: { title: string; assignee: string | null; date: string | null }[];
+  remaining: { column: string; cards: { title: string; assignee: string | null }[] }[];
+  people: { label: string; kind: 'user' | 'agent' | 'anon'; events: number }[];
+  rhythm: string;
+  rhythm_counts: number[];
+  note: string | null;
+};
+
 export type ImportResult = {
   columns: number;
   cards: number;
@@ -169,6 +185,13 @@ export const api = {
   editComment: (commentId: string, body: string) =>
     request<CommentDto>('PATCH', `/comments/${commentId}`, { body }),
   deleteComment: (commentId: string) => request<void>('DELETE', `/comments/${commentId}`),
+
+  closeBoard: (boardId: string, note: string | null) =>
+    request<BoardSummary>('POST', `/boards/${boardId}/close`, {
+      confirm: true,
+      ...(note === null || note.trim() === '' ? {} : { note }),
+    }),
+  summary: (boardId: string) => request<BoardSummary>('GET', `/boards/${boardId}/summary`),
 
   importBoard: (boardId: string, file: File) =>
     requestFile<{ job_id: string; status: string; replayed: boolean; result: ImportResult }>(

@@ -36,7 +36,10 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
-      <header className="flex h-12 items-center justify-between border-b border-border px-4">
+      <header
+        data-app-chrome="true"
+        className="flex h-12 items-center justify-between border-b border-border px-4"
+      >
         <div className="flex items-center gap-3">
           <Link
             to="/boards"

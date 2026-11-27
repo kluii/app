@@ -14,6 +14,7 @@ import { Chip } from '../ui/chip';
 import { Input } from '../ui/input';
 import { ActivityDialog } from './activity-dialog';
 import { BoardDataDialog } from './board-data-dialog';
+import { CloseBoardDialog } from './close-board-dialog';
 import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from './board-filters';
 import { CardCreateModal } from './card-create-modal';
 import { CardDisplayModal, cardFromState } from './card-display-modal';
@@ -38,6 +39,7 @@ export function BoardView({ boardId }: { boardId: string }) {
   const [composer, setComposer] = useState<Composer>({ kind: 'closed' });
   const [activityOpen, setActivityOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [announcement, setAnnouncement] = useState('');
   const queryClient = useQueryClient();
@@ -192,6 +194,7 @@ export function BoardView({ boardId }: { boardId: string }) {
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
       onOpenData={() => setDataOpen(true)}
+      onOpenClose={() => setCloseOpen(true)}
       live={live}
       onMove={requestMove}
       onMoveTo={(cardId, columnId) =>
@@ -228,6 +231,16 @@ export function BoardView({ boardId }: { boardId: string }) {
         />
       ) : null}
       <BoardDataDialog boardId={boardId} open={dataOpen} onClose={() => setDataOpen(false)} />
+      <CloseBoardDialog
+        boardId={boardId}
+        boardName={state.data.board.name}
+        open={closeOpen}
+        onClose={() => setCloseOpen(false)}
+        onClosed={() => {
+          setCloseOpen(false);
+          void queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+        }}
+      />
       <ActivityDialog
         boardId={boardId}
         open={activityOpen}
@@ -261,6 +274,7 @@ function BoardFrame({
   onAddCard,
   onOpenActivity,
   onOpenData,
+  onOpenClose,
   live,
   onMove,
   onMoveTo,
@@ -277,6 +291,7 @@ function BoardFrame({
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
   onOpenData: () => void;
+  onOpenClose: () => void;
   live: LiveStatus;
   onMove: (request: MoveRequest) => void;
   onMoveTo: (cardId: string, columnId: string) => void;
@@ -305,6 +320,11 @@ function BoardFrame({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Chip>{t(`board.visibility.${board.visibility}`)}</Chip>
+          {board.closed_at === null ? null : (
+            <span data-testid="board-closed-chip">
+              <Chip>{t('board.closed.chip')}</Chip>
+            </span>
+          )}
           {live === 'closed' ? (
             <span className="font-mono text-mono-sm text-ink-subtle" data-testid="board-live">
               {t('common.label.reconnecting')}
@@ -323,6 +343,27 @@ function BoardFrame({
           <Button size="sm" variant="secondary" onClick={onOpenData} data-testid="open-board-data">
             {t('board.data.open')}
           </Button>
+          {board.closed_at === null ? (
+            caller.can_close && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={onOpenClose}
+                data-testid="open-close-board"
+              >
+                {t('board.close.open')}
+              </Button>
+            )
+          ) : (
+            <Link
+              className="inline-flex h-8 items-center rounded-sm border border-border bg-surface-2 px-3 text-body-sm text-ink hover:bg-surface-muted"
+              to="/boards/$boardId/summary"
+              params={{ boardId: board.id }}
+              data-testid="open-board-summary"
+            >
+              {t('board.summary.open')}
+            </Link>
+          )}
         </div>
       </div>
 

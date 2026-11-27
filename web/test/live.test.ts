@@ -73,6 +73,7 @@ describe('a board state under a frame', () => {
       can_write: true,
       can_manage: true,
       can_moderate: true,
+      can_close: true,
     },
     pending_count: 0,
   };

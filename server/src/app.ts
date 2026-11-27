@@ -27,6 +27,7 @@ import { registerColumnRoutes } from './columns/routes.js';
 import { registerCardRoutes } from './cards/routes.js';
 import { registerActivityRoutes } from './activity/routes.js';
 import { registerCommentRoutes } from './comments/routes.js';
+import { registerCloseoutRoutes } from './closeout/routes.js';
 import { registerResetRoutes } from './auth/reset-routes.js';
 import { registerAdminRoutes } from './admin/routes.js';
 import { registerExportRoutes } from './export/routes.js';
@@ -140,6 +141,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerColumnRoutes(scoped, { ...context, hub });
     registerCardRoutes(scoped, { ...context, hub });
     registerCommentRoutes(scoped, { ...context, hub });
+    registerCloseoutRoutes(scoped, { ...context, hub });
     registerActivityRoutes(scoped, { ...context, hub });
     registerResetRoutes(scoped, { ...context, hub });
     registerAdminRoutes(scoped, { ...context, hub });

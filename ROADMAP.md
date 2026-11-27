@@ -186,7 +186,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `GET /boards/:id/export.json` and `.md`, `POST /boards/:id/import` accepting `klui.export/v2`, `klui.export/v1` (Appendix A of the brief) and Trello JSON, deterministic ordering, stable ids.
   **Exit:** round-trip export → import into an empty database → export is byte-identical modulo timestamps; a real v1 fixture imported twice produces the same board twice; Trello import sets `done:false` deliberately.
 
-- [ ] **K2-12 — Close-out** `M` · dep: K2-11
+- [x] **K2-12 — Close-out** `M` · dep: K2-11
   `POST /boards/:id/close` freezes the board read-only and generates the summary (done / remaining / who did what / dates / span) from `events`, rendered as a page and exportable as markdown.
   **Exit:** closing twice answers `409`; a closed board refuses writes with `403 board_closed` but stays readable; the markdown summary contains every done card exactly once.
 
