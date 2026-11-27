@@ -182,7 +182,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `GET /api/v1/stream` SSE hub, event envelope, heartbeat, reconnect with `Last-Event-ID`, client merge by id, per-card rollback on failure.
   **Exit:** the race test (echo injected before the POST resolves) yields exactly one DOM node; a killed connection reconnects and converges without duplicates.
 
-- [ ] **K2-11 — Export and import** `L` · dep: K1-10
+- [x] **K2-11 — Export and import** `L` · dep: K1-10
   `GET /boards/:id/export.json` and `.md`, `POST /boards/:id/import` accepting `klui.export/v2`, `klui.export/v1` (Appendix A of the brief) and Trello JSON, deterministic ordering, stable ids.
   **Exit:** round-trip export → import into an empty database → export is byte-identical modulo timestamps; a real v1 fixture imported twice produces the same board twice; Trello import sets `done:false` deliberately.
 
