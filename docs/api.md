@@ -255,7 +255,7 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 | `GET` | `/me/digest` | `{enabled, hour, timezone, channels:{webhook,email,rss}, last_sent_at, rss_url?}`. `rss_url` is returned only immediately after rotation. |
 | `PATCH` | `/me/digest` | `{enabled?, hour?, timezone?, webhook?, email?, rss?: "rotate"|"disable"}`. |
 | `POST` | `/me/digest/test` | Builds the digest for real events and delivers to the configured channel; `{sent, sections, bytes}`. Empty digest → `{sent:false, reason:"empty"}`. |
-| `GET` | `/healthz` | `{"status":"ok","version":"2.0.0","db":"up"}`; `503` with `db:"down"` otherwise. No auth. |
+| `GET` | `/healthz` | `{"status":"ok","version":"<package version>","db":"up"}`; `503` with `db:"down"` otherwise. No auth. |
 | `GET` | `/metrics` | Off by default (`404`). When enabled: loopback or `Authorization: Bearer $KLUI_METRICS_TOKEN`. |
 | `POST` | `/mcp` | See `docs/mcp.md`. |
 | `GET` | `/api/v1/stream` | SSE. `?board=<id>` (repeatable). Auth as usual. |

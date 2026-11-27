@@ -4,7 +4,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: klui:2.0.0
+    # The tag is the package version. Nothing derives it at runtime:
+    # server/test/version.test.ts fails when this default, the three
+    # package.json files and /healthz disagree, so the four cannot drift.
+    # K5-10 raises them to 2.0.0 in one commit; a release build may override
+    # KLUI_VERSION.
+    image: klui:${KLUI_VERSION:-0.1.0}
     restart: unless-stopped
     depends_on:
       db:
