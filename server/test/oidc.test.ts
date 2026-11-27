@@ -6,8 +6,20 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startServer } from './helpers/server.js';
+import { createHmac, generateKeyPairSync, sign as cryptoSign } from 'node:crypto';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { startServer, type TestClient } from './helpers/server.js';
+
+/** The published signing key, and a second pair no JWKS entry mentions. */
+const KEY_PAIR = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const FOREIGN_KEY_PAIR = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const SIGNING_KID = 'test-signing-key-1';
+const PUBLIC_JWK = {
+  ...KEY_PAIR.publicKey.export({ format: 'jwk' }),
+  kid: SIGNING_KID,
+  alg: 'RS256',
+  use: 'sig',
+};
 
 type FakeIdpState = {
   sub: string;
@@ -18,7 +30,23 @@ type FakeIdpState = {
   lastNonce: string | null;
   lastCodeVerifier: string | null;
   lastClientSecret: string | null;
+  /** How the next ID token is minted; tests flip these to prove each refusal. */
+  algorithm: 'RS256' | 'HS256' | 'none';
+  signingKey: 'published' | 'foreign';
+  /** `null` means "whatever the client sent as client_id". */
+  audience: string | null;
+  /** `null` means "the fake issuer's own base URL". */
+  issuer: string | null;
+  expiresInSeconds: number;
 };
+
+function resetTokenMinting(state: FakeIdpState): void {
+  state.algorithm = 'RS256';
+  state.signingKey = 'published';
+  state.audience = null;
+  state.issuer = null;
+  state.expiresInSeconds = 300;
+}
 
 function startFakeIdp(state: FakeIdpState): Promise<{ url: string; close: () => Promise<void> }> {
   return new Promise((resolve) => {
@@ -33,8 +61,14 @@ function startFakeIdp(state: FakeIdpState): Promise<{ url: string; close: () => 
             authorization_endpoint: `${baseUrl}/authorize`,
             token_endpoint: `${baseUrl}/token`,
             userinfo_endpoint: `${baseUrl}/userinfo`,
+            jwks_uri: `${baseUrl}/jwks`,
           }),
         );
+        return;
+      }
+      if (url.pathname === '/jwks') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ keys: [PUBLIC_JWK] }));
         return;
       }
       if (url.pathname === '/token' && req.method === 'POST') {
@@ -44,26 +78,46 @@ function startFakeIdp(state: FakeIdpState): Promise<{ url: string; close: () => 
           const params = new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
           state.lastCodeVerifier = params.get('code_verifier');
           state.lastClientSecret = params.get('client_secret');
-          const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString(
-            'base64url',
-          );
-          const payload = Buffer.from(
-            JSON.stringify({
-              iss: baseUrl,
-              sub: state.sub,
-              email: state.email,
-              email_verified: true,
-              name: state.name,
-              preferred_username: state.preferredUsername,
-              nonce: state.lastNonce,
-            }),
-          ).toString('base64url');
+          const clientId = params.get('client_id') ?? 'unknown-client';
+          const now = Math.floor(Date.now() / 1000);
+
+          const header: Record<string, unknown> = { typ: 'JWT', alg: state.algorithm };
+          if (state.algorithm !== 'none') header.kid = SIGNING_KID;
+          const payload: Record<string, unknown> = {
+            iss: state.issuer ?? baseUrl,
+            aud: state.audience ?? clientId,
+            sub: state.sub,
+            email: state.email,
+            email_verified: true,
+            name: state.name,
+            preferred_username: state.preferredUsername,
+            nonce: state.lastNonce,
+            iat: now,
+            exp: now + state.expiresInSeconds,
+          };
+
+          const headerSegment = Buffer.from(JSON.stringify(header)).toString('base64url');
+          const payloadSegment = Buffer.from(JSON.stringify(payload)).toString('base64url');
+          const signingInput = `${headerSegment}.${payloadSegment}`;
+          let signatureSegment = '';
+          if (state.algorithm === 'RS256') {
+            const privateKey =
+              state.signingKey === 'published' ? KEY_PAIR.privateKey : FOREIGN_KEY_PAIR.privateKey;
+            signatureSegment = cryptoSign('sha256', Buffer.from(signingInput), privateKey).toString(
+              'base64url',
+            );
+          } else if (state.algorithm === 'HS256') {
+            signatureSegment = createHmac('sha256', state.lastClientSecret ?? '')
+              .update(signingInput)
+              .digest('base64url');
+          }
+
           res.writeHead(200, { 'content-type': 'application/json' });
           res.end(
             JSON.stringify({
               access_token: 'fake-access-token',
               token_type: 'Bearer',
-              id_token: `${header}.${payload}.sig`,
+              id_token: `${signingInput}.${signatureSegment}`,
             }),
           );
         });
@@ -106,6 +160,11 @@ const idpState: FakeIdpState = {
   lastNonce: null,
   lastCodeVerifier: null,
   lastClientSecret: null,
+  algorithm: 'RS256',
+  signingKey: 'published',
+  audience: null,
+  issuer: null,
+  expiresInSeconds: 300,
 };
 
 beforeAll(async () => {
@@ -303,5 +362,166 @@ describe('OIDC SSO behind a flag (K5-09)', () => {
     const me = await freshBrowser.request('GET', '/api/v1/me');
     expect(me.statusCode).toBe(200);
     expect((me.json() as { id: string }).id).toBe(localUser.id);
+  });
+});
+
+/**
+ * H1 — the ID token is verified before any claim is trusted: signature against
+ * the provider JWKS, then iss/aud/azp/exp/iat/nonce. An unsigned token is not
+ * "unverified but continue", it is refused.
+ */
+describe('OIDC ID token verification', () => {
+  const RUN = Date.now().toString(36);
+
+  beforeEach(() => {
+    resetTokenMinting(idpState);
+  });
+
+  let providerSeq = 0;
+
+  async function configureProvider(): Promise<{ slug: string; client: TestClient }> {
+    providerSeq += 1;
+    const { client } = await makeAdmin(`v${RUN}-${providerSeq}`);
+    const slug = `verify-${client.suffix}`;
+    const created = await client.request('POST', '/api/v1/admin/oidc/providers', {
+      slug,
+      name: 'Verifying IdP',
+      issuer_url: idp.url,
+      client_id: 'klui-verify-client',
+      client_secret: 'verify-secret-456',
+      enabled: true,
+    });
+    expect(created.statusCode).toBe(201);
+    return { slug, client };
+  }
+
+  /** Run start → callback with the fake IdP minting whatever `idpState` says. */
+  async function attemptLogin(slug: string): Promise<{
+    browser: TestClient;
+    callback: Awaited<ReturnType<TestClient['request']>>;
+  }> {
+    const browser = harness.client();
+    const startRes = await browser.request('GET', `/api/v1/auth/oidc/${slug}/start`);
+    expect(startRes.statusCode).toBe(302);
+    const authorizeUrl = new URL(String(startRes.headers.location));
+    const state = authorizeUrl.searchParams.get('state') ?? '';
+    idpState.lastNonce = authorizeUrl.searchParams.get('nonce');
+    const oidc = (startRes.cookies as { name: string; value: string }[]).find(
+      (cookie) => cookie.name === 'klui_oidc',
+    );
+    const callback = await browser.request(
+      'GET',
+      `/api/v1/auth/oidc/${slug}/callback?code=auth-code-verify&state=${encodeURIComponent(state)}`,
+      undefined,
+      { cookie: oidc ? `klui_oidc=${oidc.value}` : '' },
+    );
+    return { browser, callback };
+  }
+
+  it('accepts an RS256 ID token signed by a key published in the JWKS', async () => {
+    const { slug } = await configureProvider();
+    idpState.sub = `rs256-sub-${RUN}`;
+    idpState.email = `rs256-${RUN}@example.test`;
+    idpState.preferredUsername = `rs256-${RUN}`;
+
+    const { browser, callback } = await attemptLogin(slug);
+    expect(callback.statusCode).toBe(302);
+    expect(callback.headers.location).toBe('/boards');
+
+    const me = await browser.request('GET', '/api/v1/me');
+    expect(me.statusCode).toBe(200);
+    const created = await harness.db.user.findUnique({ where: { email: idpState.email } });
+    expect(created).not.toBeNull();
+    expect((me.json() as { id: string }).id).toBe(created?.id);
+    const link = await harness.db.oAuthAccount.findFirst({
+      where: { provider: slug, provider_account_id: idpState.sub },
+    });
+    expect(link?.user_id).toBe(created?.id);
+  });
+
+  it('accepts an HS256 ID token signed with the provider client secret', async () => {
+    const { slug } = await configureProvider();
+    idpState.algorithm = 'HS256';
+    idpState.sub = `hs256-sub-${RUN}`;
+    idpState.email = `hs256-${RUN}@example.test`;
+    idpState.preferredUsername = `hs256-${RUN}`;
+
+    const { browser, callback } = await attemptLogin(slug);
+    expect(callback.statusCode).toBe(302);
+    expect((await browser.request('GET', '/api/v1/me')).statusCode).toBe(200);
+  });
+
+  it('refuses an ID token signed by a key the JWKS does not publish, and creates no session', async () => {
+    const { slug } = await configureProvider();
+    idpState.signingKey = 'foreign';
+    idpState.sub = `forged-sub-${RUN}`;
+    idpState.email = `forged-${RUN}@example.test`;
+    idpState.preferredUsername = `forged-${RUN}`;
+
+    const { browser, callback } = await attemptLogin(slug);
+    expect(callback.statusCode).toBe(401);
+    expect((callback.json() as { error: { code: string } }).error.code).toBe('unauthenticated');
+
+    expect((await browser.request('GET', '/api/v1/me')).statusCode).toBe(401);
+    expect(await harness.db.user.findUnique({ where: { email: idpState.email } })).toBeNull();
+    expect(
+      await harness.db.oAuthAccount.findFirst({
+        where: { provider: slug, provider_account_id: idpState.sub },
+      }),
+    ).toBeNull();
+  });
+
+  it('refuses an expired ID token', async () => {
+    const { slug } = await configureProvider();
+    idpState.expiresInSeconds = -120;
+    idpState.sub = `expired-sub-${RUN}`;
+    idpState.email = `expired-${RUN}@example.test`;
+    idpState.preferredUsername = `expired-${RUN}`;
+
+    const { browser, callback } = await attemptLogin(slug);
+    expect(callback.statusCode).toBe(401);
+    expect((callback.json() as { error: { message: string } }).error.message).toContain('exp');
+    expect((await browser.request('GET', '/api/v1/me')).statusCode).toBe(401);
+  });
+
+  it('refuses an ID token whose aud names another client', async () => {
+    const { slug } = await configureProvider();
+    idpState.audience = 'some-other-client';
+    idpState.sub = `aud-sub-${RUN}`;
+    idpState.email = `aud-${RUN}@example.test`;
+    idpState.preferredUsername = `aud-${RUN}`;
+
+    const { browser, callback } = await attemptLogin(slug);
+    expect(callback.statusCode).toBe(401);
+    expect((callback.json() as { error: { message: string } }).error.message).toContain('aud');
+    expect((await browser.request('GET', '/api/v1/me')).statusCode).toBe(401);
+  });
+
+  it('refuses an ID token whose iss names another issuer', async () => {
+    const { slug } = await configureProvider();
+    idpState.issuer = 'https://issuer.example.test';
+    idpState.sub = `iss-sub-${RUN}`;
+    idpState.email = `iss-${RUN}@example.test`;
+    idpState.preferredUsername = `iss-${RUN}`;
+
+    const { browser, callback } = await attemptLogin(slug);
+    expect(callback.statusCode).toBe(401);
+    expect((callback.json() as { error: { message: string } }).error.message).toContain('iss');
+    expect((await browser.request('GET', '/api/v1/me')).statusCode).toBe(401);
+  });
+
+  it('refuses an alg: none ID token', async () => {
+    const { slug } = await configureProvider();
+    idpState.algorithm = 'none';
+    idpState.sub = `none-sub-${RUN}`;
+    idpState.email = `none-${RUN}@example.test`;
+    idpState.preferredUsername = `none-${RUN}`;
+
+    const { browser, callback } = await attemptLogin(slug);
+    expect(callback.statusCode).toBe(401);
+    const body = callback.json() as { error: { code: string; hint: string | null } };
+    expect(body.error.code).toBe('unauthenticated');
+    expect(body.error.hint).toBe('This instance verifies RS256, PS256 and HS256 ID tokens.');
+    expect((await browser.request('GET', '/api/v1/me')).statusCode).toBe(401);
   });
 });

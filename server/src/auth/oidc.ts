@@ -6,11 +6,23 @@
  *   never returned by any API endpoint.
  * - Authorization code + PKCE (S256), state and nonce stored in a signed
  *   httpOnly cookie.
+ * - The ID token's signature, issuer, audience, authorized party, expiry and
+ *   nonce are verified before any claim is trusted: RS256 and PS256 against the
+ *   provider JWKS, HS256 against the client secret. Nothing else is accepted.
  * - Account linking is strictly explicit: an existing local account sharing an
  *   email address is NEVER auto-linked.
  * - A broken discovery URL or failing IdP never locks out local password login.
  */
-import { createHash, randomBytes } from 'node:crypto';
+import {
+  constants as cryptoConstants,
+  createHash,
+  createHmac,
+  createPublicKey,
+  randomBytes,
+  timingSafeEqual,
+  verify as cryptoVerify,
+  type webcrypto,
+} from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { Db } from '../db.js';
 import type { Env } from '../env.js';
@@ -53,6 +65,8 @@ export type OidcDiscovery = {
   authorization_endpoint: string;
   token_endpoint: string;
   userinfo_endpoint?: string;
+  /** The provider's key set; required for RS256 and PS256 ID tokens. */
+  jwks_uri?: string;
 };
 
 export type OidcTestResult =
@@ -242,6 +256,7 @@ export async function discoverOidc(
     const tokenEndpoint = typeof raw.token_endpoint === 'string' ? raw.token_endpoint : '';
     const userinfoEndpoint =
       typeof raw.userinfo_endpoint === 'string' ? raw.userinfo_endpoint : undefined;
+    const jwksUri = typeof raw.jwks_uri === 'string' ? raw.jwks_uri : undefined;
 
     if (!authorizationEndpoint || !tokenEndpoint) {
       return {
@@ -257,6 +272,7 @@ export async function discoverOidc(
         authorization_endpoint: authorizationEndpoint,
         token_endpoint: tokenEndpoint,
         ...(userinfoEndpoint ? { userinfo_endpoint: userinfoEndpoint } : {}),
+        ...(jwksUri ? { jwks_uri: jwksUri } : {}),
       },
     };
   } catch (error) {
@@ -359,15 +375,260 @@ type OidcClaims = {
   nonce: string | null;
 };
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split('.');
-  if (parts.length < 2 || !parts[1]) return null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function decodeJwtSegment(segment: string): Record<string, unknown> | null {
   try {
-    const json = Buffer.from(parts[1], 'base64url').toString('utf8');
-    return JSON.parse(json) as Record<string, unknown>;
+    const json = Buffer.from(segment, 'base64url').toString('utf8');
+    const parsed: unknown = JSON.parse(json);
+    return isRecord(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+/** Accepted ID token signatures. Everything else — including `none` — is refused. */
+const ID_TOKEN_ALGORITHMS = ['RS256', 'PS256', 'HS256'] as const;
+type IdTokenAlgorithm = (typeof ID_TOKEN_ALGORITHMS)[number];
+
+function idTokenAlgorithm(value: unknown): IdTokenAlgorithm | null {
+  return ID_TOKEN_ALGORITHMS.find((candidate) => candidate === value) ?? null;
+}
+
+const JWKS_TTL_MS = 10 * 60 * 1000;
+const JWKS_TIMEOUT_MS = 5_000;
+const CLOCK_SKEW_SECONDS = 60;
+
+/**
+ * Key sets cached in memory for ten minutes, keyed by `jwks_uri`. The key is a
+ * provider-configured URL, so the map is bounded by the number of providers,
+ * not by traffic.
+ */
+const jwksCache = new Map<string, { keys: Record<string, unknown>[]; fetchedAt: number }>();
+
+function signatureFailure(message: string): AppError {
+  return new AppError('unauthenticated', {
+    message,
+    hint: 'Start the sign-in flow again.',
+  });
+}
+
+async function fetchJwksKeys(jwksUri: string): Promise<Record<string, unknown>[]> {
+  const cached = jwksCache.get(jwksUri);
+  if (cached !== undefined && Date.now() - cached.fetchedAt < JWKS_TTL_MS) {
+    return cached.keys;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(jwksUri, {
+      method: 'GET',
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(JWKS_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new AppError('service_unavailable', {
+      message: `OIDC JWKS endpoint ${jwksUri} is unreachable: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      hint: 'Sign in with your local password or retry later.',
+    });
+  }
+  if (!response.ok) {
+    throw new AppError('service_unavailable', {
+      message: `OIDC JWKS endpoint ${jwksUri} answered HTTP ${response.status}.`,
+      hint: 'Sign in with your local password or retry later.',
+    });
+  }
+
+  const body: unknown = await response.json();
+  const keys = isRecord(body) && Array.isArray(body.keys) ? body.keys.filter(isRecord) : [];
+  if (keys.length === 0) {
+    throw new AppError('service_unavailable', {
+      message: `OIDC JWKS endpoint ${jwksUri} published no usable keys.`,
+      hint: 'Sign in with your local password or retry later.',
+    });
+  }
+  jwksCache.set(jwksUri, { keys, fetchedAt: Date.now() });
+  return keys;
+}
+
+/** Pick the signing key by `kid`, or the only key when the header names none. */
+function selectJwk(
+  keys: Record<string, unknown>[],
+  kid: string | null,
+): Record<string, unknown> | null {
+  if (kid === null) return keys.length === 1 ? (keys[0] ?? null) : null;
+  return keys.find((key) => key.kid === kid) ?? null;
+}
+
+function verifyAsymmetric(input: {
+  algorithm: 'RS256' | 'PS256';
+  signingInput: string;
+  signature: Buffer;
+  jwk: Record<string, unknown>;
+}): boolean {
+  let publicKey: ReturnType<typeof createPublicKey>;
+  try {
+    publicKey = createPublicKey({
+      key: input.jwk as unknown as webcrypto.JsonWebKey,
+      format: 'jwk',
+    });
+  } catch {
+    return false;
+  }
+  const verifyOptions =
+    input.algorithm === 'RS256'
+      ? { key: publicKey, padding: cryptoConstants.RSA_PKCS1_PADDING }
+      : {
+          key: publicKey,
+          padding: cryptoConstants.RSA_PKCS1_PSS_PADDING,
+          saltLength: cryptoConstants.RSA_PSS_SALTLEN_DIGEST,
+        };
+  try {
+    return cryptoVerify(
+      'sha256',
+      Buffer.from(input.signingInput, 'utf8'),
+      verifyOptions,
+      input.signature,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function verifyHmac(input: {
+  signingInput: string;
+  signature: Buffer;
+  clientSecret: string;
+}): boolean {
+  const expected = createHmac('sha256', input.clientSecret)
+    .update(input.signingInput, 'utf8')
+    .digest();
+  return expected.length === input.signature.length && timingSafeEqual(expected, input.signature);
+}
+
+function assertIdTokenClaims(
+  claims: Record<string, unknown>,
+  input: { issuer: string; clientId: string; expectedNonce: string },
+): void {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  const exp = claims.exp;
+  if (typeof exp !== 'number' || !Number.isFinite(exp)) {
+    throw signatureFailure('OIDC ID token is missing a numeric exp claim.');
+  }
+  if (exp <= nowSeconds - CLOCK_SKEW_SECONDS) {
+    throw signatureFailure('OIDC ID token exp is in the past.');
+  }
+
+  const iat = claims.iat;
+  if (iat !== undefined) {
+    if (typeof iat !== 'number' || !Number.isFinite(iat)) {
+      throw signatureFailure('OIDC ID token has a non-numeric iat claim.');
+    }
+    if (iat > nowSeconds + CLOCK_SKEW_SECONDS) {
+      throw signatureFailure('OIDC ID token iat is more than 60 s in the future.');
+    }
+  }
+
+  if (claims.iss !== input.issuer) {
+    throw signatureFailure('OIDC ID token iss does not match the configured issuer.');
+  }
+
+  const aud = claims.aud;
+  const audMatches =
+    aud === input.clientId || (Array.isArray(aud) && aud.some((entry) => entry === input.clientId));
+  if (!audMatches) {
+    throw signatureFailure('OIDC ID token aud does not name this client.');
+  }
+
+  if (claims.azp !== undefined && claims.azp !== input.clientId) {
+    throw signatureFailure('OIDC ID token azp does not match this client.');
+  }
+
+  if (claims.nonce !== input.expectedNonce) {
+    throw signatureFailure('OIDC nonce mismatch.');
+  }
+}
+
+/**
+ * Verify the ID token end to end before a single claim is read: algorithm
+ * allow-list, signature over the signing input, then the claims that bind the
+ * token to this client, this issuer, this flow and this moment.
+ */
+async function verifyIdToken(input: {
+  token: string;
+  discovery: OidcDiscovery;
+  clientId: string;
+  clientSecret: string;
+  expectedNonce: string;
+}): Promise<Record<string, unknown>> {
+  const segments = input.token.split('.');
+  if (segments.length !== 3) {
+    throw signatureFailure('OIDC provider returned a malformed ID token.');
+  }
+  const [headerSegment, payloadSegment, signatureSegment] = segments;
+  if (!headerSegment || !payloadSegment || signatureSegment === undefined) {
+    throw signatureFailure('OIDC provider returned a malformed ID token.');
+  }
+
+  // The algorithm is read before the signature is looked at: an unsigned token
+  // is refused as an unsupported algorithm, not as a malformed one.
+  const header = decodeJwtSegment(headerSegment);
+  const rawAlg = header?.alg;
+  const algorithm = idTokenAlgorithm(rawAlg);
+  if (algorithm === null) {
+    throw new AppError('unauthenticated', {
+      message: `OIDC ID token algorithm "${typeof rawAlg === 'string' ? rawAlg : 'unset'}" is not accepted.`,
+      hint: 'This instance verifies RS256, PS256 and HS256 ID tokens.',
+    });
+  }
+
+  const signingInput = `${headerSegment}.${payloadSegment}`;
+  const signature = Buffer.from(signatureSegment, 'base64url');
+  const kid = typeof header?.kid === 'string' ? header.kid : null;
+
+  if (algorithm === 'HS256') {
+    if (!verifyHmac({ signingInput, signature, clientSecret: input.clientSecret })) {
+      throw signatureFailure(
+        'OIDC ID token HMAC signature does not verify against the client secret.',
+      );
+    }
+  } else {
+    if (!input.discovery.jwks_uri) {
+      throw new AppError('service_unavailable', {
+        message:
+          'OIDC discovery document advertises no jwks_uri, so the ID token signature cannot be verified.',
+        hint: 'Fix the provider configuration or sign in with your local password.',
+      });
+    }
+    const keys = await fetchJwksKeys(input.discovery.jwks_uri);
+    const jwk = selectJwk(keys, kid);
+    if (jwk === null) {
+      throw signatureFailure(
+        kid === null
+          ? 'OIDC ID token names no kid and the provider publishes more than one key.'
+          : `OIDC ID token kid "${kid}" is not published by the provider JWKS.`,
+      );
+    }
+    if (!verifyAsymmetric({ algorithm, signingInput, signature, jwk })) {
+      throw signatureFailure('OIDC ID token signature does not verify against the provider JWKS.');
+    }
+  }
+
+  const claims = decodeJwtSegment(payloadSegment);
+  if (claims === null) {
+    throw signatureFailure('OIDC provider returned a malformed ID token.');
+  }
+  assertIdTokenClaims(claims, {
+    issuer: input.discovery.issuer,
+    clientId: input.clientId,
+    expectedNonce: input.expectedNonce,
+  });
+  return claims;
 }
 
 async function exchangeCodeForClaims(input: {
@@ -416,20 +677,13 @@ async function exchangeCodeForClaims(input: {
   };
   let claims: Record<string, unknown> = {};
   if (typeof tokens.id_token === 'string') {
-    const decoded = decodeJwtPayload(tokens.id_token);
-    if (!decoded) {
-      throw new AppError('unauthenticated', {
-        message: 'OIDC provider returned a malformed ID token.',
-        hint: 'Start the sign-in flow again.',
-      });
-    }
-    if (decoded.nonce !== input.expectedNonce) {
-      throw new AppError('unauthenticated', {
-        message: 'OIDC nonce mismatch.',
-        hint: 'Start the sign-in flow again.',
-      });
-    }
-    claims = { ...decoded };
+    claims = await verifyIdToken({
+      token: tokens.id_token,
+      discovery: input.discovery,
+      clientId: input.clientId,
+      clientSecret: input.clientSecret,
+      expectedNonce: input.expectedNonce,
+    });
   }
 
   if (
