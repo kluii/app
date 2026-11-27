@@ -282,7 +282,7 @@ describe('agent key buckets', () => {
         return (response.json() as { key: string }).key;
       };
 
-      const write = async (key: string): Promise<Response> =>
+      const write = async (key: string) =>
         harness.app.inject({
           method: 'PATCH',
           url: '/api/v1/me',

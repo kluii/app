@@ -1,0 +1,224 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+/**
+ * `POST /mcp` — stateless JSON-RPC 2.0 (docs/mcp.md §1).
+ *
+ * No session, no state between calls: the credential on the request is the
+ * whole context, which is why revocation is effective on the next call. A
+ * `GET` answers 405 rather than pretending the endpoint streams.
+ */
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
+import type { AppContext } from '../app.js';
+import { AppError } from '../lib/errors.js';
+import { readVersion } from '../lib/version.js';
+import { TOOL_EXAMPLES, TOOL_NAMES, TOOL_SCHEMAS, type ToolName } from './schemas.js';
+import { TOOL_HANDLERS } from './tools.js';
+import { appErrorToRpc, closestTools, zodToRpc, type RpcId } from './errors.js';
+import { createHub } from '../realtime/events.js';
+
+const PROTOCOL_VERSION = '2025-06-18';
+const SUPPORTED_VERSIONS = new Set([PROTOCOL_VERSION, '2025-03-26']);
+
+type RpcRequest = {
+  jsonrpc?: unknown;
+  id?: unknown;
+  method?: unknown;
+  params?: unknown;
+};
+
+type RpcResponse = {
+  jsonrpc: '2.0';
+  id: RpcId;
+  result?: unknown;
+  error?: { code: number; message: string; data?: Record<string, unknown> };
+};
+
+function idOf(message: RpcRequest): RpcId {
+  if (typeof message.id === 'string' || typeof message.id === 'number') return message.id;
+  return null;
+}
+
+function errorOf(
+  id: RpcId,
+  code: number,
+  message: string,
+  data?: Record<string, unknown>,
+): RpcResponse {
+  return { jsonrpc: '2.0', id, error: { code, message, ...(data === undefined ? {} : { data }) } };
+}
+
+function toolSchemas(): {
+  name: ToolName;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}[] {
+  return TOOL_NAMES.map((name) => ({
+    name,
+    description: DESCRIPTIONS[name],
+    inputSchema: z.toJSONSchema(TOOL_SCHEMAS[name], { io: 'input' }) as Record<string, unknown>,
+  }));
+}
+
+const DESCRIPTIONS: Record<ToolName, string> = {
+  list_boards: 'Boards the credential can read, newest activity first.',
+  get_board: 'One round trip: board, columns, cards, members and caller role.',
+  create_board: 'Create a board; templates are not exposed to agents.',
+  update_board: 'Rename, re-slug or change visibility, link role and anonymous policy.',
+  delete_board: 'Irreversible. Requires confirm:true.',
+  create_column: 'Add a column, optionally between two neighbours.',
+  update_column: 'Rename a column.',
+  delete_column: 'Delete a column; cards must be moved or explicitly deleted with it.',
+  create_card: 'Create one card. Use bulk_create_cards for more than five.',
+  bulk_create_cards: 'Create up to 200 cards in one transaction; counts as one write.',
+  get_card: 'Read one card with its tags, comments count and actor label.',
+  update_card: 'Change a card; pass expected_updated_at for a card you did not just create.',
+  move_card: 'Move a card using neighbours, never an index.',
+  set_card_done: 'Mark a card done or reopen it.',
+  delete_card: 'Delete a card.',
+  list_comments: 'Comments on a card, oldest first.',
+  create_comment: 'Add a comment to a card.',
+  search_cards: 'Server-side filter; caps at 50 results.',
+  get_activity: 'The event log for a board, newest first.',
+  export_board: 'The board as klui.export/v2 JSON or Markdown, inline under 256 KB.',
+  whoami: 'The account and scope behind this credential.',
+};
+
+async function handleToolCall(
+  context: AppContext,
+  request: FastifyRequest,
+  message: RpcRequest,
+): Promise<RpcResponse> {
+  const id = idOf(message);
+  const params = message.params as { name?: unknown; arguments?: unknown } | undefined;
+  if (params === undefined || typeof params.name !== 'string') {
+    return errorOf(id, -32602, "Invalid params: 'name' must be a tool name.", {
+      parameter: 'name',
+      expected: 'string',
+      received: params?.name === undefined ? 'undefined' : typeof params.name,
+      example: TOOL_EXAMPLES.list_boards,
+    });
+  }
+  const name = params.name;
+  if (!TOOL_NAMES.includes(name as ToolName)) {
+    return errorOf(id, -32601, `Unknown tool: ${name}.`, {
+      hint: `Did you mean ${closestTools(name, TOOL_NAMES).join(', ')}?`,
+    });
+  }
+  const tool = name as ToolName;
+  const parsed = TOOL_SCHEMAS[tool].safeParse(params.arguments ?? {});
+  if (!parsed.success) return { jsonrpc: '2.0', id, error: zodToRpc(tool, parsed.error) };
+
+  const db = context.db;
+  if (!db) throw new AppError('internal', { message: 'database is required', hint: null });
+  if (!request.actor) throw new AppError('unauthenticated');
+
+  try {
+    const result = await TOOL_HANDLERS[tool](
+      { db, actor: request.actor, env: context.env, hub: context.hub ?? createHub() },
+      parsed.data as never,
+    );
+    return {
+      jsonrpc: '2.0',
+      id,
+      result: {
+        content: [{ type: 'text', text: JSON.stringify(result) }],
+        structuredContent: result as Record<string, unknown>,
+        isError: false,
+      },
+    };
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { jsonrpc: '2.0', id, error: appErrorToRpc(error) };
+    }
+    throw error;
+  }
+}
+
+async function handleMessage(
+  context: AppContext,
+  request: FastifyRequest,
+  raw: unknown,
+): Promise<RpcResponse | null> {
+  if (typeof raw !== 'object' || raw === null) {
+    return errorOf(null, -32600, 'Invalid Request: expected a JSON object.');
+  }
+  const message = raw as RpcRequest;
+  const id = idOf(message);
+  if (message.jsonrpc !== '2.0' || typeof message.method !== 'string') {
+    return errorOf(id, -32600, "Invalid Request: 'jsonrpc' must be '2.0' and 'method' a string.");
+  }
+
+  // Notifications are accepted and answered with 202, in a batch or alone.
+  if (message.method.startsWith('notifications/')) return null;
+
+  switch (message.method) {
+    case 'initialize': {
+      const params = message.params as { protocolVersion?: unknown } | undefined;
+      const requested =
+        typeof params?.protocolVersion === 'string' ? params.protocolVersion : PROTOCOL_VERSION;
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          protocolVersion: SUPPORTED_VERSIONS.has(requested) ? requested : PROTOCOL_VERSION,
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'klui', version: readVersion() },
+        },
+      };
+    }
+    case 'ping':
+      return { jsonrpc: '2.0', id, result: {} };
+    case 'tools/list':
+      return { jsonrpc: '2.0', id, result: { tools: toolSchemas() } };
+    case 'tools/call':
+      return handleToolCall(context, request, message);
+    default:
+      return errorOf(id, -32601, `Unknown method: ${message.method}.`, {
+        hint: 'Supported: initialize, ping, tools/list, tools/call, notifications/*.',
+      });
+  }
+}
+
+export function registerMcpRoutes(app: FastifyInstance, context: AppContext): void {
+  app.get('/mcp', async (_request: FastifyRequest, reply: FastifyReply) => {
+    reply.header('allow', 'POST');
+    return reply.code(405).send({
+      jsonrpc: '2.0',
+      id: null,
+      error: {
+        code: -32600,
+        message: 'GET /mcp is not supported.',
+        data: { hint: 'POST a JSON-RPC message to /mcp.' },
+      },
+    });
+  });
+
+  app.post('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
+    const contentType = request.headers['content-type'] ?? '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      throw new AppError('unsupported_media_type', {
+        message: 'The MCP endpoint reads application/json.',
+        hint: 'Send Content-Type: application/json.',
+      });
+    }
+    if (!request.actor) {
+      reply.header('www-authenticate', 'Bearer');
+      return reply.code(401).send(
+        errorOf(null, -32001, 'Unauthenticated: MCP needs a bearer credential.', {
+          hint: 'Send Authorization: Bearer kb_… (an agent key).',
+        }),
+      );
+    }
+
+    const body = request.body;
+    const batch = Array.isArray(body);
+    const messages = batch ? body : [body];
+    const responses: RpcResponse[] = [];
+    for (const message of messages) {
+      const response = await handleMessage(context, request, message);
+      if (response !== null) responses.push(response);
+    }
+    if (responses.length === 0) return reply.code(202).send();
+    return batch ? responses : responses[0];
+  });
+}

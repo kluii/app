@@ -254,7 +254,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `POST/GET/DELETE /agent-keys`, `POST /agent-keys/:id/test`; `kb_` prefix, `sha256` at rest, shown once, scope (`board` | `user`), expiry, revoke, `last_used_at`, rate limit per key.
   **Exit:** a board-scoped key cannot read another board even when its owner is an instance admin (test); a revoked key answers `401` on the next call; the raw key never appears in logs (grep the log fixture).
 
-- [ ] **K4-02 — MCP transport** `M` · dep: K4-01
+- [x] **K4-02 — MCP transport** `M` · dep: K4-01
   `POST /mcp`, stateless JSON-RPC 2.0, `Accept: application/json, text/event-stream`, `initialize`, `tools/list`, `tools/call`, `notifications/*` tolerated, error envelope with parameter name, expected type and one working example.
   **Exit:** a raw `curl` initialize + tools/list returns all 21 tools; an unknown tool answers `-32601`; a bad argument answers `-32602` naming the parameter and an example.
 
