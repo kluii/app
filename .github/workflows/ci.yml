@@ -1,10 +1,13 @@
-# The gate, on every push to every branch. A workflow that exists but never ran
-# is not CI (docs/testing.md §11), so the run URL is recorded in docs/verify/.
+# The gate, on every push to every branch, and on a release tag — a tag push
+# matches no branch, so without `tags` the `release` job below could never run.
+# A workflow that exists but never ran is not CI (docs/testing.md §11), so the run
+# URL is recorded in docs/verify/.
 name: ci
 
 on:
   push:
     branches: ['**']
+    tags: ['v*']
   pull_request:
 
 concurrency:
