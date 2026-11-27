@@ -135,3 +135,22 @@ key really is read-only.
 Revisit if an agent-to-agent handoff ever needs a credential narrower than the
 person who created it. Until then a second permission source is the bug, not
 the feature.
+
+### D-57 — One agent bucket for MCP, until the transport can classify a call
+
+`docs/mcp.md` §5 separates reads (600/min per key) from writes (60/min, burst
+20). The bucket is filled in `onRequest` by `settings/ratelimit.ts`, which
+decides "write" from the HTTP method — and every MCP call is a `POST /mcp`.
+So an agent painting a board is throttled at 60 calls a minute whatever it is
+doing, and a `list_boards` in a loop costs the same as a `create_card`.
+
+That is a real gap between a frozen document and the code, found while proving
+`-32004`, and it is not fixed here because the fix is transport work, not a
+handler: the bucket has to move into `/mcp` after the JSON-RPC body is parsed,
+where `params.name` says `get_board` (a read) or `create_card` (a write), and
+the response has to carry `x-ratelimit-remaining` for the bucket that was
+actually charged. Doing it in `onRequest` would mean parsing the body twice.
+
+Until then: one bucket, the write one, and §5's read allowance is a promise the
+endpoint does not keep. The next agent that touches `settings/ratelimit.ts`
+should close it, and the test is a key that reads 100 times and writes once.
