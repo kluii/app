@@ -329,11 +329,11 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 
 ## Not yet served
 
-The tables above are the contract. These rows are documented and answered by
-nobody yet, listed here so the difference is a claim with an owner instead of a
-gap a reader discovers with a 404. `server/test/api-docs.test.ts` fails when one
-of them starts being served (then it moves up into its section) and when one
-names a roadmap id that does not exist.
+The tables above are the contract. A row that is documented and answered by
+nobody yet is listed here, so the difference is a claim with an owner instead of
+a gap a reader discovers with a 404. `server/test/api-docs.test.ts` fails when
+one of them starts being served (then it moves up into its section). The table
+is empty: every path this file documents is answered by the server today.
 
 | Method | Path | Serves it |
 |---|---|---|
