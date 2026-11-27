@@ -10,6 +10,7 @@ import helmet from '@fastify/helmet';
 import type { Env } from './env.js';
 import type { Db } from './db.js';
 import { AppError, toWire } from './lib/errors.js';
+import { appErrorToRpc } from './mcp/errors.js';
 import { loggerOptions } from './lib/logger.js';
 import { registerHealth } from './settings/health.js';
 import { registerRateLimit } from './settings/ratelimit.js';
@@ -203,6 +204,12 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     if (error instanceof AppError) {
       const { status, body } = toWire(error, String(request.id));
+      // `/mcp` answers in JSON-RPC even for a refusal raised before the handler
+      // ran — the agent rate limit is one (docs/mcp.md §2, §5). A REST envelope
+      // here would be a second error vocabulary on a protocol endpoint.
+      if (request.url.startsWith('/mcp')) {
+        return reply.code(status).send({ jsonrpc: '2.0', id: null, error: appErrorToRpc(error) });
+      }
       // A browser navigating to a dead URL gets the app's 404 page, not JSON;
       // an API client gets the envelope it parses (docs/api.md §1).
       if (status === 404 && assets && isSpaNavigation(request.url, request.headers.accept)) {

@@ -614,3 +614,48 @@ async function username(): Promise<string> {
   const me = await call('whoami');
   return (me.user as { username: string }).username;
 }
+
+/**
+ * docs/mcp.md §5: the agent bucket is exceeded with `-32004` and
+ * `data.retry_after_s`, over HTTP 429 with `Retry-After`. The bucket is filled
+ * by the onRequest hook, before the JSON-RPC handler runs, so this is also the
+ * test that the endpoint never answers a protocol call with the REST envelope.
+ */
+describe('an exhausted agent bucket is still JSON-RPC', () => {
+  it('answers -32004 with retry_after_s and a 429 + Retry-After', async () => {
+    const tight = await startServer({ env: { KLUI_AGENT_WRITES: 2, KLUI_AGENT_READS: 2 } });
+    try {
+      const client = tight.client();
+      await client.signup(`mcp-tight-${client.suffix}`);
+      const created = await client.request('POST', '/api/v1/agent-keys', {
+        name: 'tight',
+        scope: 'user',
+      });
+      const tightKey = (created.json() as { key: string }).key;
+
+      const send = () =>
+        tight.app.inject({
+          method: 'POST',
+          url: '/mcp',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${tightKey}` },
+          payload: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+        });
+
+      expect((await send()).statusCode).toBe(200);
+      expect((await send()).statusCode).toBe(200);
+      const blocked = await send();
+      expect(blocked.statusCode).toBe(429);
+      expect(blocked.headers['retry-after']).toBeDefined();
+      const body = blocked.json() as {
+        jsonrpc?: string;
+        error?: { code: number; data?: { code?: string; retry_after_s?: number } };
+      };
+      expect(body.jsonrpc).toBe('2.0');
+      expect(body.error?.code).toBe(-32004);
+      expect(body.error?.data?.code).toBe('rate_limited');
+      expect(body.error?.data?.retry_after_s).toBeGreaterThan(0);
+    } finally {
+      await tight.close();
+    }
+  });
+});
