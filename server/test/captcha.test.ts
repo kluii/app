@@ -11,6 +11,8 @@ import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { loadEnv } from '../src/env.js';
 import { anonLimiter } from '../src/anon/limits.js';
+import type { Db } from '../src/db.js';
+import { setLegacyPolicy } from './helpers/legacy.js';
 import { startServer, type TestClient } from './helpers/server.js';
 
 let stub: Server;
@@ -49,17 +51,16 @@ afterAll(async () => {
 
 type Board = { id: string; visibility: string; anon_write: string };
 
-async function openBoard(c: TestClient): Promise<Board> {
+async function openBoard(c: TestClient, db: Db): Promise<Board> {
   await c.signup(`cap-owner-${c.suffix}`);
   const created = await c.request('POST', '/api/v1/boards', {
     name: 'Captcha board',
     visibility: 'link',
   });
   const id = (created.json() as { id: string }).id;
-  const patched = await c.request('PATCH', `/api/v1/boards/${id}`, {
-    link_role: 'read',
-    anon_write: 'open',
-  });
+  const patched = await c.request('PATCH', `/api/v1/boards/${id}`, { link_role: 'read' });
+  // A legacy row keeps the join gate open; the write it used to allow is gone.
+  await setLegacyPolicy(db, id, { anonWrite: 'open' });
   return patched.json() as Board;
 }
 
@@ -138,33 +139,18 @@ describe('the captcha gate', () => {
     seen.length = 0;
   });
 
-  it('asks for a token past the threshold and verifies it against the Cap instance', async () => {
-    const board = await openBoard(harness.client());
+  it('never challenges a write it would refuse: no anonymous write is left to gate', async () => {
+    const board = await openBoard(harness.client(), harness.db);
     const visitor = new Visitor(harness.client());
     expect(await visitor.join(board.id)).toBe(200);
     const column = await visitor.firstColumn(board.id);
 
-    // Below the threshold: an anonymous write is the ordinary case, not a
-    // challenge, and no request leaves the instance for it.
-    const first = await visitor.create(board.id, column);
-    expect(first.statusCode).toBe(201);
+    // The gate sits behind `can()`: a write that can never be accepted is
+    // refused before a token is asked for, and no request leaves the instance.
+    const refused = await visitor.create(board.id, column, 'good-token');
+    expect(refused.statusCode).toBe(403);
+    expect(refused.code).toBe('forbidden');
     expect(seen).toHaveLength(0);
-
-    const missing = await visitor.create(board.id, column);
-    expect(missing.statusCode).toBe(400);
-    expect(missing.code).toBe('captcha_required');
-    expect(seen).toHaveLength(0);
-
-    const wrong = await visitor.create(board.id, column, 'bad-token');
-    expect(wrong.statusCode).toBe(400);
-    expect(wrong.code).toBe('captcha_failed');
-    expect(seen).toHaveLength(1);
-    expect(seen[0]?.token).toBe('bad-token');
-    expect(seen[0]?.authorization).toBe('Bearer cap-secret');
-
-    const good = await visitor.create(board.id, column, 'good-token');
-    expect(good.statusCode).toBe(201);
-    expect(seen).toHaveLength(2);
   });
 
   it('refuses to boot with the captcha enabled and no instance URL', () => {
@@ -178,20 +164,18 @@ describe('the captcha gate', () => {
     expect(result.problems.map((problem) => problem.variable)).toContain('KLUI_CAPTCHA_URL');
   });
 
-  it('is off by default: a token-bearing write needs no challenge', async () => {
+  it('refuses the write on an instance with no captcha, with no challenge either way', async () => {
     const plain = await startServer();
     try {
       anonLimiter.clear();
-      const board = await openBoard(plain.client());
+      const board = await openBoard(plain.client(), plain.db);
       const visitor = new Visitor(plain.client());
       expect(await visitor.join(board.id)).toBe(200);
       const column = await visitor.firstColumn(board.id);
-      // The field is accepted whether or not the gate is on: a client that
-      // always sends it is not punished on an instance that does not use Cap.
       for (let index = 0; index < 3; index += 1) {
         const response = await visitor.create(board.id, column);
-        expect(response.statusCode).toBe(201);
-        expect(response.code).toBeNull();
+        expect(response.statusCode).toBe(403);
+        expect(response.code).toBe('forbidden');
       }
     } finally {
       await plain.close();

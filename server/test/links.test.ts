@@ -191,14 +191,15 @@ describe('using a link', () => {
     };
     expect(parsed.caller.actor_kind).toBe('link');
     expect(parsed.caller.role).toBeNull();
-    expect(parsed.caller.can_write).toBe(true);
+    // The row still says `edit`; the capability is retired, so a link reads.
+    expect(parsed.caller.can_write).toBe(false);
     expect(parsed.caller.label).toBe('link');
 
     const row = await harness.db.boardLink.findUnique({ where: { id: link.id } });
     expect(row?.last_used_at).not.toBeNull();
   });
 
-  it('lets an edit link write a card and refuses a delete', async () => {
+  it('refuses an edit link every write: a share link is read-only', async () => {
     const owner = harness.client();
     const { board } = await boardWith(owner);
     const link = await createLink(owner, board.id, 'edit');
@@ -206,16 +207,17 @@ describe('using a link', () => {
     await visitor.visit(link.token);
 
     const state = await visitor.request('GET', `/api/v1/boards/${board.id}/state`);
+    expect(state.statusCode).toBe(200);
     const columns = (JSON.parse(state.body) as { columns: { id: string }[] }).columns;
     const created = await visitor.request('POST', `/api/v1/boards/${board.id}/cards`, {
       column: columns[0]?.id,
       title: 'From a link',
     });
-    expect(created.statusCode).toBe(201);
-    const card = JSON.parse(created.body) as { id: string };
-
-    const deleted = await visitor.request('DELETE', `/api/v1/cards/${card.id}`);
-    expect(deleted.statusCode).toBe(403);
+    expect(created.statusCode).toBe(403);
+    expect((JSON.parse(created.body) as { error: { code: string } }).error.code).toBe('forbidden');
+    expect(await harness.db.card.count({ where: { board_id: board.id, title: 'From a link' } })).toBe(
+      0,
+    );
   });
 
   it('gives a read link the board and no write', async () => {

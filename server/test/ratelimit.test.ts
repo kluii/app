@@ -12,6 +12,7 @@ import { startServer, type TestClient } from './helpers/server.js';
 import { credentialLimiter, LOGIN_ACCOUNT, loginAccountKey } from '../src/lib/ratelimit.js';
 import { agentLimiter, sessionLimiter } from '../src/settings/ratelimit.js';
 import { anonLimiter } from '../src/anon/limits.js';
+import { setLegacyPolicy } from './helpers/legacy.js';
 
 const PASSWORD = 'a-long-enough-password';
 
@@ -216,10 +217,10 @@ describe('trusted proxy hops', () => {
         visibility: 'link',
       });
       const boardId = (created.json() as { id: string }).id;
-      await owner.request('PATCH', `/api/v1/boards/${boardId}`, {
-        link_role: 'read',
-        anon_write: 'open',
-      });
+      await owner.request('PATCH', `/api/v1/boards/${boardId}`, { link_role: 'read' });
+      // A stored `open` policy survives the rule that retires it: the join gate
+      // still reads the column, so the address limiter is still reachable.
+      await setLegacyPolicy(harness.db, boardId, { anonWrite: 'open' });
 
       const statuses: number[] = [];
       const codes: string[] = [];

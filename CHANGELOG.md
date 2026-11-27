@@ -5,6 +5,53 @@ HTTP or MCP surface. The format follows Keep a Changelog; the versions are the
 `package.json` version, which is also what `/healthz` reports and what the image
 is tagged with (D-42).
 
+## Unreleased — app shell, board chrome and the members-write rule
+
+No schema migration; no new environment variable. One behaviour change on the
+HTTP surface, described first.
+
+### Changed
+
+- **A board is written by its members.** A share link is read-only and nobody
+  writes without an account.
+  - `POST /api/v1/boards/:id/cards` and `PATCH /api/v1/cards/:id` now answer
+    `403 forbidden` for a `link` actor, whatever `link_role` says, and for an
+    anonymous visitor (`klui_anon`), whatever `anon_write` says — comments
+    included. Reads are unchanged: a link or public board is still readable
+    without an account.
+  - `PATCH /api/v1/boards/:id` refuses `anon_write: "open" | "moderated"` with
+    `400 validation_failed` and the message
+    `anonymous writes are no longer available`, and `link_role: "edit"` with
+    `400 validation_failed` and `a share link is read-only`. `anon_write: "off"`
+    and `link_role: "read" | "none"` are still accepted, and existing rows keep
+    their stored value.
+  - The moderation queue keeps working for rows already in it; nothing can add
+    a new one.
+- The share dialog offers no link role and no anonymous-write control; it states
+  that a link lets anyone read the board.
+- The app adopts the landing page's design language: warm graphite and warm
+  paper palettes, Inter / Newsreader / JetBrains Mono self-hosted, the editorial
+  type scale, 8 px surfaces, pills for controls.
+
+### Fixed
+
+- The header no longer shows four controls for one identity: a circular
+  identicon avatar opens account settings, theme, language and sign out.
+- Language switching is real: the choice persists under `klui-locale`,
+  `<html lang>` follows it, the tree re-renders without a reload and dates use
+  the UI language.
+- The board chrome is one settings menu: copy link, share, members, activity,
+  data, moderation, delete. The `owner/slug` string is gone and the board name
+  renames in place.
+- The board rail's horizontal scrollbar sits at the bottom of the content area
+  instead of under the columns.
+- Drag and drop shows a card-shaped preview, an insertion line, a highlighted
+  column and a settle animation; under `prefers-reduced-motion` only the line
+  appears.
+- Deleting a board asks for its name to be typed, and lands on `/boards`.
+- The card create modal sets tags, a deadline and an assignee.
+- A taken username and a reserved one answer the same sentence.
+
 ## 2.0.1 — 2026-11-27
 
 Security and authorization bug-fix release. No schema migrations; no new

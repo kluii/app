@@ -12,6 +12,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
 import { listBoardsFor } from '../src/boards/service.js';
+import { setLegacyPolicy } from './helpers/legacy.js';
 
 type Board = { id: string; name: string };
 type Minted = { id: string; key: string };
@@ -149,9 +150,9 @@ describe('the board list is the read decision', () => {
     const board = await newBoard(owner, 'Open to visitors');
     const opened = await owner.request('PATCH', `/api/v1/boards/${board.id}`, {
       visibility: 'public',
-      anon_write: 'open',
     });
     expect(opened.statusCode).toBe(200);
+    await setLegacyPolicy(harness.db, board.id, { anonWrite: 'open' });
 
     const joined = await harness.app.inject({
       method: 'POST',

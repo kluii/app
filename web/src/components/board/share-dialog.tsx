@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Sharing (K3-06). Visibility, link role, anonymous policy, the readable URL,
- * suffix rotation and write links. The token of a write link is shown exactly
- * once, in this dialog, and only while it is open: closing it is the point of
- * no return (docs/features/links-and-anonymous.md §3).
+ * Sharing (K3-06). Visibility, the readable URL, suffix rotation and links.
+ *
+ * A share link is read-only and nobody writes without an account, so the two
+ * selectors that used to live here are gone: there is no link role to choose and
+ * no anonymous write to allow. The token of a link is shown exactly once, in
+ * this dialog, and only while it is open (docs/features/links-and-anonymous.md
+ * §3).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../api/client';
 import { failureMessage } from '../../lib/api-error';
-import type { AnonWrite, BoardLink, BoardState, LinkRole, Visibility } from '../../api/types';
+import type { BoardLink, BoardState, LinkRole, Visibility } from '../../api/types';
 import { t } from '../../i18n';
 import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
@@ -18,8 +21,6 @@ import { Dialog } from '../ui/dialog';
 import { Input, Select } from '../ui/input';
 
 const VISIBILITIES: Visibility[] = ['private', 'link', 'public'];
-const LINK_ROLES: LinkRole[] = ['read', 'edit', 'none'];
-const ANON_POLICIES: AnonWrite[] = ['off', 'open', 'moderated'];
 
 export function ShareDialog({
   boardState,
@@ -35,7 +36,6 @@ export function ShareDialog({
   const [error, setError] = useState<string | null>(null);
   const [confirmingRotation, setConfirmingRotation] = useState(false);
   const [created, setCreated] = useState<(BoardLink & { token: string; url: string }) | null>(null);
-  const [linkRole, setLinkRole] = useState<'read' | 'edit'>('read');
 
   const links = useQuery({
     queryKey: queryKeys.links(boardId),
@@ -51,11 +51,8 @@ export function ShareDialog({
   };
 
   const update = useMutation({
-    mutationFn: (input: {
-      visibility?: Visibility;
-      link_role?: LinkRole;
-      anon_write?: AnonWrite;
-    }) => api.updateBoard(boardId, input),
+    mutationFn: (input: { visibility?: Visibility; link_role?: LinkRole }) =>
+      api.updateBoard(boardId, input),
     onSuccess: async () => {
       setError(null);
       await refresh();
@@ -71,7 +68,7 @@ export function ShareDialog({
     onError: failure,
   });
   const createLink = useMutation({
-    mutationFn: () => api.createLink(boardId, linkRole),
+    mutationFn: () => api.createLink(boardId, 'read'),
     onSuccess: async (link) => {
       setCreated(link);
       setError(null);
@@ -170,44 +167,19 @@ export function ShareDialog({
               ) : null}
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="share-link-role" className="text-label text-ink">
-                  {t('board.share.linkRole')}
-                </label>
-                <Select
-                  id="share-link-role"
-                  value={board.link_role}
-                  onChange={(event) => update.mutate({ link_role: event.target.value as LinkRole })}
-                  className="w-40"
-                >
-                  {LINK_ROLES.map((value) => (
-                    <option key={value} value={value}>
-                      {t(`board.share.role.${value}`)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="share-anon" className="text-label text-ink">
-                  {t('board.share.anon')}
-                </label>
-                <Select
-                  id="share-anon"
-                  value={board.anon_write}
-                  onChange={(event) =>
-                    update.mutate({ anon_write: event.target.value as AnonWrite })
-                  }
-                  className="w-40"
-                >
-                  {ANON_POLICIES.map((value) => (
-                    <option key={value} value={value}>
-                      {t(`board.share.anon.${value}`)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
+            <p className="text-body-sm text-ink-muted">{t('board.share.linkReadOnly')}</p>
+            {board.link_role === 'none' ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="self-start"
+                loading={update.isPending}
+                onClick={() => update.mutate({ link_role: 'read' })}
+                data-testid="enable-link"
+              >
+                {t('board.share.enableLink')}
+              </Button>
+            ) : null}
           </>
         )}
 
@@ -262,25 +234,15 @@ export function ShareDialog({
               </div>
             </div>
           ) : (
-            <div className="flex items-end gap-2">
-              <Select
-                aria-label={t('board.share.newLinkRole')}
-                value={linkRole}
-                onChange={(event) => setLinkRole(event.target.value as 'read' | 'edit')}
-                className="w-32"
-              >
-                <option value="read">{t('board.share.role.read')}</option>
-                <option value="edit">{t('board.share.role.edit')}</option>
-              </Select>
-              <Button
-                variant="primary"
-                loading={createLink.isPending}
-                onClick={() => createLink.mutate()}
-                data-testid="create-link"
-              >
-                {t('board.share.createLink')}
-              </Button>
-            </div>
+            <Button
+              variant="primary"
+              className="self-start"
+              loading={createLink.isPending}
+              onClick={() => createLink.mutate()}
+              data-testid="create-link"
+            >
+              {t('board.share.createLink')}
+            </Button>
           )}
         </div>
 

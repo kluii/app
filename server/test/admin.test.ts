@@ -13,6 +13,7 @@ import { createDb, type Db } from '../src/db.js';
 import { testEnv } from '../src/env.js';
 import { ensureInstanceSettings } from '../src/auth/service.js';
 import { TEST_SECRETS, startServer, TestClient } from './helpers/server.js';
+import { setLegacyPolicy } from './helpers/legacy.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -203,10 +204,10 @@ describe('registration and administration', () => {
       visibility: 'link',
     });
     const boardId = (created.json() as { id: string }).id;
-    await owner.request('PATCH', `/api/v1/boards/${boardId}`, {
-      link_role: 'read',
-      anon_write: 'open',
-    });
+    await owner.request('PATCH', `/api/v1/boards/${boardId}`, { link_role: 'read' });
+    // A legacy row: the join gate still reads the column, the write it could
+    // once have allowed is refused.
+    await setLegacyPolicy(harness.db, boardId, { anonWrite: 'open' });
 
     const join = async (): Promise<{ statusCode: number; body: string }> => {
       const response = await harness.app.inject({

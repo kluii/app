@@ -58,7 +58,10 @@ const EDITOR_UP: Action[] = [
   'comment.update',
   'comment.delete',
 ];
-const LINK_EDIT: Action[] = ['card.create', 'card.update', 'card.move', 'card.complete'];
+/**
+ * `link_role: 'edit'` is retired as a capability (a board is written by its
+ * members) and kept as a stored literal, so the matrix still walks the cell.
+ */
 
 function board(overrides: Partial<BoardPolicy> = {}): BoardPolicy {
   return {
@@ -107,7 +110,7 @@ function expectedFor(input: {
   isAuthor: boolean;
   isOwnCard: boolean;
 }): Expected {
-  const { actor, action, policy, role, isAuthor, isOwnCard } = input;
+  const { actor, action, policy, role, isAuthor } = input;
 
   if (actor.kind === 'agent' && actor.scope === 'board' && actor.boardId !== policy.id) {
     return 'not_found';
@@ -135,16 +138,12 @@ function expectedFor(input: {
       return memberExpected(role, action, isAuthor, actor.kind === 'agent');
     case 'link': {
       if (action === 'board.read' || action === 'board.summary') return 'allow';
-      if (actor.role === 'edit' && LINK_EDIT.includes(action)) return 'allow';
       return 'forbidden';
     }
     case 'anon': {
+      // A share link is read-only and nobody writes without an account, whatever
+      // the stored policy says.
       if (action === 'board.read' || action === 'board.summary') return 'allow';
-      if (policy.anonWrite === 'off') return 'forbidden';
-      if (action === 'card.create') return 'allow';
-      if (policy.anonWrite === 'open' && (action === 'card.update' || action === 'card.complete')) {
-        return isOwnCard ? 'allow' : 'forbidden';
-      }
       return 'forbidden';
     }
   }
@@ -265,14 +264,18 @@ describe('the authorization matrix', () => {
     }
   });
 
-  it('lets a link editor move and complete work but never delete or export it', () => {
+  it('gives an edit link nothing at all: a share link is read-only', () => {
     const policy = board({ visibility: 'link', linkRole: 'edit' });
     const actor: Actor = { kind: 'link', boardId: policy.id, role: 'edit', linkId: 'lnk_edit' };
-    expect(can(actor, 'card.move', policy).allow).toBe(true);
-    expect(can(actor, 'card.complete', policy).allow).toBe(true);
+    expect(can(actor, 'board.read', policy).allow).toBe(true);
+    expect(can(actor, 'board.summary', policy).allow).toBe(true);
+    for (const action of EDITOR_UP) {
+      expect(can(actor, action, policy).allow, action).toBe(false);
+    }
     expect(can(actor, 'card.delete', policy).allow).toBe(false);
     expect(can(actor, 'board.export', policy).allow).toBe(false);
     expect(can(actor, 'column.create', policy).allow).toBe(false);
+    expect(can(actor, 'link.create', policy).allow).toBe(false);
   });
 
   it('keeps a closed board readable and refuses every write with board_closed, owner included', () => {
@@ -298,14 +301,26 @@ describe('the authorization matrix', () => {
     expect(decision.allow).toBe(false);
   });
 
-  it('lets an anonymous actor edit only the card it created', () => {
-    const policy = board({ visibility: 'link', linkRole: 'edit', anonWrite: 'open' });
-    const actor: Actor = { kind: 'anon', boardId: policy.id, label: 'Sam', anonId: 'anon-1' };
-    expect(can(actor, 'card.update', policy, null, { isOwnCard: true }).allow).toBe(true);
-    expect(can(actor, 'card.update', policy, null, { isOwnCard: false }).allow).toBe(false);
-    expect(can(actor, 'card.move', policy, null, { isOwnCard: true }).allow).toBe(false);
-    expect(can(actor, 'comment.create', policy, null, { isOwnCard: true }).allow).toBe(false);
-    expect(can(actor, 'card.delete', policy, null, { isOwnCard: true }).allow).toBe(false);
+  it('lets an anonymous actor read and nothing else, on every stored policy', () => {
+    for (const anonWrite of ANON_POLICIES) {
+      const policy = board({ visibility: 'link', linkRole: 'edit', anonWrite });
+      const actor: Actor = { kind: 'anon', boardId: policy.id, label: 'Sam', anonId: 'anon-1' };
+      expect(can(actor, 'board.read', policy).allow, anonWrite).toBe(true);
+      expect(can(actor, 'board.summary', policy).allow, anonWrite).toBe(true);
+      expect(can(actor, 'card.create', policy).allow, anonWrite).toBe(false);
+      expect(can(actor, 'card.update', policy, null, { isOwnCard: true }).allow, anonWrite).toBe(
+        false,
+      );
+      expect(can(actor, 'card.move', policy, null, { isOwnCard: true }).allow, anonWrite).toBe(
+        false,
+      );
+      expect(can(actor, 'comment.create', policy, null, { isOwnCard: true }).allow, anonWrite).toBe(
+        false,
+      );
+      expect(can(actor, 'card.delete', policy, null, { isOwnCard: true }).allow, anonWrite).toBe(
+        false,
+      );
+    }
   });
 
   it('allows board creation only for a user or a user-scoped agent key', () => {
