@@ -16,6 +16,7 @@ import { recordEvent } from '../lib/events.js';
 import { base62 } from '../lib/ids.js';
 import { hashToken } from '../lib/hash.js';
 import type { Mailer } from '../lib/mail.js';
+import { assertPublicWebhookUrl } from '../notifications/service.js';
 import { Prisma } from '@prisma/client';
 import {
   buildDigest,
@@ -131,6 +132,9 @@ export async function updateDigestPref(
     });
   }
   if (update.webhook !== undefined && update.webhook !== null) {
+    // Same rule as the notification webhook: an account-level URL must not let a
+    // signed-in reader aim the server at an address inside the network.
+    assertPublicWebhookUrl(update.webhook);
     if (!/^https:\/\//u.test(update.webhook)) {
       throw new AppError('validation_failed', {
         message: 'A webhook URL must be https.',
@@ -276,6 +280,8 @@ export async function deliverDigest(input: {
   const sent: string[] = [];
   if (input.pref.webhook_url !== null) {
     try {
+      // A row stored before the rule existed must not be fetched either.
+      assertPublicWebhookUrl(input.pref.webhook_url);
       const response = await fetch(input.pref.webhook_url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
