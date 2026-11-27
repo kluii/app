@@ -139,6 +139,15 @@ export function tagsToDraft(tags: Tag[]): TagDraft[] {
   return tags.map((tag) => ({ name: tag.name, color: tag.color, boardWide: false }));
 }
 
-export function draftToTags(drafts: TagDraft[]): Tag[] {
-  return drafts.map((draft) => ({ name: draft.name, color: draft.color }));
+/**
+ * The API's tag input, not the DTO: a tag with no colour omits the field. The
+ * server rejects `color: null` (`tagInputSchema` accepts a hex or nothing), so
+ * sending the DTO shape back was a 400 waiting for the first colourless tag.
+ */
+export type TagInput = { name: string; color?: string };
+
+export function draftToTags(drafts: TagDraft[]): TagInput[] {
+  return drafts.map((draft) =>
+    draft.color === null ? { name: draft.name } : { name: draft.name, color: draft.color },
+  );
 }

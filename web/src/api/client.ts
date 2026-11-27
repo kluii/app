@@ -279,7 +279,7 @@ export const api = {
       column: string;
       title: string;
       description?: string;
-      tags?: { name: string; color: string | null }[];
+      tags?: { name: string; color?: string }[];
       due_at?: string;
       assignee?: string;
     },
