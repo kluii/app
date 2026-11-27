@@ -316,7 +316,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Every user-facing string keyed from the first component, catalogs `en` (source) and `fr`, server strings (errors, emails, digest) through the same catalogs, `glossary.md`, a lint rule for literal strings.
   **Exit:** the lint rule fails on a raw string in a component; switching to `fr` changes every visible string with no missing key (a test scans both catalogs for key parity).
 
-- [ ] **K5-08 — Account and sessions UI** `M` · dep: K1-03
+- [x] **K5-08 — Account and sessions UI** `M` · dep: K1-03 — verified in `docs/verify/k5.md` § K5-08
   Profile, password change, TOTP management, recovery codes, active sessions with revoke, digest preferences, delete account (with the documented cascade).
   **Exit:** revoking the current session signs out immediately; account deletion removes the user's memberships and anonymises their comments per `docs/security.md`.
 

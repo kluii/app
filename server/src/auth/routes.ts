@@ -19,7 +19,7 @@ import {
 } from './sessions.js';
 import { isSecureOrigin } from '../env.js';
 import { totpPolicy } from './totp.js';
-import { updateProfile } from './profile.js';
+import { changePassword, deleteAccount, updateProfile } from './profile.js';
 import { registerTotpRoutes } from './totp-routes.js';
 import type { Me } from '../contracts/auth.js';
 import { AppError } from '../lib/errors.js';
@@ -145,6 +145,24 @@ export function registerAuthRoutes(app: FastifyInstance, context: AppContext): v
     if (!user) throw new Error('session points at a missing user');
     const factor = await context.db.totpSecret.findUnique({ where: { user_id: userId } });
     return toMe({ ...toAuthenticated(user), ...updated }, Boolean(factor?.confirmed_at));
+  });
+
+  app.post('/api/v1/me/password', async (request, reply) => {
+    if (!context.db) throw new Error('database is required');
+    const userId = requireUser(request);
+    const meta = { ip: request.ip, userAgent: request.headers['user-agent'] ?? null };
+    const session = await changePassword(context.db, userId, pepper, request.body, meta);
+    setSessionCookie(reply, session.raw, { secure, expires_at: session.expires_at });
+    rotateCsrfCookie(reply, secure);
+    return reply.code(204).send();
+  });
+
+  app.delete('/api/v1/me', async (request, reply) => {
+    if (!context.db) throw new Error('database is required');
+    const userId = requireUser(request);
+    await deleteAccount(context.db, userId, request.body);
+    clearSessionCookie(reply);
+    return reply.code(204).send();
   });
 
   app.get('/api/v1/me/sessions', async (request) => {

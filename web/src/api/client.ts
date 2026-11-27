@@ -12,6 +12,7 @@ import type {
   Card,
   Column,
   CreatedAgentKey,
+  DigestPrefDto,
   EventDto,
   Me,
   OidcTestResult,
@@ -21,6 +22,7 @@ import type {
   PendingCard,
   PublicBoard,
   PublicOidcProvider,
+  SessionDto,
   Visibility,
 } from './types';
 
@@ -152,6 +154,30 @@ export type ImportResult = {
 
 export const api = {
   me: () => request<Me>('GET', '/me'),
+  updateProfile: (input: { username?: string; display_name?: string | null; email?: string }) =>
+    request<Me>('PATCH', '/me', input),
+  changePassword: (input: { current_password: string; new_password: string }) =>
+    request<void>('POST', '/me/password', input),
+  deleteAccount: (input: { password: string; confirm: true }) =>
+    request<void>('DELETE', '/me', input),
+  sessions: () => request<{ items: SessionDto[] }>('GET', '/me/sessions'),
+  revokeSession: (id: string) => request<void>('DELETE', `/me/sessions/${encodeURIComponent(id)}`),
+  logoutAll: () => request<void>('POST', '/auth/logout-all'),
+  digest: () => request<DigestPrefDto>('GET', '/me/digest'),
+  updateDigest: (input: {
+    enabled?: boolean;
+    hour?: number;
+    timezone?: string;
+    webhook?: string | null;
+    email?: string | null;
+    rss?: 'rotate' | 'disable';
+  }) => request<DigestPrefDto>('PATCH', '/me/digest', input),
+  testDigest: () =>
+    request<{ sent: boolean; reason?: string; sections?: number; bytes?: number }>(
+      'POST',
+      '/me/digest/test',
+      {},
+    ),
   login: (input: {
     email_or_username: string;
     password: string;
