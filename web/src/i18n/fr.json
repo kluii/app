@@ -190,6 +190,7 @@
   "board.share.rotate": "Régénérer le suffixe",
   "board.share.rotateConfirm": "Oui, régénérer",
   "board.share.rotateWarning": "Le lien actuel cesse de fonctionner immédiatement.",
+  "board.share.setLinkRoleFirst": "Un tableau privé n’a pas de lien de partage. Passez sa visibilité en lien ou public d’abord.",
   "board.share.title": "Partage",
   "board.share.token": "Lien d’écriture",
   "board.share.tokenWarning": "Copiez-le maintenant. Il ne sera plus affiché, et un rechargement indiquera seulement qu’il a été créé.",

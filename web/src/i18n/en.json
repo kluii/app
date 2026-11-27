@@ -190,6 +190,7 @@
   "board.share.rotate": "Regenerate the suffix",
   "board.share.rotateConfirm": "Yes, regenerate",
   "board.share.rotateWarning": "The current link stops working immediately.",
+  "board.share.setLinkRoleFirst": "A private board has no share link. Change its visibility to link or public first.",
   "board.share.title": "Sharing",
   "board.share.token": "Write link",
   "board.share.tokenWarning": "Copy this now. It will not be shown again, and a reload only tells you that it was created.",
