@@ -44,6 +44,7 @@ import { registerModerationRoutes } from './moderation/routes.js';
 import { registerMemberRoutes } from './boards/members-routes.js';
 import { registerAgentKeyRoutes } from './agents/routes.js';
 import { registerMcpRoutes } from './mcp/routes.js';
+import { llmsTxt } from './public/llms.js';
 import { renderHtmlPage, robotsTxt, sitemapXml } from './public/pages.js';
 import type { Mailer } from './lib/mail.js';
 
@@ -129,6 +130,13 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.get('/robots.txt', async (_request, reply) => {
     return reply.type('text/plain; charset=utf-8').send(robotsTxt(context.env.KLUI_PUBLIC_URL));
   });
+  app.get('/llms.txt', async (_request, reply) => {
+    return reply
+      .type('text/plain; charset=utf-8')
+      .header('cache-control', 'no-store')
+      .send(llmsTxt(context.env.KLUI_PUBLIC_URL));
+  });
+
   app.get('/sitemap.xml', async (_request, reply) => {
     if (!context.db) return reply.code(404).send();
     return reply

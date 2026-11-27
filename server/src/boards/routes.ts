@@ -24,7 +24,6 @@ import { can } from '../lib/authz.js';
 import { createBoardSchema, patchBoardSchema, rotateSuffixSchema } from '../contracts/boards.js';
 import { toBoardMembers } from '../boards/members.js';
 import { boardStateFor } from './state.js';
-import { conflictIfStale } from '../lib/concurrency.js';
 
 export function registerBoardRoutes(app: FastifyInstance, context: AppContext): void {
   const database = (): Db => {

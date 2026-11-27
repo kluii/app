@@ -17,7 +17,7 @@ export type RpcErrorBody = {
   error: { code: number; message: string; data?: Record<string, unknown> };
 };
 
-const PROTOCOL_CODES: Partial<Record<ErrorCode, number>> = {
+export const PROTOCOL_CODES: Partial<Record<ErrorCode, number>> = {
   not_found: -32001,
   board_not_found: -32001,
   card_not_found: -32001,

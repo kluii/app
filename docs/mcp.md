@@ -42,7 +42,7 @@ JSON-RPC error codes are used for the protocol layer; application errors ride in
 
 Rules:
 
-- `-32600` invalid request · `-32601` unknown method/tool · `-32602` invalid params · `-32603` internal · `-32001` not found (also used for unreadable resources — MCP must not become an existence oracle) · `-32002` forbidden (readable board) · `-32003` conflict · `-32004` rate limited (with `retry_after_s` in `data`) · `-32005` board closed.
+- `-32600` invalid request · `-32601` unknown method/tool · `-32602` invalid params · `-32603` internal · `-32001` not found (also used for unreadable resources — MCP must not become an existence oracle) · `-32002` forbidden (readable board) · `-32003` conflict · `-32004` rate limited (with `retry_after_s` in `data`) · `-32005` board closed · `-32006` the result is too large to carry (an export over 256 KB names the REST route in `hint`).
 - A bad argument **always** names the parameter, its expected type, and one working example. `expected string, received undefined` alone is a puzzle, not an error message.
 - Unknown tool names list the closest three by edit distance in `data.hint`. Agents guess names; make the guess cost one round trip, not five.
 
@@ -60,7 +60,7 @@ Rules:
 | `update_board` | `({board, name?, visibility?, link_role?, anon_write?, slug?})` |
 | `delete_board` | `({board, confirm: true})` |
 | `create_column` | `({board, name, position?})` |
-| `update_column` | `({board, column, name?, position?})` |
+| `update_column` | `({board, column, name?})` |
 | `delete_column` | `({board, column})` |
 | `create_card` | `({board, column, title, description?, assignee?, due_at?, tags?})` |
 | `bulk_create_cards` | `({board, column, items:[{title, description?, assignee?, due_at?, tags?, done?}]})` |
@@ -135,6 +135,7 @@ Notes that matter in practice:
 - `move_card` without `before`/`after` appends. Passing `index` or `position` is rejected with `-32602` naming the accepted shape.
 - `expected_updated_at` is optional everywhere, but an agent that omits it on `update_card` will silently overwrite a human's paragraph. The setup skill tells agents to read before writing.
 - `delete_board` requires `confirm: true`; without it the call is rejected, not implicitly confirmed.
+- Column reordering is not a tool: `PATCH /columns/:id` accepts `name` only, and an agent that could reorder a board would be editing a layout it cannot see. Column *creation* takes `position` because a new column has to land somewhere, and the rank planner resolves it against the board the caller can read.
 
 ---
 
@@ -151,7 +152,7 @@ Tool results are MCP `content` blocks. Klui returns one `text` block containing 
 
 - `get_board` returns `columns`, `cards`, `members` and `caller_role` in one call — an agent should never need a second call to paint a board.
 - Lists are capped at 200 items; `next_cursor` is returned when truncated. `search_cards` caps at 50 and says so in `data.truncated`.
-- `export_board` returns the document inline when ≤ 256 KB, otherwise an error naming the REST endpoint to download it from (`-32001`-style hint, not a silent truncation).
+- `export_board` returns the document inline when ≤ 256 KB, otherwise `-32006` naming the REST endpoint to download it from (a hint, never a silent truncation). The inline bytes are the bytes of that endpoint: one serialiser, one ordering.
 - A successful mutation returns the resulting entity (same shape as the REST response), so the agent does not need to re-read.
 
 ---
@@ -209,7 +210,10 @@ The setup panel renders a config block per client from one template. The only va
 // OpenCode / Pi / Hermes: a skill or prompt file, not a config block.
 ```
 
-The **custom-skill** variant ships as text the human can paste into an agent:
+The **custom-skill** variant ships twice: as a package a client can install
+(`docs/skill/klui/SKILL.md`, frontmatter and body), and as text the human can
+paste into an agent. The two are copied from the same wording — the panel
+renders the body, so what a person pastes is what the package contains:
 
 ```md
 You have access to a Klui board through the MCP endpoint https://app.example.com/mcp
@@ -231,4 +235,5 @@ Panel requirements:
 
 - The tool surface is versioned with the product. `serverInfo.version` reports `2.0.0`.
 - Additive optional arguments are not a breaking change. Renaming, removing, or tightening an argument is: it needs a deprecation window of at least one minor release, both names accepted during the window, and a changelog entry naming the old and the new.
-- `/llms.txt` lists the tools and the endpoint, generated from the same registry so it cannot drift.
+- `/llms.txt` lists the tools and the endpoint, generated from the same registry so it cannot drift. `server/test/mcp-docs.test.ts` asserts it names every served tool and no other.
+- `docs/mcp.md` §3 is checked against the Zod schemas in CI, in both directions: an argument the table documents but the schema refuses fails the test, and so does a required argument the table omits. It found one when it was written (`update_column.position`, which `PATCH /columns/:id` has never accepted).
