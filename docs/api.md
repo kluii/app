@@ -121,6 +121,7 @@ Positions are serialized as **strings** (`"1024"`, `"1536"`) because they are `D
 | `POST` | `/auth/oidc/:provider/link` | Explicit link for an already-signed-in user. |
 | `GET` | `/me` | `{id, email, username, display_name, totp_enabled, is_instance_admin, created_at}`. |
 | `PATCH` | `/me` | `{username?, display_name?, email?}`. Username change reserves the old value 90 days. |
+| `POST` | `/me/password` | `{current_password, new_password}`. `204`; rotates the current session and revokes all other sessions (D-16). |
 | `POST` | `/me/rotate` | `204`; revokes the current session and issues a new one in the same response, so a stolen cookie stops following the account. |
 | `GET` | `/me/sessions` | `[{id, ip, user_agent, created_at, last_seen_at, current:bool}]`. |
 | `DELETE` | `/me/sessions/:id` | `204`; deleting the current session logs out immediately. |
@@ -323,5 +324,4 @@ names a roadmap id that does not exist.
 | `GET` | `/auth/oidc/:provider/start` | K5-09 |
 | `GET` | `/auth/oidc/:provider/callback` | K5-09 |
 | `POST` | `/auth/oidc/:provider/link` | K5-09 |
-| `DELETE` | `/me` | K5-08 |
 | `GET` | `/metrics` | K5-03 |

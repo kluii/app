@@ -7,7 +7,9 @@
 import type { Db } from '../db.js';
 import { AppError, fromZod } from '../lib/errors.js';
 import { recordEvent } from '../lib/events.js';
-import { patchMeSchema } from '../contracts/auth.js';
+import { assertPasswordPolicy, hashPassword, verifyPassword } from '../lib/password.js';
+import { changePasswordSchema, deleteAccountSchema, patchMeSchema } from '../contracts/auth.js';
+import { issueSession, type IssuedSession } from './sessions.js';
 
 export const RESERVATION_DAYS = 90;
 
@@ -135,4 +137,87 @@ export async function slugRedirect(db: Db, username: string, slug: string): Prom
     select: { redirect_slug: true },
   });
   return reservation?.redirect_slug ?? null;
+}
+
+/**
+ * Password change (K5-08, D-16): verifies the current password, enforces
+ * password policy, revokes every existing session, and issues one fresh session
+ * for the caller so stolen cookies stop working immediately.
+ */
+export async function changePassword(
+  db: Db,
+  userId: string,
+  pepper: string,
+  rawInput: unknown,
+  meta: { ip: string | null; userAgent: string | null },
+): Promise<IssuedSession> {
+  const parsed = changePasswordSchema.safeParse(rawInput);
+  if (!parsed.success) throw fromZod(parsed.error);
+  const { current_password: currentPassword, new_password: newPassword } = parsed.data;
+
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError('unauthenticated');
+
+  const valid = await verifyPassword(user.password_hash, currentPassword);
+  if (!valid) {
+    throw new AppError('invalid_credential', {
+      message: 'The current password is incorrect.',
+      hint: null,
+    });
+  }
+
+  assertPasswordPolicy(newPassword);
+  const nextHash = await hashPassword(newPassword);
+
+  await db.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: userId }, data: { password_hash: nextHash } });
+    await tx.session.updateMany({
+      where: { user_id: userId, revoked_at: null },
+      data: { revoked_at: new Date() },
+    });
+    await recordEvent(tx, {
+      boardId: null,
+      actor: { kind: 'user', userId },
+      type: 'security.password_changed',
+      payload: {},
+    });
+  });
+
+  return issueSession(db, {
+    userId,
+    pepper,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  });
+}
+
+/**
+ * Account deletion with the documented cascade (K5-08, docs/security.md §9):
+ * anonymises authored comments ("deleted user") before deleting the account so
+ * shared threads stay readable, while memberships, sessions, TOTP, recovery
+ * codes, OAuth accounts, digest prefs, notifications, agent keys and owned
+ * boards cascade cleanly.
+ */
+export async function deleteAccount(db: Db, userId: string, rawInput: unknown): Promise<void> {
+  const parsed = deleteAccountSchema.safeParse(rawInput);
+  if (!parsed.success) throw fromZod(parsed.error);
+
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError('unauthenticated');
+
+  const valid = await verifyPassword(user.password_hash, parsed.data.password);
+  if (!valid) {
+    throw new AppError('invalid_credential', {
+      message: 'The password is incorrect.',
+      hint: null,
+    });
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.comment.updateMany({
+      where: { author_id: userId },
+      data: { author_id: null, author_label: 'deleted user' },
+    });
+    await tx.user.delete({ where: { id: userId } });
+  });
 }

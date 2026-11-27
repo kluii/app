@@ -45,6 +45,20 @@ export const patchMeSchema = z
   })
   .strict();
 
+export const changePasswordSchema = z
+  .object({
+    current_password: z.string().min(1).max(256),
+    new_password: passwordSchema,
+  })
+  .strict();
+
+export const deleteAccountSchema = z
+  .object({
+    password: z.string().min(1).max(256),
+    confirm: z.literal(true),
+  })
+  .strict();
+
 export const signupSchema = z.object({
   email: emailSchema,
   username: usernameSchema,
