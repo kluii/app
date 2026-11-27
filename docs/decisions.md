@@ -4,7 +4,7 @@ Every decision below is **closed**. Reopening one requires an ADR with the alter
 
 The register exists because this codebase will be read by agents that have no memory of the conversations that produced it. A decision that lives only in a chat log will be "cleaned up" by the third agent that touches the file.
 
-Status legend: **locked** (decided, implement as written) · **open** (needs a human input before the wave that depends on it).
+Status legend: **locked** (decided, implement as written) · **open** (needs a human input before the change that depends on it).
 
 ---
 
@@ -25,7 +25,7 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 | D-06 | **An instance admin has no access to board content.** `is_instance_admin` grants user management, bans, instance settings and provider configuration — nothing else. | An ops role that can read every private board is a backdoor with a friendly name, and it makes the 404 promise a lie. | ADR-0002 |
 | D-07 | **`viewer` is read-only, including comments.** Comments require `editor` or above. | A comment is a write; a read-only role that writes is not read-only. | ADR-0002 |
 | D-08 | **Comments require a user actor.** Link holders and anonymous actors cannot comment. | Comments need attribution and an account to notify. Anonymous comments are the fastest route to an unusable board. | ADR-0002 |
-| D-09 | **Link actors (`role: edit`) cannot delete.** They can create, edit, move and complete cards. No deletes of cards, columns or anything else. | A revocable token that can destroy work makes every shared link a risk the owner cannot audit. | ADR-0002 |
+| D-09 | ~~**Link actors (`role: edit`) cannot delete.**~~ *(superseded by D-59: `edit` links grant nothing at all; a share link is a reader.)* | A revocable token that can destroy work makes every shared link a risk the owner cannot audit. | ADR-0002 |
 | D-10 | ~~**Anonymous actors** may create a card, edit a card they created in the same session, and mark it done. Nothing else.~~ *(superseded by D-59: an anonymous visitor reads and writes nothing.)* | The wedge is participation, not administration. | ADR-0003 |
 | D-11 | ~~**An anonymous session is a signed cookie (12 h) carrying `anon_actor_id`.** Cards and events store that id (hashed in the cookie payload, opaque in the DB).~~ *(superseded by D-59: the cookie still names an actor, but it grants no write.)* | "Edit a card you just created" needs an identity that survives a reload without creating an account. A per-request random id cannot enforce it; an IP cannot be trusted. | ADR-0003 |
 | D-12 | **The board's readable URL never grants write.** Writes by link use `/l/<token>`; the token is ≥ 22 base62 chars, stored as `sha256`, revocable, regenerable. | Three separate things: the address you can say out loud, the secret you can revoke, the account you can attribute to. | ADR-0003 |
@@ -105,7 +105,7 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 
 ---
 
-## Open decisions (need a human before the dependent wave)
+## Open decisions (need a human before the dependent change)
 
 | ID | Question | Blocks | Default if unanswered |
 |---|---|---|---|
