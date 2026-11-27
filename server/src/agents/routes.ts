@@ -72,6 +72,9 @@ export function registerAgentKeyRoutes(app: FastifyInstance, context: AppContext
       userId: actor.userId,
       pepper: context.secrets.tokenPepper,
       id,
+      // Where the probe goes: the origin an agent is told to use, not the
+      // container's own loopback (docs/mcp.md §7).
+      publicUrl: context.env.KLUI_PUBLIC_URL,
       ...(parsed.data.key === undefined ? {} : { presented: parsed.data.key }),
     });
   });

@@ -246,15 +246,20 @@ function BlockCard({
 /** The server's answer, in the reader's language. Never a green tick. */
 function resultText(result: AgentKeyTest): string {
   if (!result.ok) return t('settings.agents.test.refused', { reason: reasonText(result.reason) });
-  if (result.board === null) return t('settings.agents.test.reachedUser', { name: result.key });
-  return t('settings.agents.test.reachedBoard', {
-    name: result.key,
-    board: result.board.name,
-    role:
-      result.role === null
-        ? t('settings.agents.role.none')
-        : t(`board.members.role.${result.role}`),
-  });
+  const reached =
+    result.board === null
+      ? t('settings.agents.test.reachedUser', { name: result.key })
+      : t('settings.agents.test.reachedBoard', {
+          name: result.key,
+          board: result.board.name,
+          role:
+            result.role === null
+              ? t('settings.agents.role.none')
+              : t(`board.members.role.${result.role}`),
+        });
+  // `inline` means the instance has no public URL: the endpoint was never asked,
+  // so the answer says what it did not prove.
+  return result.via === 'inline' ? `${reached} ${t('settings.agents.test.viaInline')}` : reached;
 }
 
 function reasonText(reason: AgentKeyRefusal): string {
@@ -265,10 +270,16 @@ function reasonText(reason: AgentKeyRefusal): string {
       return t('settings.agents.test.reason.expired');
     case 'key_mismatch':
       return t('settings.agents.test.reason.keyMismatch');
+    case 'key_required':
+      return t('settings.agents.test.reason.keyRequired');
     case 'board_not_found':
       return t('settings.agents.test.reason.boardNotFound');
     case 'forbidden':
       return t('settings.agents.test.reason.forbidden');
+    case 'unreachable':
+      return t('settings.agents.test.reason.unreachable');
+    case 'mcp_error':
+      return t('settings.agents.test.reason.mcpError');
     default:
       return t('settings.agents.test.reason.unknown');
   }

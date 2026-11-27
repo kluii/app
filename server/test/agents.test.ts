@@ -8,6 +8,7 @@
  * or a log line.
  */
 import { Writable } from 'node:stream';
+import http from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyServerOptions } from 'fastify';
 import { buildApp } from '../src/app.js';
@@ -219,23 +220,18 @@ describe('agent keys', () => {
     expect(foreign.statusCode).toBe(404);
   });
 
-  it('tests a key for real, and reports the exact failure after revocation', async () => {
+  it('reports revocation without asking the endpoint', async () => {
     const { client, board } = await ownerWithBoard(`agent-test-${harness.client().suffix}`);
     const key = await mint(client, { name: 'probe', scope: 'board', board_id: board.id });
-
-    const ok = await client.request('POST', `/api/v1/agent-keys/${key.id}/test`, {});
-    expect(ok.statusCode).toBe(200);
-    const body = ok.json() as { ok: boolean; board: { id: string }; role: string };
-    expect(body.ok).toBe(true);
-    expect(body.board.id).toBe(board.id);
-    expect(body.role).toBe('owner');
 
     await client.request('DELETE', `/api/v1/agent-keys/${key.id}`);
     const after = await client.request('POST', `/api/v1/agent-keys/${key.id}/test`, {});
     expect(after.statusCode).toBe(200);
-    const failed = after.json() as { ok: boolean; reason: string };
+    const failed = after.json() as { ok: boolean; reason: string; via: string | null };
     expect(failed.ok).toBe(false);
     expect(failed.reason).toBe('revoked');
+    // Nothing was called: the row already answered.
+    expect(failed.via).toBeNull();
   });
 
   it('updates last_used_at at most once a minute', async () => {
@@ -251,6 +247,139 @@ describe('agent keys', () => {
     const second = await harness.db.agentKey.findUnique({ where: { id: key.id } });
     // Within a minute of the stored value: no write, so the timestamp is intact.
     expect(second?.last_used_at?.toISOString()).toBe(stamp.toISOString());
+  });
+});
+
+/**
+ * K4-07 — "Test connection" is an MCP call (docs/mcp.md §7).
+ *
+ * The panel used to hash the key and re-run `loadBoardFor` in process, so it
+ * answered "connected" while `/mcp` was unreachable or refused that key. These
+ * tests make the button prove the endpoint: a real `initialize` and
+ * `tools/call whoami` against a listener, a JSON-RPC error is a refusal, and the
+ * in-process path survives only for an instance with no public URL.
+ */
+describe('test connection', () => {
+  let live: Awaited<ReturnType<typeof startServer>>;
+
+  beforeAll(async () => {
+    live = await startServer({ listen: true });
+  });
+
+  afterAll(async () => {
+    await live.close();
+  });
+
+  async function ownerWithKey(
+    username: string,
+  ): Promise<{ owner: TestClient; board: Board; key: Created }> {
+    const owner = live.client();
+    await owner.signup(username);
+    const created = await owner.request('POST', '/api/v1/boards', {
+      name: 'Probe board',
+      visibility: 'private',
+    });
+    const board = created.json() as Board;
+    const key = await mint(owner, { name: 'probe', scope: 'board', board_id: board.id });
+    return { owner, board, key };
+  }
+
+  it('goes through /mcp and reports the board the key really reaches', async () => {
+    const { owner, board, key } = await ownerWithKey(`probe-mcp-${live.client().suffix}`);
+
+    const tested = await owner.request('POST', `/api/v1/agent-keys/${key.id}/test`, {
+      key: key.key,
+    });
+    expect(tested.statusCode).toBe(200);
+    const body = tested.json() as {
+      ok: boolean;
+      via: string;
+      board: { id: string; name: string };
+      role: string;
+      key: string;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.via).toBe('mcp');
+    expect(body.board).toEqual({ id: board.id, name: 'Probe board' });
+    expect(body.role).toBe('owner');
+    expect(body.key).toBe('probe');
+  });
+
+  it('refuses when /mcp answers -32603, whatever the row says', async () => {
+    // A stand-in endpoint: it speaks JSON-RPC and answers every call with the
+    // internal error the panel must not paper over.
+    const stub = http.createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          error: { code: -32603, message: 'internal error' },
+        }),
+      );
+    });
+    await new Promise<void>((resolve) => {
+      stub.listen(0, '127.0.0.1', resolve);
+    });
+    const address = stub.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+
+    const broken = await startServer({ env: { KLUI_PUBLIC_URL: `http://127.0.0.1:${port}` } });
+    try {
+      const owner = broken.client();
+      await owner.signup(`probe-broken-${owner.suffix}`);
+      const created = await owner.request('POST', '/api/v1/boards', { name: 'Unreachable' });
+      const board = created.json() as Board;
+      const key = await mint(owner, { name: 'probe', scope: 'board', board_id: board.id });
+
+      const tested = await owner.request('POST', `/api/v1/agent-keys/${key.id}/test`, {
+        key: key.key,
+      });
+      expect(tested.statusCode).toBe(200);
+      const body = tested.json() as { ok: boolean; reason: string; via: string };
+      expect(body.ok).toBe(false);
+      expect(body.reason).toBe('mcp_error');
+      expect(body.via).toBe('mcp');
+    } finally {
+      await broken.close();
+      stub.close();
+    }
+  });
+
+  it('asks for the key when the endpoint needs one', async () => {
+    const { owner, key } = await ownerWithKey(`probe-nokey-${live.client().suffix}`);
+    const tested = await owner.request('POST', `/api/v1/agent-keys/${key.id}/test`, {});
+    expect(tested.statusCode).toBe(200);
+    const body = tested.json() as { ok: boolean; reason: string; via: string | null };
+    expect(body.ok).toBe(false);
+    expect(body.reason).toBe('key_required');
+    expect(body.via).toBeNull();
+  });
+
+  it('falls back in process, and says so, when there is no public URL', async () => {
+    const offline = await startServer({ env: { KLUI_PUBLIC_URL: null } });
+    try {
+      const owner = offline.client();
+      await owner.signup(`probe-offline-${owner.suffix}`);
+      const created = await owner.request('POST', '/api/v1/boards', { name: 'No public URL' });
+      const board = created.json() as Board;
+      const key = await mint(owner, { name: 'probe', scope: 'board', board_id: board.id });
+
+      const tested = await owner.request('POST', `/api/v1/agent-keys/${key.id}/test`, {});
+      expect(tested.statusCode).toBe(200);
+      const body = tested.json() as {
+        ok: boolean;
+        via: string;
+        board: { id: string };
+        role: string;
+      };
+      expect(body.ok).toBe(true);
+      expect(body.via).toBe('inline');
+      expect(body.board.id).toBe(board.id);
+      expect(body.role).toBe('owner');
+    } finally {
+      await offline.close();
+    }
   });
 });
 

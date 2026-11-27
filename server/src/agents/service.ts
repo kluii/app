@@ -13,6 +13,7 @@ import { base62, newId } from '../lib/ids.js';
 import { hashToken } from '../lib/hash.js';
 import { recordEvent } from '../lib/events.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
+import { probeAgentKey } from './probe.js';
 
 export const KEY_PREFIX = 'kb_';
 export const DEFAULT_EXPIRY_DAYS = 90;
@@ -172,18 +173,53 @@ export async function revokeAgentKey(
   });
 }
 
+export type AgentKeyRefusal =
+  | 'revoked'
+  | 'expired'
+  | 'key_mismatch'
+  | 'key_required'
+  | 'board_not_found'
+  | 'forbidden'
+  | 'unreachable'
+  | 'mcp_error';
+
+/**
+ * `via` says which path answered (docs/mcp.md §7): `mcp` is the real round trip
+ * through the instance's own endpoint, `inline` the in-process fallback an
+ * instance without `KLUI_PUBLIC_URL` is left with, and `null` a refusal decided
+ * from the row before anything was called.
+ */
 export type AgentKeyTest =
-  | { ok: true; board: { id: string; name: string } | null; role: string | null; key: string }
-  | { ok: false; reason: 'revoked' | 'expired' | 'key_mismatch' | 'board_not_found' | 'forbidden' };
+  | {
+      ok: true;
+      via: 'mcp' | 'inline';
+      board: { id: string; name: string } | null;
+      role: string | null;
+      key: string;
+    }
+  | { ok: false; via: 'mcp' | 'inline' | null; reason: AgentKeyRefusal };
 
 /**
  * A real answer, not a green check: the row is read, the presented key is
- * compared when one is given, and the reach is computed through `can()` with the
- * same actor `resolveActor` would build.
+ * compared when one is given, and then the key is used the way an agent would
+ * use it.
+ *
+ * With `KLUI_PUBLIC_URL` set, that means `initialize` and `tools/call whoami`
+ * against this instance's own `/mcp` (agents/probe.ts): the panel used to
+ * re-run `loadBoardFor` in process and report "connected" while `/mcp` was
+ * unreachable or answering `-32603` for that very key. The in-process path is
+ * the fallback for an instance that has no public URL to call, and the response
+ * says so in `via`.
  */
 export async function testAgentKey(
   db: Db,
-  input: { userId: string; pepper: string; id: string; presented?: string },
+  input: {
+    userId: string;
+    pepper: string;
+    id: string;
+    presented?: string;
+    publicUrl?: string | null;
+  },
 ): Promise<AgentKeyTest> {
   const row = await db.agentKey.findFirst({ where: { id: input.id, user_id: input.userId } });
   if (!row) throw new AppError('agent_key_not_found');
@@ -191,19 +227,29 @@ export async function testAgentKey(
     input.presented !== undefined &&
     agentKeyHash(input.presented, input.pepper) !== row.key_hash
   ) {
-    return { ok: false, reason: 'key_mismatch' };
+    return { ok: false, via: null, reason: 'key_mismatch' };
   }
-  if (row.revoked_at !== null) return { ok: false, reason: 'revoked' };
-  if (row.expires_at.getTime() <= Date.now()) return { ok: false, reason: 'expired' };
+  if (row.revoked_at !== null) return { ok: false, via: null, reason: 'revoked' };
+  if (row.expires_at.getTime() <= Date.now()) return { ok: false, via: null, reason: 'expired' };
+
+  const publicUrl = input.publicUrl ?? null;
+  if (publicUrl !== null) {
+    // The endpoint needs the credential, and a hash is not one: testing a stored
+    // key without presenting it cannot be an MCP call, and pretending otherwise
+    // would be the old lie in a new shape.
+    if (input.presented === undefined) return { ok: false, via: null, reason: 'key_required' };
+    const probe = await probeAgentKey(publicUrl, input.presented);
+    return probe.ok ? { ...probe, key: row.name } : probe;
+  }
 
   if (row.board_id === null) {
     // A user-scoped key reaches every board its owner belongs to; the panel only
     // needs to know the key is alive, and the role is per board by definition.
-    return { ok: true, board: null, role: null, key: row.name };
+    return { ok: true, via: 'inline', board: null, role: null, key: row.name };
   }
 
   const board = await db.board.findUnique({ where: { id: row.board_id } });
-  if (!board) return { ok: false, reason: 'board_not_found' };
+  if (!board) return { ok: false, via: 'inline', reason: 'board_not_found' };
   const loaded = await loadBoardFor(
     db,
     { kind: 'agent', userId: row.user_id, scope: 'board', boardId: row.board_id },
@@ -212,11 +258,12 @@ export async function testAgentKey(
   );
   if (!loaded.decision.allow) {
     return loaded.decision.reason === 'not_found'
-      ? { ok: false, reason: 'board_not_found' }
-      : { ok: false, reason: 'forbidden' };
+      ? { ok: false, via: 'inline', reason: 'board_not_found' }
+      : { ok: false, via: 'inline', reason: 'forbidden' };
   }
   return {
     ok: true,
+    via: 'inline',
     board: { id: board.id, name: board.name },
     role: loaded.membership?.role ?? null,
     key: row.name,

@@ -147,13 +147,31 @@ export type AgentKey = {
 export type CreatedAgentKey = AgentKey & { key: string };
 
 export type AgentKeyRefusal =
-  'revoked' | 'expired' | 'key_mismatch' | 'board_not_found' | 'forbidden';
+  | 'revoked'
+  | 'expired'
+  | 'key_mismatch'
+  | 'key_required'
+  | 'board_not_found'
+  | 'forbidden'
+  | 'unreachable'
+  | 'mcp_error';
 
 /**
  * What "test connection" actually reached. `board` is null for a user-scoped
  * key (the role is per board, so there is no single one to report), and `key`
  * is the key's *name*, not the credential.
+ *
+ * `via` names the path that answered: `mcp` is the real `initialize` +
+ * `tools/call whoami` against the instance's own endpoint, `inline` the
+ * in-process fallback an instance without a public URL is left with, and
+ * `null` a refusal decided from the stored row before anything was called.
  */
 export type AgentKeyTest =
-  | { ok: true; board: { id: string; name: string } | null; role: MemberRole | null; key: string }
-  | { ok: false; reason: AgentKeyRefusal };
+  | {
+      ok: true;
+      via: 'mcp' | 'inline';
+      board: { id: string; name: string } | null;
+      role: MemberRole | null;
+      key: string;
+    }
+  | { ok: false; via: 'mcp' | 'inline' | null; reason: AgentKeyRefusal };

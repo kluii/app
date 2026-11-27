@@ -15,10 +15,13 @@ export const TEST_SECRETS = {
 };
 
 export async function startServer(
-  options: { mail?: Mailer | null; env?: Partial<Env>; webDir?: string } = {},
+  options: { mail?: Mailer | null; env?: Partial<Env>; webDir?: string; listen?: boolean } = {},
 ): Promise<{
   app: ReturnType<typeof buildApp>;
   db: Db;
+  env: Env;
+  /** The real origin, when `listen` was asked for: the agent-key probe calls it. */
+  origin: string | null;
   client: () => TestClient;
   close: () => Promise<void>;
 }> {
@@ -39,9 +42,26 @@ export async function startServer(
     ...(options.webDir === undefined ? {} : { webDir: options.webDir }),
   });
   await app.ready();
+
+  // A test that exercises a self-call (the agent-key probe, docs/mcp.md §7)
+  // needs a listener, and the port is only known after `listen`. Route handlers
+  // read `context.env` per request, so the origin is assigned rather than
+  // rebuilt: no rebuild can disagree with the socket that is actually open.
+  let origin: string | null = null;
+  if (options.listen === true) {
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const address = app.server.address();
+    if (typeof address === 'object' && address !== null) {
+      origin = `http://127.0.0.1:${address.port}`;
+      env.KLUI_PUBLIC_URL = origin;
+    }
+  }
+
   return {
     app,
     db,
+    env,
+    origin,
     client: () => new TestClient(app, db),
     close: async () => {
       await app.close();
