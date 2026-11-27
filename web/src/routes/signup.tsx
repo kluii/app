@@ -41,8 +41,9 @@ function SignupPage() {
         caught instanceof ApiError &&
         caught.details?.some((detail) => detail.message === RESERVED_MESSAGE)
       ) {
-        // The same rule the form checks locally, in case the server list moved.
-        setError(t('auth.signUp.error.reserved'));
+        // The same answer a taken name gets: which names the instance keeps for
+        // itself is not something a stranger has to be able to enumerate.
+        setError(t('auth.signUp.error.conflict'));
       } else if (caught instanceof ApiError && caught.code === 'validation_failed') {
         setError(t('auth.signUp.error.weak'));
       } else {
@@ -74,7 +75,7 @@ function SignupPage() {
           label={t('auth.signUp.username')}
           htmlFor="username"
           hint={t('auth.signUp.usernameHint')}
-          error={checkUsername(username) === 'reserved' ? t('auth.signUp.error.reserved') : null}
+          error={checkUsername(username) === 'reserved' ? t('auth.signUp.error.conflict') : null}
         >
           <Input
             id="username"
