@@ -59,6 +59,14 @@ enum BanSubjectKind {
   user
 }
 
+/// Who wrote a comment. A user account can go away; the type is what the export
+/// carries so a v1 file round-trips its `author_type` verbatim.
+enum CommentAuthorType {
+  user
+  agent
+  anon
+}
+
 enum JobStatus {
   pending
   running
@@ -406,6 +414,7 @@ model Comment {
   board_id     String
   card_id      String
   author_id    String?
+  author_type  CommentAuthorType @default(user)
   author_label String?
   body         String
   edited_at    DateTime?

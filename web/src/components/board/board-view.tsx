@@ -13,6 +13,7 @@ import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Input } from '../ui/input';
 import { ActivityDialog } from './activity-dialog';
+import { BoardDataDialog } from './board-data-dialog';
 import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from './board-filters';
 import { CardCreateModal } from './card-create-modal';
 import { CardDisplayModal, cardFromState } from './card-display-modal';
@@ -36,6 +37,7 @@ type Composer =
 export function BoardView({ boardId }: { boardId: string }) {
   const [composer, setComposer] = useState<Composer>({ kind: 'closed' });
   const [activityOpen, setActivityOpen] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [announcement, setAnnouncement] = useState('');
   const queryClient = useQueryClient();
@@ -189,6 +191,7 @@ export function BoardView({ boardId }: { boardId: string }) {
       onOpenCard={(card) => setComposer({ kind: 'read', cardId: card.id })}
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
+      onOpenData={() => setDataOpen(true)}
       live={live}
       onMove={requestMove}
       onMoveTo={(cardId, columnId) =>
@@ -224,6 +227,7 @@ export function BoardView({ boardId }: { boardId: string }) {
           onClose={() => setComposer({ kind: 'closed' })}
         />
       ) : null}
+      <BoardDataDialog boardId={boardId} open={dataOpen} onClose={() => setDataOpen(false)} />
       <ActivityDialog
         boardId={boardId}
         open={activityOpen}
@@ -252,6 +256,7 @@ function BoardFrame({
   onOpenCard,
   onAddCard,
   onOpenActivity,
+  onOpenData,
   live,
   onMove,
   onMoveTo,
@@ -267,6 +272,7 @@ function BoardFrame({
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
+  onOpenData: () => void;
   live: LiveStatus;
   onMove: (request: MoveRequest) => void;
   onMoveTo: (cardId: string, columnId: string) => void;
@@ -309,6 +315,9 @@ function BoardFrame({
           />
           <Button size="sm" variant="secondary" onClick={onOpenActivity}>
             {t('board.activity.title')}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={onOpenData} data-testid="open-board-data">
+            {t('board.data.open')}
           </Button>
         </div>
       </div>

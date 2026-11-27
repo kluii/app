@@ -69,6 +69,38 @@ async function request<T>(
   return parsed as T;
 }
 
+async function requestFile<T>(path: string, file: File): Promise<T> {
+  const csrf = csrfToken();
+  const form = new FormData();
+  form.append('file', file);
+  const response = await fetch(`/api/v1${path}`, {
+    method: 'POST',
+    // No content-type: the browser must set the multipart boundary itself.
+    headers: { accept: 'application/json', ...(csrf ? { 'x-klui-csrf': csrf } : {}) },
+    credentials: 'same-origin',
+    body: form,
+  });
+  const text = await response.text();
+  const parsed: unknown = text === '' ? null : JSON.parse(text);
+  if (!response.ok) {
+    const envelope = parsed as { error?: ApiErrorBody } | null;
+    throw new ApiError(
+      response.status,
+      envelope?.error ?? { code: 'internal', message: 'The request failed.', hint: null },
+    );
+  }
+  return parsed as T;
+}
+
+export type ImportResult = {
+  columns: number;
+  cards: number;
+  comments: number;
+  created_columns: number;
+  dropped: Record<string, number>;
+  warnings: string[];
+};
+
 export const api = {
   me: () => request<Me>('GET', '/me'),
   login: (input: {
@@ -115,6 +147,12 @@ export const api = {
   updateCard: (cardId: string, input: Record<string, unknown>) =>
     request<Card>('PATCH', `/cards/${cardId}`, input),
   deleteCard: (cardId: string) => request<void>('DELETE', `/cards/${cardId}`),
+  importBoard: (boardId: string, file: File) =>
+    requestFile<{ job_id: string; status: string; replayed: boolean; result: ImportResult }>(
+      `/boards/${boardId}/import`,
+      file,
+    ),
+
   moveCard: (
     cardId: string,
     input: { column: string; before?: string | null; after?: string | null },

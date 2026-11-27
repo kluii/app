@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
 import type { Env } from './env.js';
 import type { Db } from './db.js';
@@ -27,6 +28,8 @@ import { registerCardRoutes } from './cards/routes.js';
 import { registerActivityRoutes } from './activity/routes.js';
 import { registerResetRoutes } from './auth/reset-routes.js';
 import { registerAdminRoutes } from './admin/routes.js';
+import { registerExportRoutes } from './export/routes.js';
+import { registerImportRoutes } from './import/routes.js';
 import type { Mailer } from './lib/mail.js';
 
 export type AppContext = {
@@ -65,6 +68,10 @@ export function buildApp(context: AppContext): FastifyInstance {
   });
 
   app.register(cookie, { secret: context.secrets.sessionSecret, hook: 'onRequest' });
+
+  // Import accepts a file upload (docs/api.md §1). One file, 5 MB, and the JSON
+  // body limit on that route is raised to match.
+  app.register(multipart, { limits: { files: 1, fileSize: 5 * 1024 * 1024 } });
 
   app.register(helmet, {
     contentSecurityPolicy: false,
@@ -134,6 +141,8 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerActivityRoutes(scoped, { ...context, hub });
     registerResetRoutes(scoped, { ...context, hub });
     registerAdminRoutes(scoped, { ...context, hub });
+    registerExportRoutes(scoped, { ...context, hub });
+    registerImportRoutes(scoped, { ...context, hub });
     registerRealtimeRoutes(scoped, { ...context, hub });
   });
 
@@ -154,7 +163,11 @@ export function buildApp(context: AppContext): FastifyInstance {
     }
     if (typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode < 500) {
       const appError = new AppError(
-        error.statusCode === 415 ? 'unsupported_media_type' : 'validation_failed',
+        error.statusCode === 415
+          ? 'unsupported_media_type'
+          : error.statusCode === 413
+            ? 'payload_too_large'
+            : 'validation_failed',
         { message: error.message, hint: null, status: error.statusCode },
       );
       const { status, body } = toWire(appError, String(request.id));

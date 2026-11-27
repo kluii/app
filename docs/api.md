@@ -147,7 +147,7 @@ next request is `401` and the next login answers `403 banned`.
 | `GET` | `/boards/:id/activity` | `?limit&cursor&actor_kind=user|agent|anon&type=<csv>`. `{items:[Event],next_cursor}`. |
 | `GET` | `/boards/:id/export.json` | `klui.export/v2`, `Content-Disposition: attachment`. |
 | `GET` | `/boards/:id/export.md` | Markdown per `docs/features/import-export.md`. |
-| `POST` | `/boards/:id/import` | `{format:"v2"|"v1"|"trello", data:<parsed json>}` or multipart `file`. `202` with `{job_id}`; progress over SSE (`import.progress`). Idempotent on `(board_id, source_hash)`. |
+| `POST` | `/boards/:id/import` | `{format:"v2"|"v1"|"trello", data:<parsed json>}` or multipart `file` (one part named `file`, 5 MB; the format is read from the file, `?format=` overrides it). `202` with `{job_id, status, replayed, result}`; `import.progress` over SSE, `import.completed` in the event log. Idempotent on `(board_id, source_hash)`: the second call returns the first job with `replayed: true`. All-or-nothing: one invalid card writes nothing. `400 unsupported_schema` for a file that is none of the three, `413 payload_too_large` past a limit. |
 | `POST` | `/boards/:id/close` | `{confirm:true, note?}`. Generates the summary, sets `closed_at`. `409` if already closed. Irreversible. |
 | `GET` | `/boards/:id/summary` | The stored close-out summary (JSON). `404` until closed. |
 | `GET` | `/boards/:id/members` | `[{user_id, username, role, joined_at}]`. |

@@ -93,6 +93,9 @@ export const credentialLimiter = new RateLimiter();
 export const LOGIN_ACCOUNT: BucketOptions = { max: 5, windowMs: 15 * 60 * 1000 };
 export const LOGIN_IP: BucketOptions = { max: 20, windowMs: 60 * 60 * 1000 };
 export const SIGNUP_IP: BucketOptions = { max: 5, windowMs: 60 * 60 * 1000 };
+/** Per board, per hour (docs/api.md §1): a bulk exit is not an incident, a loop is. */
+export const EXPORT_PER_BOARD: BucketOptions = { max: 10, windowMs: 60 * 60 * 1000 };
+export const IMPORT_PER_BOARD: BucketOptions = { max: 3, windowMs: 60 * 60 * 1000 };
 
 export function loginAccountKey(identifier: string): string {
   return `login:account:${identifier.trim().toLowerCase()}`;
@@ -117,4 +120,12 @@ export function submittedIdentifier(body: unknown): string | null {
 
 export function signupIpKey(ip: string): string {
   return `signup:ip:${ip}`;
+}
+
+export function exportKey(boardId: string): string {
+  return `export:board:${boardId}`;
+}
+
+export function importKey(boardId: string): string {
+  return `import:board:${boardId}`;
 }

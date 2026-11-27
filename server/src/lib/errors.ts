@@ -31,6 +31,7 @@ export type ErrorCode =
   | 'rate_limited'
   | 'too_many_attempts'
   | 'payload_too_large'
+  | 'unsupported_schema'
   | 'unsupported_media_type'
   | 'unknown_field'
   | 'internal'
@@ -75,6 +76,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   column_not_empty: 409,
   conflict: 409,
   payload_too_large: 413,
+  unsupported_schema: 400,
   unsupported_media_type: 415,
   rate_limited: 429,
   too_many_attempts: 429,
@@ -142,6 +144,10 @@ export function defaultMessage(code: ErrorCode): string {
       return 'The column still holds cards.';
     case 'board_closed':
       return 'This board is closed.';
+    case 'payload_too_large':
+      return 'The payload is too large.';
+    case 'unsupported_schema':
+      return 'The file is not a supported export.';
     case 'internal':
       return 'Something went wrong on our side.';
     default:

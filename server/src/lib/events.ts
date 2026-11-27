@@ -47,7 +47,7 @@ export type EventTypeName =
   | 'security.user_unbanned'
   | 'security.profile_updated';
 
-type Tx = Prisma.TransactionClient;
+export type Tx = Prisma.TransactionClient;
 
 export function toEnumName(type: EventTypeName): string {
   return type.replaceAll('.', '_');
