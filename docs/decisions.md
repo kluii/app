@@ -138,6 +138,21 @@ the feature.
 
 ### D-57 — One agent bucket for MCP, until the transport can classify a call
 
+**Closed 2026-11-27.** The transport now classifies the call:
+`settings/ratelimit.ts` keeps the REST buckets and skips `/mcp`, and the `/mcp`
+route charges after the JSON-RPC body is parsed, through `mcp/ratelimit.ts`,
+using the tool's bucket from `TOOL_KINDS` beside the registry (a tool without a
+classification fails `mcp-parity.test.ts`). A batch is charged per message
+before any of them runs, the refusal is `-32004` with `data.retry_after_s` and
+an HTTP `429`, and `x-ratelimit-limit` / `x-ratelimit-remaining` describe the
+bucket that was actually charged. The proof is "the MCP bucket → lets 100 reads
+through, refuses the 61st write, and spares a second key" in
+`server/test/ratelimit.test.ts` (`npx vitest run test/ratelimit.test.ts`): 100
+reads spend the read bucket, the 61st write is refused, a second key of the same
+account writes, and the exhausted key can still read. The original entry is kept
+below, because the reasoning that made it the right shape is the reasoning this
+fix follows.
+
 `docs/mcp.md` §5 separates reads (600/min per key) from writes (60/min, burst
 20). The bucket is filled in `onRequest` by `settings/ratelimit.ts`, which
 decides "write" from the HTTP method — and every MCP call is a `POST /mcp`.

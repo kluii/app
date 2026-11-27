@@ -20,6 +20,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { TOOL_EXAMPLES, TOOL_NAMES, TOOL_SCHEMAS } from '../src/mcp/schemas.js';
 import { PARITY, HUMAN_ONLY_ROUTES, PARITY_NAMESPACES } from '../src/mcp/parity.js';
+import { TOOL_KINDS } from '../src/mcp/registry.js';
 import { zodToRpc } from '../src/mcp/errors.js';
 
 const ROOT = new URL('../src', import.meta.url).pathname;
@@ -91,6 +92,36 @@ describe('the parity table holds in both directions', () => {
         true,
       );
     }
+  });
+});
+
+/**
+ * docs/mcp.md §5 promises 600 reads a minute and 60 writes per key. That
+ * promise is only keepable if every tool has a bucket, so a tool added without
+ * one fails here instead of being silently charged at the read price.
+ */
+describe('every tool has a rate-limit bucket', () => {
+  it('classifies all of them, and nothing that writes is a read', () => {
+    expect(Object.keys(TOOL_KINDS).sort()).toEqual([...TOOL_NAMES].sort());
+
+    const WRITING = /^(create|update|delete|move|set|bulk)_/u;
+    const misclassified = TOOL_NAMES.filter(
+      (tool) => WRITING.test(tool) && TOOL_KINDS[tool] !== 'write',
+    );
+    expect(misclassified).toEqual([]);
+
+    // Reads are exactly the ones that leave no event: a tool whose name says
+    // nothing about writing must be listed as a read deliberately.
+    expect(TOOL_NAMES.filter((tool) => TOOL_KINDS[tool] === 'read').sort()).toEqual([
+      'export_board',
+      'get_activity',
+      'get_board',
+      'get_card',
+      'list_boards',
+      'list_comments',
+      'search_cards',
+      'whoami',
+    ]);
   });
 });
 

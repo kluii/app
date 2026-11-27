@@ -15,6 +15,7 @@ import { TOOL_EXAMPLES, TOOL_NAMES, TOOL_SCHEMAS, type ToolName } from './schema
 import { LISTED_TOOLS, handlerFor } from './registry.js';
 import { DESCRIPTIONS } from './descriptions.js';
 import { appErrorToRpc, closestTools, zodToRpc, type RpcId } from './errors.js';
+import { chargeMcp, refusalHint } from './ratelimit.js';
 import { createHub } from '../realtime/events.js';
 
 const PROTOCOL_VERSION = '2025-06-18';
@@ -194,6 +195,34 @@ export function registerMcpRoutes(app: FastifyInstance, context: AppContext): vo
     const body = request.body;
     const batch = Array.isArray(body);
     const messages = batch ? body : [body];
+
+    // The bucket is charged here, and only here: `params.name` is what says a
+    // call reads or writes, and it exists only after the body is parsed
+    // (docs/mcp.md §5, mcp/ratelimit.ts). A batch is charged for every message
+    // before any of them runs, so a refused batch does nothing.
+    if (request.agentKeyId !== null) {
+      for (const message of messages) {
+        const charge = chargeMcp(reply, context.env, request.agentKeyId, message);
+        if (!charge.allowed) {
+          reply.header('retry-after', String(charge.retryAfter));
+          return reply.code(429).send(
+            errorOf(
+              idOf(message as RpcRequest),
+              -32004,
+              `Too many ${charge.bucket} calls for this agent key.`,
+              {
+                code: 'rate_limited',
+                bucket: charge.bucket,
+                limit: charge.limit,
+                retry_after_s: charge.retryAfter,
+                hint: refusalHint(charge.retryAfter),
+              },
+            ),
+          );
+        }
+      }
+    }
+
     const responses: RpcResponse[] = [];
     for (const message of messages) {
       const response = await handleMessage(context, request, message);

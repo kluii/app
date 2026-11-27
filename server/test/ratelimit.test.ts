@@ -10,7 +10,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
 import { credentialLimiter, LOGIN_ACCOUNT, loginAccountKey } from '../src/lib/ratelimit.js';
-import { sessionLimiter } from '../src/settings/ratelimit.js';
+import { agentLimiter, sessionLimiter } from '../src/settings/ratelimit.js';
 import { anonLimiter } from '../src/anon/limits.js';
 
 const PASSWORD = 'a-long-enough-password';
@@ -258,6 +258,112 @@ describe('trusted proxy hops', () => {
   });
 });
 
+/**
+ * K4 — `/mcp` charges the bucket the call belongs to (docs/mcp.md §5: 600 reads
+ * a minute per key, 60 writes).
+ *
+ * The bucket used to be decided in `onRequest` from the HTTP method, and every
+ * MCP call is `POST /mcp`: an agent reading a board was throttled at the write
+ * price, and 70 `list_boards` in a burst produced 17 refusals. The transport
+ * now reads `params.name` and charges the read or the write bucket, so this test
+ * is the measurement D-57 recorded as missing.
+ */
+describe('the MCP bucket', () => {
+  it('lets 100 reads through, refuses the 61st write, and spares a second key', async () => {
+    const harness = await startServer({
+      env: { KLUI_AGENT_WRITES: 60, KLUI_AGENT_READS: 600 },
+    });
+    try {
+      agentLimiter.clear();
+      const owner = harness.client();
+      await owner.signup(`mcp-bucket-${owner.suffix}`);
+      const created = await owner.request('POST', '/api/v1/boards', { name: 'Busy board' });
+      const boardId = (created.json() as { id: string }).id;
+      const state = await owner.request('GET', `/api/v1/boards/${boardId}/state`);
+      const [column] = (state.json() as { columns: { id: string }[] }).columns;
+      if (!column) throw new Error('no column');
+
+      const mint = async (name: string): Promise<string> => {
+        const response = await owner.request('POST', '/api/v1/agent-keys', {
+          name,
+          scope: 'board',
+          board_id: boardId,
+        });
+        expect(response.statusCode).toBe(201);
+        return (response.json() as { key: string }).key;
+      };
+
+      const call = (key: string, tool: string, args: unknown = {}) =>
+        harness.app.inject({
+          method: 'POST',
+          url: '/mcp',
+          headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+          payload: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: { name: tool, arguments: args },
+          }),
+        });
+
+      const key = await mint('reader');
+
+      // 100 reads, every one of them answered: the read bucket is 600, and a
+      // read is not a write.
+      let lastRead: Awaited<ReturnType<typeof call>> | null = null;
+      for (let index = 0; index < 100; index += 1) {
+        const response = await call(key, 'list_boards');
+        expect(response.statusCode).toBe(200);
+        expect(JSON.parse(response.body)).toMatchObject({ jsonrpc: '2.0', id: 1 });
+        lastRead = response;
+      }
+      expect(lastRead?.headers['x-ratelimit-limit']).toBe('600');
+      expect(Number(lastRead?.headers['x-ratelimit-remaining'])).toBe(500);
+
+      // 60 writes fit in the write bucket; the 61st is the documented refusal.
+      for (let index = 0; index < 60; index += 1) {
+        const response = await call(key, 'create_card', {
+          board: boardId,
+          column: column.id,
+          title: `Card ${index}`,
+        });
+        expect(response.statusCode).toBe(200);
+      }
+      const blocked = await call(key, 'create_card', {
+        board: boardId,
+        column: column.id,
+        title: 'One too many',
+      });
+      expect(blocked.statusCode).toBe(429);
+      const refusal = JSON.parse(blocked.body) as {
+        error: { code: number; data: { code: string; retry_after_s: number } };
+      };
+      expect(refusal.error.code).toBe(-32004);
+      expect(refusal.error.data.code).toBe('rate_limited');
+      expect(refusal.error.data.retry_after_s).toBeGreaterThan(0);
+      expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+      expect(blocked.headers['x-ratelimit-limit']).toBe('60');
+      expect(blocked.headers['x-ratelimit-remaining']).toBe('0');
+
+      // The bucket is the key's, not the account's.
+      const second = await mint('second');
+      const spared = await call(second, 'create_card', {
+        board: boardId,
+        column: column.id,
+        title: 'From another key',
+      });
+      expect(spared.statusCode).toBe(200);
+      expect(spared.headers['x-ratelimit-remaining']).toBe('59');
+
+      // And a read from the exhausted key still works: the write bucket is full,
+      // the read bucket is not.
+      expect((await call(key, 'list_boards')).statusCode).toBe(200);
+    } finally {
+      agentLimiter.clear();
+      await harness.close();
+    }
+  });
+});
 /**
  * K4-01 — the agent bucket is per key, not per user (docs/features/agents.md §2):
  * two agents on one account must not starve each other, and a looping agent must

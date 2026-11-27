@@ -48,11 +48,22 @@ export function exemptFromSessionBuckets(request: FastifyRequest): boolean {
   return !path.startsWith('/api/v1/');
 }
 
+/**
+ * `/mcp` charges its own bucket inside the route, after the JSON-RPC body says
+ * whether the call reads or writes (docs/mcp.md §5, mcp/ratelimit.ts). Charging
+ * it here first would bill every read at the write price — the gap D-57
+ * recorded — or, worse, charge it twice.
+ */
+export function isMcpRequest(request: FastifyRequest): boolean {
+  return (request.url.split('?')[0] ?? request.url) === '/mcp';
+}
+
 export function registerRateLimit(app: FastifyInstance, env: Env): void {
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     // The agent buckets are always on, like the anonymous ones: an agent loop is
     // an incident whether or not the session buckets were switched off.
     if (request.agentKeyId !== null) {
+      if (isMcpRequest(request)) return;
       const max = isWrite(request) ? env.KLUI_AGENT_WRITES : env.KLUI_AGENT_READS;
       const key = `agent:${request.agentKeyId}:${isWrite(request) ? 'write' : 'read'}`;
       const result = agentLimiter.take(key, { max, windowMs: WINDOW_MS });

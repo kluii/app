@@ -160,6 +160,7 @@ Tool results are MCP `content` blocks. Klui returns one `text` block containing 
 ## 5. Rate limits and batching
 
 - Writes: 60 per minute per key, burst 20. Reads: 600 per minute. Exceeded → `-32004` with `data.retry_after_s` and an HTTP `429` + `Retry-After`.
+- The bucket is charged from `params.name`, not from the HTTP method: both kinds travel as `POST /mcp`. Every response carries `x-ratelimit-limit` and `x-ratelimit-remaining` for the bucket the call was charged to, and a batch is charged per message before any of them runs.
 - `bulk_create_cards` counts as **one** write. An agent that loops `create_card` 40 times will be throttled; the error hint says "use bulk_create_cards for more than 5 cards".
 - Idempotency: a `create_card` retried after a timeout may duplicate. The tool accepts an optional `idempotency_key` in `data` (same 24 h window as REST) — documented in the skill, optional in the schema.
 

@@ -91,5 +91,41 @@ export function handlerFor(name: ToolName): ToolHandler | undefined {
   return TOOL_HANDLERS[name];
 }
 
+/**
+ * Which rate-limit bucket a tool call is charged to (docs/mcp.md §5).
+ *
+ * It lives beside the registry on purpose: a new tool is a new line here, and
+ * `mcp-parity.test.ts` fails when a tool has no classification, so the read and
+ * write sets cannot fall behind the tool list. `tools/list`, `initialize` and
+ * anything that is not a tool call are reads.
+ */
+export const TOOL_KINDS: Record<ToolName, 'read' | 'write'> = {
+  list_boards: 'read',
+  get_board: 'read',
+  get_card: 'read',
+  list_comments: 'read',
+  search_cards: 'read',
+  get_activity: 'read',
+  export_board: 'read',
+  whoami: 'read',
+  create_board: 'write',
+  update_board: 'write',
+  delete_board: 'write',
+  create_column: 'write',
+  update_column: 'write',
+  delete_column: 'write',
+  create_card: 'write',
+  bulk_create_cards: 'write',
+  update_card: 'write',
+  move_card: 'write',
+  set_card_done: 'write',
+  delete_card: 'write',
+  create_comment: 'write',
+};
+
+export function isWriteTool(name: string): boolean {
+  return (TOOL_KINDS as Record<string, 'read' | 'write' | undefined>)[name] === 'write';
+}
+
 export { TOOL_SCHEMAS };
 export type { ToolName };
