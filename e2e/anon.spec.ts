@@ -32,7 +32,7 @@ test('a readable URL alone grants nothing: no name gate, no write', async ({
   // and the credential here is the `/l/<token>` cookie, not the address.
   await expect(page.getByRole('heading', { level: 1, name: 'Not found' })).toBeVisible();
   await expect(page.getByLabel('Your name')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Join the board' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View the board' })).toHaveCount(0);
   await stranger.close();
 });
 
