@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LogOut, Moon, Sun } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { api } from '../../api/client';
+import { applyBranding } from '../../lib/branding';
 import { queryKeys } from '../../lib/query-client';
 import { useTheme } from '../../lib/theme';
 import { t } from '../../i18n';
@@ -25,9 +26,20 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
     staleTime: 30_000,
   });
 
+  const branding = useQuery({
+    queryKey: ['branding'],
+    queryFn: api.branding,
+    retry: false,
+    staleTime: 60_000,
+  });
+
   useEffect(() => {
     document.documentElement.lang = 'en';
   }, []);
+
+  useEffect(() => {
+    if (branding.data) applyBranding(branding.data);
+  }, [branding.data]);
 
   const signOut = async () => {
     await api.logout();
@@ -52,11 +64,11 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
           <Link
             to="/boards"
             className="flex items-center rounded-sm outline-offset-4"
-            aria-label={t('common.app.name')}
+            aria-label={branding.data?.instance_name ?? t('common.app.name')}
           >
             <img
-              src={theme === 'dark' ? lightLogo : darkLogo}
-              alt={t('common.app.name')}
+              src={branding.data?.logo_url ?? (theme === 'dark' ? lightLogo : darkLogo)}
+              alt={branding.data?.instance_name ?? t('common.app.name')}
               className="h-6 w-auto"
             />
           </Link>

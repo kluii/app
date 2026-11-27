@@ -5,6 +5,7 @@ import type {
   AnonWrite,
   Board,
   BoardLink,
+  Branding,
   LinkRole,
   BoardState,
   Card,
@@ -147,6 +148,17 @@ export type ImportResult = {
 };
 
 export const api = {
+  branding: () => request<Branding>('GET', '/branding'),
+  updateBranding: (input: {
+    instance_name?: string;
+    tab_title?: string | null;
+    accent_color?: string | null;
+    logo_url?: null;
+    favicon_url?: null;
+  }) => request<Branding>('PATCH', '/admin/branding', input),
+  uploadBrandingAsset: (file: File, kind: 'logo' | 'favicon' = 'logo') =>
+    requestFile<Branding>(`/admin/branding/logo?kind=${kind}`, file),
+
   me: () => request<Me>('GET', '/me'),
   login: (input: {
     email_or_username: string;

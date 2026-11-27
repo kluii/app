@@ -19,6 +19,15 @@ export type Me = {
   created_at: string;
 };
 
+export type Branding = {
+  instance_name: string;
+  tab_title: string | null;
+  logo_url: string | null;
+  favicon_url: string | null;
+  accent_color: string | null;
+  accent_foreground: string | null;
+};
+
 export type Board = {
   id: string;
   name: string;
