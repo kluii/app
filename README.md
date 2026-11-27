@@ -16,8 +16,8 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The app answers on `http://localhost:8080`. The first account created becomes
-the instance admin. To work on the source, `npm ci`, then `npm run dev` for the
+The app answers on `http://localhost:8080` and reports the release it is running
+at `/healthz`. The first account created becomes the instance admin. To work on the source, `npm ci`, then `npm run dev` for the
 API on `:8080` and Vite on `:5173`; `npm run build && npm run start` serves the
 built SPA and the API from one process. The full gate is `npm run format:check`,
 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`.

@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+
+/** The version the built server must report: the one in package.json (D-42). */
+const VERSION = (
+  JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 test.describe('the shell', () => {
   test('healthz reports the running build and the database', async ({ request }) => {
     const response = await request.get('/healthz');
     expect(response.status()).toBe(200);
-    expect(await response.json()).toEqual({ status: 'ok', version: '0.1.0', db: 'up' });
+    expect(await response.json()).toEqual({ status: 'ok', version: VERSION, db: 'up' });
   });
 
   test('answers / with a redirect, never a marketing page', async ({ request }) => {

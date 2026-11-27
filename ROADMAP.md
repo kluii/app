@@ -324,7 +324,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   OIDC provider framework: discovery, claim mapping, stable `provider_account_id`, admin UI with "test this provider", secrets encrypted at rest, per-provider enable flags, explicit account linking (never auto-link by email), break-glass local admin.
   **Exit:** a provider with a broken discovery URL shows a readable error in the admin UI and does not lock the instance out; an existing local account with the same email is not auto-linked.
 
-- [ ] **K5-10 — Release 2.0.0** `M` · dep: K5-01…K5-09
+- [x] **K5-10 — Release 2.0.0** `M` · dep: the must-ship line above (K5-02, K5-05, K5-07) — verified in `docs/verify/k5.md` § K5-10; image and tag push are the owner's steps
   Version bump in both `package.json` files, CHANGELOG, tags, multi-arch image published from CI, docs updated, `docs/verify/k5.md` complete.
 
 ---

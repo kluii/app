@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeApp } from './helpers/app.js';
+import { readVersion } from '../src/lib/version.js';
 
 const apps: ReturnType<typeof makeApp>[] = [];
 
@@ -16,6 +17,7 @@ describe('GET /healthz', () => {
 
     expect(response.statusCode).toBe(503);
     expect(response.headers['cache-control']).toBe('no-store');
-    expect(response.json()).toEqual({ status: 'error', version: '0.1.0', db: 'down' });
+    // The version is read, not pinned: bumping it must not require editing a test.
+    expect(response.json()).toEqual({ status: 'error', version: readVersion(), db: 'down' });
   });
 });

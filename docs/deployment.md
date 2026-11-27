@@ -218,7 +218,11 @@ The cloud instance runs the same image and the same compose file with different 
 1. Version bumped in `server/package.json` and `web/package.json`.
 2. CHANGELOG entry with migrations, env changes and rollback notes.
 3. Full gate green, recorded in `docs/verify/k5.md`.
-4. Image published for `linux/amd64` and `linux/arm64`, tagged `2.0.0` and `latest`.
+4. Tag pushed: `git tag -a v2.0.0 -m "Klui 2.0.0" && git push origin v2.0.0`. The
+   `release` job in `.github/workflows/ci.yml` runs only for a `v*` tag, refuses
+   when the tag and `package.json` disagree, and publishes
+   `ghcr.io/<owner>/klui:2.0.0` and `:latest` for `linux/amd64` and `linux/arm64`.
+   It cannot run before `gate`, `e2e` and `docker` pass on that commit.
 5. Pre-upgrade dump taken and its restore tested on a scratch database.
 6. Row counts recorded before, compared after.
 7. `/healthz` reports the new version.
