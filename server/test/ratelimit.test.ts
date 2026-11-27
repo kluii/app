@@ -257,3 +257,52 @@ describe('trusted proxy hops', () => {
     expect(statuses).toEqual([200, 200, 200]);
   });
 });
+
+/**
+ * K4-01 — the agent bucket is per key, not per user (docs/features/agents.md §2):
+ * two agents on one account must not starve each other, and a looping agent must
+ * not spend its owner's session budget.
+ */
+describe('agent key buckets', () => {
+  it('limits each key separately and answers 429 with Retry-After', async () => {
+    const harness = await startServer({ env: { KLUI_AGENT_WRITES: 2 } });
+    try {
+      const owner = harness.client();
+      await owner.signup(`agent-limit-${owner.suffix}`);
+      const created = await owner.request('POST', '/api/v1/boards', { name: 'Limited' });
+      const boardId = (created.json() as { id: string }).id;
+
+      const mint = async (name: string): Promise<string> => {
+        const response = await owner.request('POST', '/api/v1/agent-keys', {
+          name,
+          scope: 'board',
+          board_id: boardId,
+        });
+        expect(response.statusCode).toBe(201);
+        return (response.json() as { key: string }).key;
+      };
+
+      const write = async (key: string): Promise<Response> =>
+        harness.app.inject({
+          method: 'PATCH',
+          url: '/api/v1/me',
+          headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+          payload: JSON.stringify({ display_name: 'Agent' }),
+        });
+
+      const first = await mint('first');
+      expect((await write(first)).statusCode).toBe(200);
+      expect((await write(first)).statusCode).toBe(200);
+      const blocked = await write(first);
+      expect(blocked.statusCode).toBe(429);
+      expect(errorCode(blocked.body)).toBe('rate_limited');
+      expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+
+      // A second key of the same user starts with its own budget.
+      const second = await mint('second');
+      expect((await write(second)).statusCode).toBe(200);
+    } finally {
+      await harness.close();
+    }
+  });
+});

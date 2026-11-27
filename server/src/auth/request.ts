@@ -8,6 +8,8 @@ declare module 'fastify' {
     actor: Actor | null;
     sessionId: string | null;
     userId: string | null;
+    /** Set when the credential is an agent key (K4-01): rate limits key on it. */
+    agentKeyId: string | null;
   }
 }
 

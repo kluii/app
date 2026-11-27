@@ -97,6 +97,8 @@ Names are a contract: compose files, docs and the site depend on them.
 | `KLUI_ANON_WRITES_PER_BOARD` | `30` | Per board per hour |
 | `KLUI_ANON_WRITES_PER_IP` | `10` | Per address per hour |
 | `KLUI_ANON_JOINS_PER_IP` | `20` | Display-name joins per address per hour |
+| `KLUI_AGENT_WRITES` | `60` | Agent-key writes per key per minute |
+| `KLUI_AGENT_READS` | `600` | Agent-key reads per key per minute |
 | `KLUI_OIDC_DISCORD_CLIENT_ID` / `_SECRET` | unset | Provider flags default off |
 | `KLUI_OIDC_GITHUB_CLIENT_ID` / `_SECRET` | unset | |
 | `KLUI_OIDC_GENERIC_{NAME}_ISSUER` / `_CLIENT_ID` / `_SECRET` | unset | `{NAME}` uppercased, e.g. `KLUI_OIDC_GENERIC_AUTHENTIK_ISSUER` |

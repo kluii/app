@@ -248,10 +248,10 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 
 | Method | Path | Notes |
 |---|---|---|
-| `POST` | `/agent-keys` | `{name, scope:"board"|"user", board_id?, expires_in_days?}`. `201` `{id, key, name, scope, board_id, expires_at}` — key shown once. |
-| `GET` | `/agent-keys` | Metadata only, never the key. |
-| `DELETE` | `/agent-keys/:id` | `204`; effective on the next request. |
-| `POST` | `/agent-keys/:id/test` | Performs a real `whoami`-equivalent with the key and returns `{ok, board, role}` or the exact failure. |
+| `POST` | `/agent-keys` | `{name, scope:"board"\|"user", board_id?, expires_in_days?}` (default 90, 1..365; `board_id` is required for `board` and refused for `user`). `201` `{id, key, name, scope, board_id, board_name, role, expires_at, last_used_at, revoked_at, created_at}` — `key` (`kb_` + 32 base62) appears in this response and nowhere else. A session issues keys; a key that tries answers `403`. |
+| `GET` | `/agent-keys` | `{items:[…]}` without `key` or `key_hash`: id, name, scope, board, role, created, last used, expires, revoked. |
+| `DELETE` | `/agent-keys/:id` | `204`; effective on the next request (`401 invalid_credential`). Idempotent on an already-revoked key. |
+| `POST` | `/agent-keys/:id/test` | `{key?}` → `200 {ok:true, board, role, key}` or `{ok:false, reason:"revoked"\|"expired"\|"key_mismatch"\|"board_not_found"\|"forbidden"}`. The reach is computed through `can()` with the same actor a real call would use. |
 | `GET` | `/me/digest` | `{enabled, hour, timezone, channels:{webhook,email,rss}, last_sent_at, rss_url?}`. `rss_url` is returned only immediately after rotation. |
 | `PATCH` | `/me/digest` | `{enabled?, hour?, timezone?, webhook?, email?, rss?: "rotate"|"disable"}`. |
 | `POST` | `/me/digest/test` | Builds the digest for real events and delivers to the configured channel; `{sent, sections, bytes}`. Empty digest → `{sent:false, reason:"empty"}`. |

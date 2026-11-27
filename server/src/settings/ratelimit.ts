@@ -19,10 +19,12 @@ import { AppError } from '../lib/errors.js';
 import { RateLimiter } from '../lib/ratelimit.js';
 
 const WRITE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
-const WINDOW_MS = 60_000;
 
 /** One limiter per process, like the credential buckets: a restart forgives. */
 const sessionLimiter = new RateLimiter();
+/** Per agent key, not per user: two agents on one account must not starve each other. */
+const agentLimiter = new RateLimiter();
+const WINDOW_MS = 60_000;
 
 export function isWrite(request: FastifyRequest): boolean {
   return WRITE_METHODS.has(request.method.toUpperCase());
@@ -47,9 +49,27 @@ export function exemptFromSessionBuckets(request: FastifyRequest): boolean {
 }
 
 export function registerRateLimit(app: FastifyInstance, env: Env): void {
-  if (env.KLUI_RATE_LIMIT !== 'on') return;
-
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
+    // The agent buckets are always on, like the anonymous ones: an agent loop is
+    // an incident whether or not the session buckets were switched off.
+    if (request.agentKeyId !== null) {
+      const max = isWrite(request) ? env.KLUI_AGENT_WRITES : env.KLUI_AGENT_READS;
+      const key = `agent:${request.agentKeyId}:${isWrite(request) ? 'write' : 'read'}`;
+      const result = agentLimiter.take(key, { max, windowMs: WINDOW_MS });
+      reply.header('x-ratelimit-limit', String(max));
+      if (!result.allowed) {
+        reply.header('retry-after', String(result.retryAfter));
+        reply.header('x-ratelimit-remaining', '0');
+        throw new AppError('rate_limited', {
+          message: 'Too many requests for this agent key.',
+          hint: `Wait ${result.retryAfter} seconds, or use the bulk tool.`,
+        });
+      }
+      reply.header('x-ratelimit-remaining', String(Math.max(0, max - agentLimiter.count(key))));
+      return;
+    }
+
+    if (env.KLUI_RATE_LIMIT !== 'on') return;
     if (exemptFromSessionBuckets(request)) return;
     const key = sessionKey(request);
     const max = limitFor(env, request);
@@ -70,4 +90,4 @@ export function registerRateLimit(app: FastifyInstance, env: Env): void {
   });
 }
 
-export { sessionLimiter };
+export { agentLimiter, sessionLimiter };

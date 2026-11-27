@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
+import Fastify, {
+  type FastifyError,
+  type FastifyInstance,
+  type FastifyServerOptions,
+} from 'fastify';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
@@ -36,6 +40,7 @@ import { registerLinkRoutes } from './links/routes.js';
 import { registerAnonRoutes } from './anon/routes.js';
 import { registerModerationRoutes } from './moderation/routes.js';
 import { registerMemberRoutes } from './boards/members-routes.js';
+import { registerAgentKeyRoutes } from './agents/routes.js';
 import { renderHtmlPage, robotsTxt, sitemapXml } from './public/pages.js';
 import type { Mailer } from './lib/mail.js';
 
@@ -52,6 +57,8 @@ export type AppContext = {
    * a fixture so an HTML assertion does not depend on a prior web build.
    */
   webDir?: string;
+  /** Tests inject a pino stream to assert what is (and is not) logged. */
+  logger?: NonNullable<FastifyServerOptions['logger']>;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
@@ -75,7 +82,7 @@ export function buildApp(context: AppContext): FastifyInstance {
   const csp = contentSecurityPolicy(assets?.bootstrapHash ?? null);
 
   const app: FastifyInstance = Fastify({
-    logger: loggerOptions(context.env.KLUI_LOG_LEVEL),
+    logger: context.logger ?? loggerOptions(context.env.KLUI_LOG_LEVEL),
     bodyLimit: 1024 * 1024,
     trustProxy: hops > 0 ? (_address: string, hop: number) => hop < hops : false,
     genReqId: (raw) => resolveRequestId(raw.headers['x-request-id']),
@@ -163,6 +170,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerAuthRoutes(scoped, { ...context, hub });
     registerBoardRoutes(scoped, { ...context, hub });
     registerMemberRoutes(scoped, { ...context, hub });
+    registerAgentKeyRoutes(scoped, { ...context, hub });
     registerLinkRoutes(scoped, { ...context, hub });
     registerAnonRoutes(scoped, { ...context, hub });
     registerModerationRoutes(scoped, { ...context, hub });

@@ -250,7 +250,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
 
 **Wave exit:** that sentence is true on two clients; every MCP tool has an app equivalent and vice versa; the parity suite runs through a real MCP SDK client.
 
-- [ ] **K4-01 — Agent keys** `M` · dep: K3-01
+- [x] **K4-01 — Agent keys** `M` · dep: K3-01
   `POST/GET/DELETE /agent-keys`, `POST /agent-keys/:id/test`; `kb_` prefix, `sha256` at rest, shown once, scope (`board` | `user`), expiry, revoke, `last_used_at`, rate limit per key.
   **Exit:** a board-scoped key cannot read another board even when its owner is an instance admin (test); a revoked key answers `401` on the next call; the raw key never appears in logs (grep the log fixture).
 

@@ -12,6 +12,7 @@ import { sessionCookieName } from '../contracts/auth.js';
 import type { Actor } from '../lib/authz.js';
 import { clearLinkCookie, findActiveLink, readLinkCookie, touchLink } from '../links/service.js';
 import { readAnonCookie } from '../anon/service.js';
+import { isAgentKey } from '../agents/service.js';
 
 export function bearerToken(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization;
@@ -30,8 +31,15 @@ export async function resolveActor(
   request.actor = null;
   request.sessionId = null;
   request.userId = null;
+  request.agentKeyId = null;
 
   const bearer = bearerToken(request);
+  // An agent key is a bearer credential with its own resolver: it carries a
+  // scope, and a revoked key must stop on the next call (K4-01).
+  if (bearer !== undefined && isAgentKey(bearer)) {
+    await resolveAgentActor(db, pepper, request, bearer);
+    return;
+  }
   const cookie = request.cookies[sessionCookieName];
   const raw = bearer ?? cookie;
   if (!raw) {
@@ -71,6 +79,46 @@ export async function resolveActor(
   // last_seen_at is for ordering the session list, not a security decision.
   if (Date.now() - session.last_seen_at.getTime() > 60_000) {
     await db.session.update({ where: { id: session.id }, data: { last_seen_at: new Date() } });
+  }
+}
+
+/**
+ * The agent credential: a `kb_` key is looked up by hash, its expiry and
+ * revocation checked on every request, and its scope baked into the actor.
+ * `last_used_at` is written at most once a minute — it is a display value, not a
+ * security decision.
+ */
+async function resolveAgentActor(
+  db: Db,
+  pepper: string,
+  request: FastifyRequest,
+  raw: string,
+): Promise<void> {
+  const key = await db.agentKey.findUnique({ where: { key_hash: hashToken(raw, pepper) } });
+  if (!key || key.revoked_at !== null || key.expires_at.getTime() <= Date.now()) {
+    throw new AppError('invalid_credential');
+  }
+  const ban = await db.ban.findFirst({
+    where: {
+      subject: key.user_id,
+      subject_kind: 'user',
+      OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
+    },
+    select: { id: true },
+  });
+  if (ban) throw new AppError('banned');
+
+  request.actor = {
+    kind: 'agent',
+    userId: key.user_id,
+    scope: key.scope,
+    ...(key.board_id === null ? {} : { boardId: key.board_id }),
+  } satisfies Actor;
+  request.agentKeyId = key.id;
+  request.userId = key.user_id;
+
+  if (key.last_used_at === null || Date.now() - key.last_used_at.getTime() > 60_000) {
+    await db.agentKey.update({ where: { id: key.id }, data: { last_used_at: new Date() } });
   }
 }
 

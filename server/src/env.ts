@@ -45,6 +45,9 @@ export type Env = {
   KLUI_RATE_LIMIT: 'on' | 'off';
   KLUI_RATE_LIMIT_WRITES: number;
   KLUI_RATE_LIMIT_READS: number;
+  /** Per-key buckets (docs/features/agents.md §2): two agents never starve each other. */
+  KLUI_AGENT_WRITES: number;
+  KLUI_AGENT_READS: number;
 };
 
 export type EnvProblem = { variable: string; expected: string; problem: string };
@@ -79,6 +82,8 @@ const EXAMPLES: Record<string, string> = {
   KLUI_RATE_LIMIT: 'on',
   KLUI_RATE_LIMIT_WRITES: '120',
   KLUI_RATE_LIMIT_READS: '600',
+  KLUI_AGENT_WRITES: '60',
+  KLUI_AGENT_READS: '600',
 };
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
@@ -229,6 +234,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): EnvResult {
     ),
     KLUI_RATE_LIMIT_WRITES: integer('KLUI_RATE_LIMIT_WRITES', 120, 1, 100_000),
     KLUI_RATE_LIMIT_READS: integer('KLUI_RATE_LIMIT_READS', 600, 1, 100_000),
+    KLUI_AGENT_WRITES: integer('KLUI_AGENT_WRITES', 60, 1, 100_000),
+    KLUI_AGENT_READS: integer('KLUI_AGENT_READS', 600, 1, 100_000),
   };
 
   problems.push(...productionProblems(env));
@@ -347,6 +354,8 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     KLUI_RATE_LIMIT: 'off',
     KLUI_RATE_LIMIT_WRITES: 120,
     KLUI_RATE_LIMIT_READS: 600,
+    KLUI_AGENT_WRITES: 60,
+    KLUI_AGENT_READS: 600,
     ...overrides,
   };
 }
