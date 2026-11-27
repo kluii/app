@@ -5,6 +5,7 @@
  * {"error":{"code","message","hint"}} — `hint` is null, never absent.
  */
 import type { ZodError } from 'zod';
+import { translate, type Locale } from '../i18n/index.js';
 
 export type ErrorCode =
   | 'validation_failed'
@@ -97,6 +98,14 @@ export class AppError extends Error {
   readonly code: ErrorCode;
   readonly status: number;
   readonly hint: string | null;
+  /** A catalogue key for the hint, translated at the wire (K5-07). */
+  readonly hintKey: string | null;
+  /**
+   * Set only when the call site wrote the sentence itself. Everything else is
+   * translated from `error.<code>` at the wire, so the same failure speaks the
+   * reader's language while `Error.message` and the logs stay English.
+   */
+  readonly explicitMessage: string | null;
   readonly details: ValidationDetail[] | undefined;
   readonly current: unknown;
 
@@ -105,6 +114,7 @@ export class AppError extends Error {
     options: {
       message?: string;
       hint?: string | null;
+      hintKey?: string;
       status?: number;
       details?: ValidationDetail[];
       current?: unknown;
@@ -115,6 +125,8 @@ export class AppError extends Error {
     this.code = code;
     this.status = options.status ?? STATUS_BY_CODE[code];
     this.hint = options.hint ?? null;
+    this.hintKey = options.hintKey ?? null;
+    this.explicitMessage = options.message ?? null;
     this.details = options.details;
     this.current = options.current;
   }
@@ -174,9 +186,10 @@ export function fromZod(error: ZodError): AppError {
     code: issue.code,
     message: issue.message,
   }));
+  // No literal: the message and the hint are keys, so this one call site speaks
+  // every catalogued language without passing a locale through thirty callers.
   return new AppError('validation_failed', {
-    message: defaultMessage('validation_failed'),
-    hint: 'Fix the fields listed in details.',
+    hintKey: 'error.validation.hint',
     details,
   });
 }
@@ -184,13 +197,19 @@ export function fromZod(error: ZodError): AppError {
 export function toWire(
   error: AppError,
   requestId: string,
+  locale: Locale = 'en',
 ): { status: number; body: WireErrorBody } {
+  const translated =
+    error.explicitMessage ??
+    translate(locale, `error.${error.code}`, {}, defaultMessage(error.code));
   const body: WireErrorBody = {
     error: {
       code: error.code,
-      message:
-        error.code === 'internal' ? `${error.message} (request ${requestId})` : error.message,
-      hint: error.hint,
+      message: error.code === 'internal' ? `${translated} (request ${requestId})` : translated,
+      hint:
+        error.hintKey === null
+          ? error.hint
+          : translate(locale, error.hintKey, {}, error.hint ?? undefined),
     },
   };
   if (error.details) {

@@ -10,6 +10,7 @@ import helmet from '@fastify/helmet';
 import type { Env } from './env.js';
 import type { Db } from './db.js';
 import { AppError, toWire } from './lib/errors.js';
+import { localeOf } from './i18n/index.js';
 import { appErrorToRpc } from './mcp/errors.js';
 import { loggerOptions } from './lib/logger.js';
 import { registerHealth } from './settings/health.js';
@@ -220,8 +221,11 @@ export function buildApp(context: AppContext): FastifyInstance {
   });
 
   app.setErrorHandler<FastifyError>((error, request, reply) => {
+    // The reader's language, decided once per failure (K5-07): the envelope is
+    // translated, the log line is not.
+    const locale = localeOf(request.headers['accept-language']);
     if (error instanceof AppError) {
-      const { status, body } = toWire(error, String(request.id));
+      const { status, body } = toWire(error, String(request.id), locale);
       // `/mcp` answers in JSON-RPC even for a refusal raised before the handler
       // ran — the agent rate limit is one (docs/mcp.md §2, §5). A REST envelope
       // here would be a second error vocabulary on a protocol endpoint.
@@ -249,11 +253,11 @@ export function buildApp(context: AppContext): FastifyInstance {
             : 'validation_failed',
         { message: error.message, hint: null, status: error.statusCode },
       );
-      const { status, body } = toWire(appError, String(request.id));
+      const { status, body } = toWire(appError, String(request.id), locale);
       return reply.code(status).send(body);
     }
     request.log.error({ err: error }, 'unhandled error');
-    const { status, body } = toWire(new AppError('internal'), String(request.id));
+    const { status, body } = toWire(new AppError('internal'), String(request.id), locale);
     return reply.code(status).send(body);
   });
 
@@ -286,6 +290,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     const { status, body } = toWire(
       new AppError('not_found', { message: 'Not found.', hint: null, status: 404 }),
       String(request.id),
+      localeOf(request.headers['accept-language']),
     );
     request.log.info({ status: 404 }, 'not found');
     return reply.code(status).send(body);

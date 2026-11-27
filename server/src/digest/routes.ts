@@ -15,6 +15,7 @@ import { requireActor, requireUser } from '../auth/request.js';
 import { AppError, fromZod } from '../lib/errors.js';
 import { digestUpdateSchema } from '../contracts/digest.js';
 import { escapeHtml } from '../public/meta.js';
+import { localeOf, translate, type Locale } from '../i18n/index.js';
 import {
   deliverDigest,
   digestFeed,
@@ -118,7 +119,7 @@ export function registerDigestRoutes(app: FastifyInstance, context: AppContext):
       .type('text/html; charset=utf-8')
       .header('cache-control', 'no-store')
       .header('x-robots-tag', 'noindex');
-    return UNSUBSCRIBED_PAGE;
+    return unsubscribedPage(localeOf(request.headers['accept-language']));
   });
 }
 
@@ -143,13 +144,20 @@ export function rssXml(feed: { username: string; text: string; sentAt: Date }): 
   ].join('\n');
 }
 
-/** No JavaScript, no redirect, no second click: the link is the action. */
-const UNSUBSCRIBED_PAGE = [
-  '<!doctype html><html lang="en"><head><meta charset="utf-8">',
-  '<meta name="robots" content="noindex">',
-  '<title>Unsubscribed — Klui</title></head>',
-  '<body><main style="max-width:32rem;margin:4rem auto;font-family:system-ui;padding:0 1rem">',
-  '<h1>You are unsubscribed.</h1>',
-  '<p>The digest is off for this account. Nothing is deleted, and signing in turns it back on.</p>',
-  '</main></body></html>',
-].join('');
+/**
+ * No JavaScript, no redirect, no second click: the link is the action. The copy
+ * is catalogued (K5-07) and the language is the mail client's `Accept-Language`,
+ * because the reader has no session for the server to remember a preference on.
+ */
+export function unsubscribedPage(locale: Locale): string {
+  const title = translate(locale, 'digest.unsubscribe.title');
+  return [
+    `<!doctype html><html lang="${locale}"><head><meta charset="utf-8">`,
+    '<meta name="robots" content="noindex">',
+    `<title>${escapeHtml(title)} — Klui</title></head>`,
+    '<body><main style="max-width:32rem;margin:4rem auto;font-family:system-ui;padding:0 1rem">',
+    `<h1>${escapeHtml(title)}</h1>`,
+    `<p>${escapeHtml(translate(locale, 'digest.unsubscribe.body'))}</p>`,
+    '</main></body></html>',
+  ].join('');
+}

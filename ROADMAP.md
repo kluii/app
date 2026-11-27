@@ -312,7 +312,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `KLUI_DIGEST_LLM_URL` + `KLUI_DIGEST_LLM_KEY`; unset means nothing leaves the instance. Set means the model rewrites the already-computed payload, never decides content, length-capped, silent fallback to deterministic text on any failure.
   **Exit:** with the URL unset, a test asserts no outbound call; with a fake endpoint returning garbage, the deterministic text is sent.
 
-- [ ] **K5-07 — i18n** `L` · dep: K2-03
+- [x] **K5-07 — i18n** `L` · dep: K2-03 — verified in `docs/verify/k5.md` § K5-07; rules in `docs/i18n.md`
   Every user-facing string keyed from the first component, catalogs `en` (source) and `fr`, server strings (errors, emails, digest) through the same catalogs, `glossary.md`, a lint rule for literal strings.
   **Exit:** the lint rule fails on a raw string in a component; switching to `fr` changes every visible string with no missing key (a test scans both catalogs for key parity).
 

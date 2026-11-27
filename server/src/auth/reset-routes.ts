@@ -8,6 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../app.js';
 import { AppError } from '../lib/errors.js';
 import { requireUser } from './request.js';
+import { localeOf } from '../i18n/index.js';
 import { adminResetLink, confirmReset, requestReset } from './reset.js';
 
 export function registerResetRoutes(app: FastifyInstance, context: AppContext): void {
@@ -24,6 +25,9 @@ export function registerResetRoutes(app: FastifyInstance, context: AppContext): 
       context.secrets.tokenPepper,
       context.mail ?? null,
       request.body,
+      // The link's reader is the account owner; the request's language is the
+      // only signal the server has (K5-07).
+      localeOf(request.headers['accept-language']),
     );
     return reply.code(202).send({ status: 'accepted' });
   });
