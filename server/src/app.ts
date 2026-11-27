@@ -14,6 +14,7 @@ import { localeOf } from './i18n/index.js';
 import { appErrorToRpc } from './mcp/errors.js';
 import { loggerOptions } from './lib/logger.js';
 import { registerHealth } from './settings/health.js';
+import { registerMetrics } from './settings/metrics.js';
 import { registerRateLimit } from './settings/ratelimit.js';
 import { warnOnUntrustedProxy } from './settings/proxy.js';
 import {
@@ -152,8 +153,12 @@ export function buildApp(context: AppContext): FastifyInstance {
   });
 
   // 7. Authentication: resolve the credential into an actor before any handler.
+  // Operational probes (`/healthz`, `/metrics`) handle their own auth so a
+  // scrape bearer token is never misread as a user session credential.
   app.addHook('onRequest', async (request, reply) => {
     if (!context.db) return;
+    const path = request.url.split('?')[0] ?? request.url;
+    if (path === '/healthz' || path === '/metrics') return;
     await resolveActor(context.db, context.secrets.tokenPepper, request, reply);
   });
 
@@ -213,6 +218,10 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.register(async (scoped) => {
     registerHealth(scoped, context.db);
   });
+
+  // Registered on the root instance so its `onResponse` counter observes every
+  // route across encapsulated plugins (K5-03).
+  registerMetrics(app, { env: context.env, db: context.db, hub });
 
   // A shutting-down process says so on every open stream, so clients reconnect
   // with backoff instead of waiting for a dead socket (docs/features/realtime.md §1).
