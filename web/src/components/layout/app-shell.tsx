@@ -8,8 +8,8 @@ import { queryKeys } from '../../lib/query-client';
 import { useTheme } from '../../lib/theme';
 import { t } from '../../i18n';
 import { Button } from '../ui/button';
-import lightLogo from '../../assets/light-logo.png';
-import darkLogo from '../../assets/dark-logo.png';
+import whiteLogo from '../../assets/klui-logo-white.png';
+import blackLogo from '../../assets/klui-logo-black.png';
 
 /**
  * 48 px bar, canvas ground, hairline bottom, no shadow (DESIGN.md §4).
@@ -55,9 +55,9 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
             aria-label={t('common.app.name')}
           >
             <img
-              src={theme === 'dark' ? lightLogo : darkLogo}
+              src={theme === 'dark' ? whiteLogo : blackLogo}
               alt={t('common.app.name')}
-              className="h-6 w-auto"
+              className="h-7 w-auto sm:h-8"
             />
           </Link>
           {actions}
