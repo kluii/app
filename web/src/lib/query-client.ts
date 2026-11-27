@@ -27,4 +27,5 @@ export const queryKeys = {
   pending: (boardId: string) => ['pending', boardId] as const,
   members: (boardId: string) => ['members', boardId] as const,
   links: (boardId: string) => ['links', boardId] as const,
+  agentKeys: ['agent-keys'] as const,
 };

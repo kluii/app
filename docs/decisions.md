@@ -114,3 +114,24 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 | O-03 | SMTP transport for the pilot instance. | K5-05 email channel | Email channel disabled; webhook and RSS ship. |
 | O-04 | Which OIDC providers are enabled on the pilot. | K5-09 | Discord and GitHub scaffolded, generic provider documented, all flags off. |
 | O-05 | Digest default hour for the pilot (08:00 assumed). | K5-05 | 08:00 account timezone. |
+
+### D-56 — An agent key carries its issuer's role; there is no read-only key
+
+`docs/mcp.md` §7 asks the setup panel to offer "a read-only key alongside a
+write key". The key row has no role column: `createAgentKey` records
+`(user_id, scope, board_id)` and the actor resolves to
+`{kind:'agent', userId, scope, boardId}`, so `can()` grants exactly the role the
+issuer holds on that board. A viewer's key can read and cannot write; an
+editor's key can do what an editor does.
+
+Two ways to keep the sentence and the code together: add `role` to `agent_keys`
+(a migration, a second source of truth for permissions, and a `can()` branch
+that caps an agent below its own membership), or say what the product does. We
+say what it does. The panel states it plainly — "There is no read-only key: a
+key always carries your own role, so it can write wherever you can" — and the
+board-scoped copy changes when `GET /boards` reports a viewer, because then the
+key really is read-only.
+
+Revisit if an agent-to-agent handoff ever needs a credential narrower than the
+person who created it. Until then a second permission source is the bug, not
+the feature.

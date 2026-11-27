@@ -125,3 +125,35 @@ export type EventDto = {
 };
 
 export type Page<T> = { items: T[]; next_cursor: string | null };
+
+/**
+ * An issued agent key, without the credential (`server/src/agents/service.ts`
+ * `AgentKeyDto`). The raw key exists only in the response that created it, so
+ * `CreatedAgentKey` is the only shape that can carry one.
+ */
+export type AgentKey = {
+  id: string;
+  name: string;
+  scope: 'board' | 'user';
+  board_id: string | null;
+  board_name: string | null;
+  role: MemberRole | null;
+  expires_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
+export type CreatedAgentKey = AgentKey & { key: string };
+
+export type AgentKeyRefusal =
+  'revoked' | 'expired' | 'key_mismatch' | 'board_not_found' | 'forbidden';
+
+/**
+ * What "test connection" actually reached. `board` is null for a user-scoped
+ * key (the role is per board, so there is no single one to report), and `key`
+ * is the key's *name*, not the credential.
+ */
+export type AgentKeyTest =
+  | { ok: true; board: { id: string; name: string } | null; role: MemberRole | null; key: string }
+  | { ok: false; reason: AgentKeyRefusal };

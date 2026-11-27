@@ -227,7 +227,7 @@ Panel requirements:
 
 - "Test connection" performs a real `initialize` + `whoami` with the key and reports the board and role actually reached (not "looks good").
 - The key is shown once at creation, with a copy button and a warning; the panel afterwards shows "created 2026-11-26, last used 3 minutes ago", never the key.
-- A read-only key is offered alongside a write key, with plain-language scope copy: "This key can read and write one board. It cannot read any other board."
+- A key carries the role of the account that issued it (D-56), so the copy is the scope, not a promise of read-only: "This key can read and write one board. It cannot read any other board." For a viewer's key the panel says the other half out loud — it can read that board and not write it.
 
 ---
 

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {
+  AgentKey,
+  AgentKeyTest,
   AnonWrite,
   Board,
   BoardLink,
@@ -7,6 +9,7 @@ import type {
   BoardState,
   Card,
   Column,
+  CreatedAgentKey,
   EventDto,
   Me,
   Page,
@@ -170,6 +173,27 @@ export const api = {
     request<{ enabled: false }>('POST', '/auth/totp/disable', input),
   regenerateRecoveryCodes: (password: string) =>
     request<{ recovery_codes: string[] }>('POST', '/auth/recovery-codes', { password }),
+
+  /**
+   * Agent keys (docs/features/agents.md §1). The credential is in the 201 body
+   * and nowhere else: no endpoint reads it back, so the panel renders it from
+   * this response or not at all.
+   */
+  agentKeys: () => request<{ items: AgentKey[] }>('GET', '/agent-keys'),
+  createAgentKey: (input: {
+    name: string;
+    scope: 'board' | 'user';
+    board_id?: string;
+    expires_in_days?: number;
+  }) => request<CreatedAgentKey>('POST', '/agent-keys', input),
+  revokeAgentKey: (id: string) => request<void>('DELETE', `/agent-keys/${encodeURIComponent(id)}`),
+  /** `key` is optional: with it the server compares hashes, without it it probes the stored row. */
+  testAgentKey: (id: string, key?: string) =>
+    request<AgentKeyTest>(
+      'POST',
+      `/agent-keys/${encodeURIComponent(id)}/test`,
+      key === undefined ? {} : { key },
+    ),
 
   boards: () => request<{ items: Board[] }>('GET', '/boards'),
   userBoards: (username: string) =>
