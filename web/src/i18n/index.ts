@@ -5,9 +5,18 @@ import fr from './fr.json' with { type: 'json' };
 export type Locale = 'en' | 'fr';
 
 const CATALOGS: Record<Locale, Record<string, string>> = { en, fr };
+const STORAGE_KEY = 'klui-locale';
 
-/** The browser's language when the catalog covers it, English otherwise. */
+const LISTENERS = new Set<() => void>();
+
+/** A stored choice wins; the first visit follows the browser, English otherwise. */
 function initialLocale(): Locale {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'en' || stored === 'fr') return stored;
+  } catch {
+    // a blocked storage falls back to the browser, never to an exception
+  }
   return typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('fr')
     ? 'fr'
     : 'en';
@@ -15,11 +24,38 @@ function initialLocale(): Locale {
 
 let locale: Locale = initialLocale();
 
+/**
+ * The document language is part of the choice, not of a component's effect: a
+ * screen reader decides how to pronounce the page from it, and a render pass is
+ * not a place to write to the DOM.
+ */
+if (typeof document !== 'undefined') document.documentElement.lang = locale;
+
 export function setLocale(next: Locale): void {
+  if (next === locale) return;
   locale = next;
+  document.documentElement.lang = next;
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // the session keeps the choice even when it cannot be remembered
+  }
+  for (const listener of LISTENERS) listener();
 }
 
 export function getLocale(): Locale {
+  return locale;
+}
+
+/** `useSyncExternalStore` contract: a stable value per locale, and a way to hear about it. */
+export function subscribe(listener: () => void): () => void {
+  LISTENERS.add(listener);
+  return () => {
+    LISTENERS.delete(listener);
+  };
+}
+
+export function getSnapshot(): Locale {
   return locale;
 }
 
