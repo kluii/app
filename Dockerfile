@@ -1,7 +1,10 @@
 # syntax=docker/dockerfile:1
 # One image: build the SPA and the API, then run `prisma migrate deploy` and the server.
 
-FROM node:26-alpine AS build
+# The two Node stages are architecture-independent: TypeScript and the SPA do
+# not care, and `prisma generate` must not run under emulation (see the schema's
+# binaryTargets comment). Only the runtime stage is built per architecture.
+FROM --platform=$BUILDPLATFORM node:26-alpine AS build
 WORKDIR /app
 ENV npm_config_update_notifier=false
 
@@ -21,13 +24,17 @@ RUN npm run build
 # web workspace's production dependencies (lucide-react 48 MB, react-dom,
 # @tanstack, @atlaskit) beside a SPA that is already built, plus the
 # peer-installed typescript (23 MB) that no runtime file imports.
-FROM node:26-alpine AS deps
+FROM --platform=$BUILDPLATFORM node:26-alpine AS deps
 WORKDIR /app
 ENV npm_config_update_notifier=false
 
 COPY package.json package-lock.json ./
 COPY server/package.json server/package.json
 COPY web/package.json web/package.json
+# Both architectures' engines, fetched for the build host: `migrate deploy` needs a
+# schema engine at boot, and the client needs a query engine, so each image must
+# carry its own. PRISMA_CLI_BINARY_TARGETS is the CLI's own switch for this.
+ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x,linux-musl-arm64-openssl-3.0.x
 RUN npm ci --omit=dev --workspace @klui/server --ignore-scripts --no-audit --no-fund
 
 # The generated client is the runtime artefact: it carries the engine this image
@@ -43,7 +50,8 @@ RUN rm -rf node_modules/typescript
 # without the query engine beside the schema engine, and it answers "Can't write
 # to /app/node_modules/@prisma/engines" rather than a migration error when one is
 # missing. The engine the server itself loads is the generated one in
-# `.prisma/client`, and that is single-platform: libquery_engine-linux-musl.
+# `.prisma/client`; it carries both architectures' engines because the same tree
+# is copied into the amd64 and the arm64 image.
 
 FROM node:26-alpine AS runtime
 WORKDIR /app

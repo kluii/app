@@ -155,13 +155,14 @@ jobs:
       # The image carried 404 MB of node_modules: the web workspace's production
       # dependencies beside a built SPA, and a peer-installed typescript. The
       # ceiling is a regression guard, not a target: 251 MB of it is the node
-      # base and 176 MB is the Prisma toolchain `migrate deploy` runs, so the
-      # honest floor is ~500 MB and docs/deployment.md records the arithmetic.
+      # base, 176 MB is the Prisma toolchain `migrate deploy` runs, and 98 MB is
+      # the second architecture's engines (see the schema's binaryTargets). The
+      # measured size is 757 MB and docs/deployment.md §8 records the arithmetic.
       - name: Print the image size, and fail if it regrows
         run: |
           size=$(docker image inspect --format '{{.Size}}' "klui:$(node -p "require('./package.json').version")")
           printf 'image %s bytes (%s MB)\n' "$size" "$((size / 1000000))"
-          test "$size" -lt 700000000
+          test "$size" -lt 800000000
 
       - name: Assert the instance is healthy
         run: |

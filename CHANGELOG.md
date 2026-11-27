@@ -43,7 +43,9 @@ The first release. Everything below is in the image tagged `2.0.0` for
 - The event log carries what a reader prints: `card.completed` and
   `card.reopened` include `title`, `card.moved` includes `title` and
   `to_column_name`, `card.updated` includes `title`.
-- The runtime image copies only what the server executes: 793 MB → 659 MB.
+- The runtime image copies only what the server executes: 793 MB → 757 MB, and
+  it now carries both architectures' Prisma engines (`linux/amd64` and
+  `linux/arm64`), which is 98 MB of that.
 - `ROADMAP.md` reflects the verify files instead of the wave that wrote it.
 
 ### Schema
@@ -86,9 +88,12 @@ Named here rather than discovered later. Each is tracked in `ROADMAP.md`.
 - Branding (K5-01), Prometheus metrics (K5-03), in-app notifications (K5-04), the
   LLM digest layer (K5-06), the account settings UI (K5-08) and SSO (K5-09) are
   not in this release. They are scheduled for 2.1.
-- The image is 659 MB, not the 300 MB the first plan named: 251 MB is the Node
-  base and 176 MB is the Prisma toolchain that `migrate deploy` needs at boot.
-  The arithmetic is in `docs/deployment.md` §8.
+- The image is 757 MB, not the 300 MB the first plan named: 251 MB is the Node
+  base, 176 MB is the Prisma toolchain `migrate deploy` runs and 98 MB is the
+  second architecture's engines. The arithmetic is in `docs/deployment.md` §8.
+- The `linux/arm64` image is built by CI and has never been executed: Prisma's
+  schema parser fails under QEMU emulation (`get-dmmf wasm`, measured), so this
+  workspace could not boot it. Real arm64 hardware was not available.
 - The digest's email channel sends `text/plain` with no HTML part.
 - `docs/api.md` §9 describes OpenAPI generation that is not built; §"Not yet
   served" lists every route that is documented and answered by nobody.
