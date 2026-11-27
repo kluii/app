@@ -28,4 +28,6 @@ export const queryKeys = {
   members: (boardId: string) => ['members', boardId] as const,
   links: (boardId: string) => ['links', boardId] as const,
   agentKeys: ['agent-keys'] as const,
+  notifications: ['notifications'] as const,
+  notificationPrefs: ['notification-prefs'] as const,
 };

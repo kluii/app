@@ -15,6 +15,9 @@ import type {
   Page,
   Member,
   MemberRole,
+  NotificationKind,
+  NotificationList,
+  NotificationPrefs,
   PendingCard,
   PublicBoard,
   Visibility,
@@ -313,4 +316,14 @@ export const api = {
       `/cards/${cardId}/move`,
       input,
     ),
+
+  notifications: () => request<NotificationList>('GET', '/me/notifications'),
+  markNotificationRead: (id: string) =>
+    request<void>('POST', `/me/notifications/${encodeURIComponent(id)}/read`, {}),
+  markAllNotificationsRead: () => request<void>('POST', '/me/notifications/read-all', {}),
+  notificationPrefs: () => request<NotificationPrefs>('GET', '/me/notifications/prefs'),
+  updateNotificationPrefs: (input: {
+    muted_kinds?: NotificationKind[];
+    webhook_url?: string | null;
+  }) => request<NotificationPrefs>('PATCH', '/me/notifications/prefs', input),
 };

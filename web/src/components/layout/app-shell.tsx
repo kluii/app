@@ -8,6 +8,7 @@ import { queryKeys } from '../../lib/query-client';
 import { useTheme } from '../../lib/theme';
 import { t } from '../../i18n';
 import { Button } from '../ui/button';
+import { NotificationBell } from './notification-bell';
 import lightLogo from '../../assets/light-logo.png';
 import darkLogo from '../../assets/dark-logo.png';
 
@@ -74,6 +75,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
           </Button>
           {me.data ? (
             <>
+              <NotificationBell />
               <Link
                 to="/settings"
                 className="rounded-sm px-2 text-label text-ink-muted underline-offset-4 hover:text-ink hover:underline"
