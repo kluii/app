@@ -190,7 +190,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `POST /boards/:id/close` freezes the board read-only and generates the summary (done / remaining / who did what / dates / span) from `events`, rendered as a page and exportable as markdown.
   **Exit:** closing twice answers `409`; a closed board refuses writes with `403 board_closed` but stays readable; the markdown summary contains every done card exactly once.
 
-- [ ] **K2-13 — Responsive board** `M` · dep: K2-06
+- [x] **K2-13 — Responsive board** `M` · dep: K2-06
   390 px layout: horizontal column scroll with snap, sticky column headers, 40 px coarse-pointer targets, modal as a sheet under 640 px.
   **Exit:** the drag journey passes at 390 × 844; no horizontal page scroll outside the board rail; axe passes at both widths.
 

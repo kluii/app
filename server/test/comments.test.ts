@@ -276,7 +276,9 @@ describe('the activity feed', () => {
        ORDER BY created_at DESC, id DESC
        LIMIT 31`;
     const planText = JSON.stringify(plan);
-    expect(planText).toContain('Index Scan');
+    // "Index Scan" or "Index Only Scan": both read the index, neither reads the
+    // table. Postgres picks the covering one when the select list allows it.
+    expect(planText).toMatch(/Index (Only )?Scan/);
     expect(planText).not.toContain('Seq Scan');
   });
 });

@@ -374,8 +374,8 @@ function BoardFrame({
           <ColumnRail boardId={board.id} canWrite={caller.can_write} className="border-none p-0" />
         </div>
       ) : (
-        <div className="flex-1 overflow-x-auto">
-          <div className="flex items-start gap-4 px-4 py-4">
+        <div className="flex-1 overflow-x-auto" data-testid="board-scroll">
+          <div className="board-rail flex items-start gap-4 px-4 py-4">
             {columns.map((column) => (
               <ColumnSection
                 key={column.id}
@@ -467,7 +467,7 @@ function ColumnSection({
   return (
     <section
       ref={droppable.ref}
-      className="flex w-column shrink-0 flex-col gap-2 rounded-md bg-column p-2"
+      className="board-column flex w-column shrink-0 flex-col gap-2 rounded-md bg-column p-2"
       data-testid={`column-${column.id}`}
     >
       <header className="flex items-center justify-between px-1 py-1">
