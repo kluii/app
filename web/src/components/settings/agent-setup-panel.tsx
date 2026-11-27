@@ -43,6 +43,8 @@ export function AgentSetupPanel({
 }) {
   const { notify } = useToast();
   const [targetId, setTargetId] = useState('');
+  const [clientId, setClientId] = useState('claude');
+  const [skillId, setSkillId] = useState('opencode');
   const [error, setError] = useState<string | null>(null);
 
   const url = `${window.location.origin}/mcp`;
@@ -122,20 +124,56 @@ export function AgentSetupPanel({
         </p>
       </div>
 
-      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {clients.map((block) => (
-          <BlockCard key={block.id} block={block} onCopy={copy} />
-        ))}
-      </ul>
+      <div className="flex flex-col gap-2">
+        <Field label={t('settings.agents.setup.clientLabel')} htmlFor="agent-client">
+          <Select
+            id="agent-client"
+            value={clientId}
+            onChange={(event) => setClientId(event.target.value)}
+            data-testid="agent-client"
+            className="sm:w-64"
+          >
+            {clients.map((block) => (
+              <option key={block.id} value={block.id}>
+                {block.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <ul className="grid grid-cols-1 gap-3">
+          <BlockCard
+            key={chosenBlock(clients, clientId).id}
+            block={chosenBlock(clients, clientId)}
+            onCopy={copy}
+          />
+        </ul>
+      </div>
 
       <div className="flex flex-col gap-2 border-t border-border pt-4">
         <h3 className="text-h3">{t('settings.agents.skill.title')}</h3>
         <p className="text-body-sm text-ink-muted">{t('settings.agents.skill.description')}</p>
         <p className="text-body-sm text-ink-subtle">{t('settings.agents.skill.scrollHint')}</p>
-        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {skills.map((block) => (
-            <BlockCard key={block.id} block={block} onCopy={copy} />
-          ))}
+        <Field label={t('settings.agents.setup.skillLabel')} htmlFor="agent-skill">
+          <Select
+            id="agent-skill"
+            value={skillId}
+            onChange={(event) => setSkillId(event.target.value)}
+            data-testid="agent-skill"
+            className="sm:w-64"
+          >
+            {skills.map((block) => (
+              <option key={block.id} value={block.id}>
+                {block.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <ul className="grid grid-cols-1 gap-3">
+          <BlockCard
+            key={chosenBlock(skills, skillId).id}
+            block={chosenBlock(skills, skillId)}
+            onCopy={copy}
+          />
         </ul>
       </div>
 
@@ -197,6 +235,11 @@ export function AgentSetupPanel({
       </div>
     </div>
   );
+}
+
+/** The selected block, or the first one if the selection no longer exists. */
+function chosenBlock(blocks: CopyBlock[], id: string): CopyBlock {
+  return blocks.find((block) => block.id === id) ?? (blocks[0] as CopyBlock);
 }
 
 function BlockCard({
