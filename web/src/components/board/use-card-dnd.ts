@@ -113,7 +113,8 @@ function buildDragPreview(container: HTMLElement, card: Card): void {
 
 /**
  * A card is both a draggable and a drop target: the gaps between cards are only
- * a visual line, never a droppable band (PROMPT.md §10.4).
+ * a visual line, never a droppable band
+ * (docs/features/board-interaction.md §1.2).
  */
 export function useCardDnd(input: {
   card: Card;
@@ -211,7 +212,7 @@ export function useCardDnd(input: {
   /**
    * A drop ends with a click on the card that was dragged. pragmatic-drag-and-drop
    * does not cancel it, so the click that follows a drop is swallowed here
-   * (PROMPT.md §10.3) instead of opening the modal.
+   * (docs/features/board-interaction.md §1.1, step 9) instead of opening the modal.
    */
   function consumeDragClick(): boolean {
     return Date.now() - droppedAt.current < 300;

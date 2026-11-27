@@ -2,7 +2,7 @@
 
 ## Status
 
-`accepted`
+`superseded — 2026-11-27, see D-59 in docs/decisions.md`
 
 Date: 2026-11-26. Deciders: Wyliam, Hermes.
 
@@ -50,3 +50,10 @@ open board survivable.
 | An IP-based identity | NAT collapses a team into one actor, and a mobile network rotates mid-session. |
 | No anonymous identity at all (create-only) | "Edit the card I just created" is the minimum that makes the contribution useful. |
 | Captcha as the primary control | A captcha is a bot filter, not a rate limit; it replaces nothing (D-46). |
+
+## Superseded by
+
+D-59 (2026-11-27): a board is written by its members. The `klui_anon` cookie
+still identifies a reader and the columns stay for rows written before the
+change, but an anonymous actor no longer writes a card, edits one or completes
+one, and the per-board write cap guards nothing.

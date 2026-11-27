@@ -8,7 +8,7 @@ import { queryKeys } from '../../lib/query-client';
  * Toggling done is one request and an optimistic paint (docs/features/
  * board-interaction.md §2). A failure patches the one card back — never a
  * whole-state snapshot, which would discard a teammate's concurrent update
- * (PROMPT.md §10.6).
+ * (docs/features/board-interaction.md §1.4).
  */
 export function useToggleDone(boardId: string) {
   const queryClient = useQueryClient();

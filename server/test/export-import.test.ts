@@ -382,7 +382,7 @@ describe('import', () => {
 /**
  * Shaped from the mapping table in docs/features/import-export.md §2.1, not from
  * a real file: O-01 has no sample. The importer is marked "shaped from the
- * appendix" in docs/verify/k2.md rather than claimed verified.
+ * appendix" in the release notes rather than claimed verified.
  */
 const V1_FIXTURE = {
   name: 'Klui v1 board',

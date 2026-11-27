@@ -136,7 +136,7 @@ export function BoardView({ boardId }: { boardId: string }) {
     }, 400);
   };
 
-  // One in-flight move per card (PROMPT.md §10.1): a second drop computed from
+  // One in-flight move per card (docs/features/board-interaction.md §1.1): a second drop computed from
   // a stale position would write the same card twice.
   const inFlight = useRef(new Set<string>());
   const requestMove = (request: MoveRequest): void => {

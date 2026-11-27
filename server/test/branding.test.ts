@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * K5-01 — instance branding admin (DESIGN.md §2.4, §13, ROADMAP.md K5-01).
+ * K5-01 — instance branding admin (DESIGN.md §2.4, §13).
  *
  * - `GET /api/v1/branding` serves defaults and customised values through the
  *   same shape (no special "unbranded" code path).

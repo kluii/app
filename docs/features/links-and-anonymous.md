@@ -67,11 +67,11 @@ Requirements: a display name, 2–32 characters, chosen client-side, stored per 
 
 ## 6. Abuse
 
-- Per-board anonymous write cap (30/hour default) — the cap, not a captcha, is what makes an open board survivable.
-- Per-IP and per-session buckets; a ban blocks the next request.
-- Cap captcha is optional, off by default, triggered past a threshold, and explicitly **not** a security control.
-- Every anonymous event carries `actor_kind: anon`, so the activity feed can be filtered and a raid is visible in one view.
-- The owner can switch `anon_write` to `moderated` or `off` at any time; the change takes effect on the next request (no cache).
+- **Retired:** the per-board anonymous write cap (30/hour default) guarded a write surface that no longer exists (§4). The cap now guards nothing but the join gate; it was retired with anonymous writes, not removed from the history of the rule.
+- Per-IP and per-session buckets still run; a ban blocks the next request.
+- Cap captcha is optional, off by default, and explicitly **not** a security control.
+- **Retired:** every anonymous event used to carry `actor_kind: anon` so the feed could be filtered for a raid. An anonymous visitor produces no event now; rows written before the retirement keep their actor, so old activity still reads correctly.
+- `anon_write` can no longer be set: rows that still store `open` or `moderated` grant nothing (§4), and only `off` is accepted on a write.
 
 ## 7. URL and SEO rules
 

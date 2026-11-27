@@ -2,7 +2,7 @@
 /**
  * K5-09 — OIDC SSO behind a flag: encrypted secrets, discovery test without
  * lockout, PKCE login, explicit linking, and strict refusal to auto-link by
- * email (D-14, docs/features/auth.md §7, ROADMAP.md K5-09).
+ * email (D-14, docs/features/auth.md §7).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';

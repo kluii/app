@@ -57,7 +57,7 @@ If all five sections are empty, **no message, no email, no webhook, no RSS entry
 
 **Webhook** (default): the same Discord/Slack-compatible JSON as notifications, with the digest rendered as markdown sections.
 
-**Email** (when SMTP is configured): the same computed body the webhook carries, as `text/plain`. The address is the account's own (or the one set on the setting), the subject is the digest header, there is no tracking pixel and no remote content. 2.0 sends no HTML part: the mailer in `server/src/lib/mail.ts` writes `text/plain` only, and `docs/verify/k5.md` names that as not built rather than letting this paragraph promise it. SMTP unset → the API answers `503 email_not_configured`, which is what the settings UI shows as the reason.
+**Email** (when SMTP is configured): the same computed body the webhook carries, as `text/plain`. The address is the account's own (or the one set on the setting), the subject is the digest header, there is no tracking pixel and no remote content. 2.0 sends no HTML part: the mailer in `server/src/lib/mail.ts` writes `text/plain` only, and the release notes name that as not built rather than letting this paragraph promise it. SMTP unset → the API answers `503 email_not_configured`, which is what the settings UI shows as the reason.
 
 **RSS**: `GET /me/digest/rss/<token>` — per-account, token ≥ 32 chars, `sha256` at rest (with pepper), revocable, `noindex`, `X-Robots-Tag: noindex`, no auth cookie required. Rotating invalidates the old URL immediately. It is a credential and is treated as one.
 

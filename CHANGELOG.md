@@ -121,7 +121,8 @@ The first release. Everything below is in the image tagged `2.0.0` for
 - The runtime image copies only what the server executes: 793 MB → 757 MB, and
   it now carries both architectures' Prisma engines (`linux/amd64` and
   `linux/arm64`), which is 98 MB of that.
-- `ROADMAP.md` reflects the verify files instead of the wave that wrote it.
+- The sequencing document reflected what was actually verified instead of the
+  wave that wrote it.
 
 ### Schema
 
@@ -158,7 +159,9 @@ needs no restore.
 
 ### Known gaps in 2.0.0
 
-Named here rather than discovered later. Each is tracked in `ROADMAP.md`.
+Named here rather than discovered later. Each is tracked in the project's
+sequencing document, which ships with the organisation rather than this
+repository.
 
 - Branding (K5-01), Prometheus metrics (K5-03), in-app notifications (K5-04), the
   LLM digest layer (K5-06), the account settings UI (K5-08) and SSO (K5-09) are

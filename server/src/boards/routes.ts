@@ -102,7 +102,7 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
    * The human URL for a board. It answers `301` to `/<owner>/<slug>` only for an
    * actor who can read the board: this route used to hand an anonymous caller
    * the real id of a private board (a 301 to `/api/v1/boards/brd_…`), which is
-   * board enumeration and a broken redirect at once (PROMPT.md §3.4).
+   * board enumeration and a broken redirect at once (docs/permissions.md §5).
    */
   app.get('/api/v1/users/:username/boards/:slug', async (request, reply) => {
     const db = database();
