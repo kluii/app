@@ -10,6 +10,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
 import { addressWrites } from '../src/anon/limits.js';
+import { newId } from '../src/lib/ids.js';
 
 type Rpc = {
   jsonrpc: '2.0';
@@ -166,40 +167,47 @@ describe('/mcp credential kinds (D1)', () => {
 
   it('refuses a banned IP carrying an anon cookie', async () => {
     const bannedIp = '203.0.113.42';
-    const ban = await owner.request('POST', '/api/v1/admin/bans/ip', {
-      ip: bannedIp,
-      confirm: true,
-      reason: 'test ban',
+    const banId = newId('ban');
+    await harness.db.ban.create({
+      data: {
+        id: banId,
+        subject: bannedIp,
+        subject_kind: 'ip',
+        reason: 'test ban',
+        expires_at: null,
+      },
     });
-    expect(ban.statusCode).toBe(201);
+    try {
+      const response = await mcpWithCookie(
+        anonCookie,
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 20,
+          method: 'tools/call',
+          params: {
+            name: 'create_card',
+            arguments: { board: boardId, column: columnId, title: 'Banned via MCP' },
+          },
+        }),
+        bannedIp,
+      );
+      expect(response.statusCode).toBe(401);
+      const body = response.json() as Rpc;
+      expect(body.error?.code).toBe(-32001);
 
-    const response = await mcpWithCookie(
-      anonCookie,
-      JSON.stringify({
-        jsonrpc: '2.0',
-        id: 20,
-        method: 'tools/call',
-        params: {
-          name: 'create_card',
-          arguments: { board: boardId, column: columnId, title: 'Banned via MCP' },
-        },
-      }),
-      bannedIp,
-    );
-    expect(response.statusCode).toBe(401);
-    const body = response.json() as Rpc;
-    expect(body.error?.code).toBe(-32001);
-
-    // REST also refuses the banned address with 403 banned.
-    const rest = await harness.app.inject({
-      method: 'POST',
-      url: `/api/v1/boards/${boardId}/cards`,
-      remoteAddress: bannedIp,
-      headers: { 'content-type': 'application/json', cookie: anonCookie },
-      payload: JSON.stringify({ column: columnId, title: 'Banned REST' }),
-    });
-    expect(rest.statusCode).toBe(403);
-    expect((rest.json() as { error: { code: string } }).error.code).toBe('banned');
+      // REST also refuses the banned address with 403 banned.
+      const rest = await harness.app.inject({
+        method: 'POST',
+        url: `/api/v1/boards/${boardId}/cards`,
+        remoteAddress: bannedIp,
+        headers: { 'content-type': 'application/json', cookie: anonCookie },
+        payload: JSON.stringify({ column: columnId, title: 'Banned REST' }),
+      });
+      expect(rest.statusCode).toBe(403);
+      expect((rest.json() as { error: { code: string } }).error.code).toBe('banned');
+    } finally {
+      await harness.db.ban.deleteMany({ where: { id: banId } });
+    }
   });
 
   it('leaves the anon bucket untouched by MCP traffic and keeps REST anonymous writes working', async () => {
