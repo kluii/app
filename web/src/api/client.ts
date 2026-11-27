@@ -8,6 +8,8 @@ import type {
   EventDto,
   Me,
   Page,
+  Member,
+  MemberRole,
   PendingCard,
   PublicBoard,
   Visibility,
@@ -181,6 +183,15 @@ export const api = {
   createBoard: (input: { name: string; template?: 'classic' | 'blank' }) =>
     request<Board>('POST', '/boards', input),
   boardState: (boardId: string) => request<BoardState>('GET', `/boards/${boardId}/state`),
+  members: (boardId: string) => request<{ items: Member[] }>('GET', `/boards/${boardId}/members`),
+  inviteMember: (boardId: string, username: string, role: MemberRole) =>
+    request<Member>('POST', `/boards/${boardId}/members`, { username, role }),
+  updateMember: (boardId: string, userId: string, role: MemberRole) =>
+    request<Member>('PATCH', `/boards/${boardId}/members/${userId}`, { role }),
+  removeMember: (boardId: string, userId: string) =>
+    request<void>('DELETE', `/boards/${boardId}/members/${userId}`),
+  transferBoard: (boardId: string, userId: string) =>
+    request<Board>('POST', `/boards/${boardId}/transfer`, { user_id: userId, confirm: true }),
   pending: (boardId: string) =>
     request<{ items: PendingCard[] }>('GET', `/boards/${boardId}/pending`),
   approvePending: (boardId: string, pendingId: string) =>

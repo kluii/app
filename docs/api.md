@@ -153,10 +153,10 @@ next request is `401` and the next login answers `403 banned`.
 | `POST` | `/boards/:id/anon` | `{label}` (2–32 characters, trimmed). `200 {board_id, label, actor_kind:"anon"}` and a signed `klui_anon` cookie (12 h). `404` for a private board, `403` when `anon_write` is `off`. No account is created. |
 | `GET` | `/boards/:id/public` | The board's name, visibility and `anon_write` for a credential-less visitor, plus `accepts_anon`. `404` unless an anonymous actor could read the board. |
 | `GET` | `/boards/:id/members` | `[{user_id, username, role, joined_at}]`. |
-| `POST` | `/boards/:id/members` | `{username, role}`. `201`. Owner/admin. |
+| `POST` | `/boards/:id/members` | `{username, role:\"admin\"|\"editor\"|\"viewer\"}`. `201`. Owner/admin. `404` for an unknown username, `409` when the account is already a member. `owner` is not an accepted role here: ownership moves through `/transfer`. |
 | `PATCH` | `/boards/:id/members/:userId` | `{role, expected_updated_at?}`. Cannot demote the last owner. |
 | `DELETE` | `/boards/:id/members/:userId` | `204`. Cannot remove the owner; an admin cannot remove another admin. |
-| `POST` | `/boards/:id/transfer` | `{user_id, confirm:true}`. Owner only; one transaction. |
+| `POST` | `/boards/:id/transfer` | `{user_id, confirm:true}`. Owner only; one transaction that demotes the old owner to admin, promotes the target, and updates `board.owner_id`. `400` when the target is not a member, `409` when it is already the owner. A partial unique index (`board_members_one_owner_per_board`) refuses two owners at any instant. |
 | `GET` | `/boards/:id/pending` | `{items:[{id, column_id, title, description, tags, due_at, actor_label, created_at, expires_at}]}`. Owner/admin only (`moderation.list`). |
 | `POST` | `/boards/:id/pending/:pendingId/approve` | `{confirm?:true}` not required. `201 {card_id}`: the card is created in the pending row's column, keeps `actor_label`, and the queue row is deleted in the same transaction. `404` if it is gone. |
 | `POST` | `/boards/:id/pending/:pendingId/reject` | `204`, nothing created. Both verbs are `moderation.decide`. |

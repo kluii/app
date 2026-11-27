@@ -78,6 +78,7 @@ describe('a board state under a frame', () => {
       can_comment: true,
       can_manage: true,
       can_manage_columns: true,
+      can_manage_members: true,
       can_moderate: true,
       can_close: true,
     },

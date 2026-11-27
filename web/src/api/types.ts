@@ -89,6 +89,7 @@ export type Caller = {
   can_comment: boolean;
   can_manage: boolean;
   can_manage_columns: boolean;
+  can_manage_members: boolean;
   can_moderate: boolean;
   can_close: boolean;
 };

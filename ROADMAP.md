@@ -226,7 +226,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `pending_cards` with approve/reject, owner/admin only, 7-day expiry job, queue UI with count badge.
   **Exit:** a moderated write creates no card and no public event; approving creates the card with the anon label preserved; an expired pending card is purged by the sweeper and the test proves it.
 
-- [ ] **K3-05 — Member management** `M` · dep: K1-09
+- [x] **K3-05 — Member management** `M` · dep: K1-09
   Invite by username, role change, removal, owner transfer (exactly one owner enforced by a constraint, not by convention), member list UI.
   **Exit:** demoting the only owner is rejected; transferring ownership leaves one owner and one admin action in the event log; a removed member loses access on the next request, without a session refresh.
 

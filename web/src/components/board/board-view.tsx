@@ -20,6 +20,7 @@ import { CardCreateModal } from './card-create-modal';
 import { CardDisplayModal, cardFromState } from './card-display-modal';
 import { CardEditorModal } from './card-editor-modal';
 import { CardRow } from './card-row';
+import { MembersButton } from './members-dialog';
 import { ModerationButton } from './moderation-dialog';
 import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
 import { useKeyboardDrag } from './use-keyboard-drag';
@@ -439,6 +440,7 @@ function BoardFrame({
             members={members}
             shown={visible.length}
           />
+          <MembersButton boardState={boardState} />
           {caller.can_moderate ? (
             <ModerationButton boardId={board.id} count={boardState.pending_count} />
           ) : null}

@@ -62,6 +62,7 @@ export type CallerDto = {
   can_move_card: boolean;
   can_comment: boolean;
   can_manage_columns: boolean;
+  can_manage_members: boolean;
   can_write: boolean;
   can_manage: boolean;
   can_moderate: boolean;
