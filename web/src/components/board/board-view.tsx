@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Copy, Plus, Settings2 } from 'lucide-react';
-import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
 import { failureMessage } from '../../lib/api-error';
 import type { Board, BoardState, Caller, Card, Column } from '../../api/types';
@@ -816,7 +816,6 @@ function BoardName({ board, canRename }: { board: Board; canRename: boolean }) {
   const [draft, setDraft] = useState(board.name);
   const cancelled = useRef(false);
   const input = useRef<HTMLInputElement>(null);
-  const hintId = useId();
 
   useEffect(() => {
     if (!editing) return;
@@ -893,15 +892,12 @@ function BoardName({ board, canRename }: { board: Board; canRename: boolean }) {
           setEditing(true);
         }}
         title={t('board.rename.label')}
-        aria-describedby={hintId}
+        aria-description={t('board.rename.label')}
         data-testid="board-name"
         className="block max-w-full truncate rounded-sm font-display text-h1 text-ink underline-offset-4 hover:underline hover:decoration-ink-subtle"
       >
         {board.name}
       </button>
-      <span id={hintId} className="sr-only">
-        {t('board.rename.label')}
-      </span>
     </h1>
   );
 }
@@ -1008,7 +1004,7 @@ function BoardSettingsMenu({
       ) : null}
       {caller.can_moderate ? (
         <DropdownItem
-          trailing={pending_count}
+          trailing={pending_count > 0 ? pending_count : undefined}
           onSelect={then(onOpenModeration)}
           testId="open-moderation"
         >
