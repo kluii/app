@@ -121,6 +121,7 @@ Positions are serialized as **strings** (`"1024"`, `"1536"`) because they are `D
 | `POST` | `/auth/oidc/:provider/link` | Explicit link for an already-signed-in user. |
 | `GET` | `/me` | `{id, email, username, display_name, totp_enabled, is_instance_admin, created_at}`. |
 | `PATCH` | `/me` | `{username?, display_name?, email?}`. Username change reserves the old value 90 days. |
+| `POST` | `/me/rotate` | `204`; revokes the current session and issues a new one in the same response, so a stolen cookie stops following the account. |
 | `GET` | `/me/sessions` | `[{id, ip, user_agent, created_at, last_seen_at, current:bool}]`. |
 | `DELETE` | `/me/sessions/:id` | `204`; deleting the current session logs out immediately. |
 | `DELETE` | `/me` | `{password, confirm:true}`. Documented cascade; anonymises authored comments. |
@@ -165,6 +166,7 @@ the same address. Both take effect on the next request, with no restart.
 | `POST` | `/boards/:id/import` | `{format:"v2"|"v1"|"trello", data:<parsed json>}` or multipart `file` (one part named `file`, 5 MB; the format is read from the file, `?format=` overrides it). `202` with `{job_id, status, replayed, result}`; `import.progress` over SSE, `import.completed` in the event log. Idempotent on `(board_id, source_hash)`: the second call returns the first job with `replayed: true`. All-or-nothing: one invalid card writes nothing. `400 unsupported_schema` for a file that is none of the three, `413 payload_too_large` past a limit. |
 | `POST` | `/boards/:id/close` | `{confirm:true, note?}`. Generates the summary, sets `closed_at`. `409` if already closed. Irreversible. |
 | `GET` | `/boards/:id/summary` | The stored close-out summary (JSON). `404` until closed. |
+| `GET` | `/boards/:id/summary.md` | The same summary as Markdown (`text/markdown`). `404` until closed. |
 | `POST` | `/boards/:id/anon` | `{label}` (2–32 characters, trimmed). `200 {board_id, label, actor_kind:"anon"}` and a signed `klui_anon` cookie (12 h). `404` for a private board, `403` when `anon_write` is `off`. No account is created. |
 | `GET` | `/boards/:id/public` | The board's name, visibility and `anon_write` for a credential-less visitor, plus `accepts_anon`. `404` unless an anonymous actor could read the board. |
 | `GET` | `/boards/:id/members` | `[{user_id, username, role, joined_at}]`. |
@@ -296,7 +298,30 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 
 ## 9. OpenAPI generation
 
+**Nothing in this section is built.** `KLUI_OPENAPI` is declared in `env.ts` and read by nothing; there is no `/api/v1/openapi.json` route, no generated client and no golden-pair contract test. This is the agreed shape of the work, kept so the shape is not re-litigated, and `server/test/api-docs.test.ts` holds §3–§7 to the routes that exist.
+
 - One Zod schema per request and response, exported from `contracts/`. Routes reference them; no route declares an inline shape.
 - `@fastify/swagger` generates the document at boot; `GET /api/v1/openapi.json` serves it (auth: any authenticated actor; `404` when `KLUI_ENV=production` and `KLUI_OPENAPI=false`).
 - The web client (`web/src/api/client.ts`) is generated with `openapi-typescript` into a committed file; regenerating it is part of the build, and a CI step fails when the committed file is stale.
 - A contract test asserts a golden request/response pair per endpoint, including every documented error shape. The 404-not-403 rule is one of them.
+
+---
+
+## Not yet served
+
+The tables above are the contract. These rows are documented and answered by
+nobody yet, listed here so the difference is a claim with an owner instead of a
+gap a reader discovers with a 404. `server/test/api-docs.test.ts` fails when one
+of them starts being served (then it moves up into its section) and when one
+names a roadmap id that does not exist.
+
+| Method | Path | Serves it |
+|---|---|---|
+| `GET` | `/auth/oidc/:provider/start` | K5-09 |
+| `GET` | `/auth/oidc/:provider/callback` | K5-09 |
+| `POST` | `/auth/oidc/:provider/link` | K5-09 |
+| `DELETE` | `/me` | K5-08 |
+| `GET` | `/me/digest` | K5-05 |
+| `PATCH` | `/me/digest` | K5-05 |
+| `POST` | `/me/digest/test` | K5-05 |
+| `GET` | `/metrics` | K5-03 |

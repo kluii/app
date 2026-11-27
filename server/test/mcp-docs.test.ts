@@ -95,6 +95,23 @@ describe('docs/mcp.md and the schemas say the same thing', () => {
     expect(missing).toEqual([]);
   });
 
+  /**
+   * The other direction, which nothing checked: a property added to a schema
+   * and left out of the table is an argument a client author never learns
+   * exists. `update_card.expected_updated_at` was in that state.
+   */
+  it('documents every argument the schema accepts', () => {
+    const missing: string[] = [];
+    for (const [tool, args] of table) {
+      const documented = new Set(argumentNames(args));
+      const schema = schemaOf(tool as (typeof TOOL_NAMES)[number]);
+      for (const name of Object.keys(schema.properties ?? {})) {
+        if (!documented.has(name)) missing.push(`${tool}.${name}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
   it('lists every error code the transport can answer', () => {
     const codes = new Set(Object.values(PROTOCOL_CODES));
     for (const code of codes) {

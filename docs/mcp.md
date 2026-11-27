@@ -61,7 +61,7 @@ Rules:
 | `delete_board` | `({board, confirm: true})` |
 | `create_column` | `({board, name, position?})` |
 | `update_column` | `({board, column, name?})` |
-| `delete_column` | `({board, column})` |
+| `delete_column` | `({board, column, move_cards_to?, delete_cards?})` |
 | `create_card` | `({board, column, title, description?, assignee?, due_at?, tags?})` |
 | `bulk_create_cards` | `({board, column, items:[{title, description?, assignee?, due_at?, tags?, done?}]})` |
 | `get_card` | `({board, card})` |
