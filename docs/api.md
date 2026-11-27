@@ -256,7 +256,7 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 | `card.moved` | `{board_id, card_id, from_column, to_column, before, after}` |
 | `card.completed` / `card.reopened` | `{board_id, card_id, column_id}` |
 | `card.deleted` | `{board_id, card_id, column_id, title}` |
-| `comment.created` / `comment.updated` | `{board_id, card_id, comment_id, body_excerpt}` |
+| `comment.created` / `comment.updated` / `comment.deleted` | `{board_id, card_id, comment_id, body_excerpt}` — `deleted` keeps the excerpt so the digest can say what was removed |
 | `link.created` / `link.revoked` | `{board_id, link_id, role}` |
 | `pending.created` | `{board_id, pending_id, title}` |
 | `pending.approved` / `pending.rejected` | `{board_id, pending_id, card_id?}` |

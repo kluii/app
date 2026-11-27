@@ -92,6 +92,16 @@ async function requestFile<T>(path: string, file: File): Promise<T> {
   return parsed as T;
 }
 
+export type CommentDto = {
+  id: string;
+  card_id: string;
+  body: string;
+  author: { id: string | null; username: string | null; label: string | null; type: string };
+  edited_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ImportResult = {
   columns: number;
   cards: number;
@@ -134,10 +144,12 @@ export const api = {
     request<Board>('POST', '/boards', input),
   boardState: (boardId: string) => request<BoardState>('GET', `/boards/${boardId}/state`),
   card: (cardId: string) => request<Card>('GET', `/cards/${cardId}`),
-  activity: (boardId: string, cursor?: string) =>
+  activity: (boardId: string, cursor?: string, actorKind?: string) =>
     request<Page<EventDto>>(
       'GET',
-      `/boards/${boardId}/activity?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+      `/boards/${boardId}/activity?limit=30${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}${
+        actorKind && actorKind !== 'all' ? `&actor_kind=${actorKind}` : ''
+      }`,
     ),
 
   createColumn: (boardId: string, input: { name: string }) =>
@@ -147,6 +159,17 @@ export const api = {
   updateCard: (cardId: string, input: Record<string, unknown>) =>
     request<Card>('PATCH', `/cards/${cardId}`, input),
   deleteCard: (cardId: string) => request<void>('DELETE', `/cards/${cardId}`),
+  comments: (cardId: string, cursor?: string) =>
+    request<{ items: CommentDto[]; next_cursor: string | null }>(
+      'GET',
+      `/cards/${cardId}/comments?limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+    ),
+  addComment: (cardId: string, body: string) =>
+    request<CommentDto>('POST', `/cards/${cardId}/comments`, { body }),
+  editComment: (commentId: string, body: string) =>
+    request<CommentDto>('PATCH', `/comments/${commentId}`, { body }),
+  deleteComment: (commentId: string) => request<void>('DELETE', `/comments/${commentId}`),
+
   importBoard: (boardId: string, file: File) =>
     requestFile<{ job_id: string; status: string; replayed: boolean; result: ImportResult }>(
       `/boards/${boardId}/import`,

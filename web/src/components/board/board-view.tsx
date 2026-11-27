@@ -232,6 +232,10 @@ export function BoardView({ boardId }: { boardId: string }) {
         boardId={boardId}
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
+        onOpenCard={(cardId) => {
+          setActivityOpen(false);
+          setComposer({ kind: 'read', cardId });
+        }}
       />
     </BoardFrame>
   );

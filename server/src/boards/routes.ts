@@ -309,10 +309,22 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
     const assigneeById = new Map(assignees.map((user) => [user.id, user]));
 
     const policy = toPolicy(loaded.board);
+    // `label` is how the client recognises its own rows — its own comments, its
+    // own name in the feed — so an account caller gets its username, which is
+    // the shape docs/api.md §2 shows (`"label":"will"`).
+    const self =
+      actor.kind === 'user' || actor.kind === 'agent'
+        ? await db.user.findUnique({ where: { id: actor.userId }, select: { username: true } })
+        : null;
     const caller: CallerDto = {
       actor_kind: actor.kind,
       role: loaded.membership ? loaded.membership.role : null,
-      label: actor.kind === 'anon' ? actor.label : actor.kind === 'link' ? 'link' : '',
+      label:
+        actor.kind === 'anon'
+          ? actor.label
+          : actor.kind === 'link'
+            ? 'link'
+            : (self?.username ?? ''),
       can_write: can(actor, 'card.create', policy, loaded.membership).allow,
       can_manage: can(actor, 'board.update', policy, loaded.membership).allow,
       can_moderate: can(actor, 'moderation.decide', policy, loaded.membership).allow,

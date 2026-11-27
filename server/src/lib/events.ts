@@ -27,6 +27,7 @@ export type EventTypeName =
   | 'card.deleted'
   | 'comment.created'
   | 'comment.updated'
+  | 'comment.deleted'
   | 'link.created'
   | 'link.revoked'
   | 'pending.created'

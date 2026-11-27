@@ -101,6 +101,7 @@ enum EventType {
   card_deleted
   comment_created
   comment_updated
+  comment_deleted
   link_created
   link_revoked
   pending_created

@@ -5,6 +5,7 @@ import type { BoardState, Caller, Card } from '../../api/types';
 import { t } from '../../i18n';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
+import { CardThread } from './card-thread';
 import { TagChip } from './tag-chip';
 import { useToggleDone } from './use-toggle-done';
 
@@ -104,6 +105,8 @@ export function CardDisplayModal({
             {errorMessage(done.error)}
           </p>
         ) : null}
+
+        <CardThread cardId={card.id} caller={caller} />
       </div>
     </Dialog>
   );

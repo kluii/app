@@ -174,7 +174,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `done` belongs to the card; tick renders only when checked; strikethrough title; travels REST, MCP, export, and survives `expected_updated_at`.
   **Exit:** a done card stays in its column; the markdown export renders `- [x]`; a read-only board renders a static mark, not a disabled checkbox.
 
-- [ ] **K2-09 — Comments and activity** `L` · dep: K2-11
+- [x] **K2-09 — Comments and activity** `L` · dep: K2-11
   Comments (account-only) with composer and edit marker; activity feed grouped by day, filterable by actor kind (human / agent / anonymous label), linking to the card, cursor paginated.
   **Exit:** 10 000 seeded events load in pages without a full-table scan (query plan checked); an anonymous actor has no comment affordance and the API answers `403`/`404` per the matrix.
 
