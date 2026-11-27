@@ -417,18 +417,19 @@ async function exchangeCodeForClaims(input: {
   let claims: Record<string, unknown> = {};
   if (typeof tokens.id_token === 'string') {
     const decoded = decodeJwtPayload(tokens.id_token);
-    if (decoded) claims = { ...decoded };
-  }
-
-  if (
-    typeof claims.nonce === 'string' &&
-    claims.nonce.length > 0 &&
-    claims.nonce !== input.expectedNonce
-  ) {
-    throw new AppError('unauthenticated', {
-      message: 'OIDC nonce mismatch.',
-      hint: 'Start the sign-in flow again.',
-    });
+    if (!decoded) {
+      throw new AppError('unauthenticated', {
+        message: 'OIDC provider returned a malformed ID token.',
+        hint: 'Start the sign-in flow again.',
+      });
+    }
+    if (decoded.nonce !== input.expectedNonce) {
+      throw new AppError('unauthenticated', {
+        message: 'OIDC nonce mismatch.',
+        hint: 'Start the sign-in flow again.',
+      });
+    }
+    claims = { ...decoded };
   }
 
   if (
@@ -485,7 +486,10 @@ function sanitizeUsernameSeed(raw: string): string {
   return cleaned;
 }
 
-async function allocateUniqueUsername(db: Db, seed: string): Promise<string> {
+async function allocateUniqueUsername(
+  db: Db | Prisma.TransactionClient,
+  seed: string,
+): Promise<string> {
   const base = sanitizeUsernameSeed(seed);
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const candidate = attempt === 0 ? base : `${base.slice(0, 24)}-${attempt + 1}`;
@@ -637,14 +641,17 @@ export async function handleOidcCallback(
     });
   }
 
-  const email = claims.email ?? `${provider.slug}-${randomBytes(6).toString('hex')}@oidc.local`;
+  const email =
+    claims.email && claims.emailVerified
+      ? claims.email
+      : `${provider.slug}-${randomBytes(6).toString('hex')}@oidc.local`;
   const usernameSeed = claims.preferredUsername ?? claims.email?.split('@')[0] ?? claims.sub;
-  const username = await allocateUniqueUsername(db, usernameSeed);
   const randomSecretPassword = randomBytes(32).toString('base64url');
   const passwordHash = await hashPassword(randomSecretPassword);
 
   const created = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('klui:signup'))`;
+    const username = await allocateUniqueUsername(tx, usernameSeed);
     const count = await tx.user.count();
     const user = await tx.user.create({
       data: {

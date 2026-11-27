@@ -108,6 +108,8 @@ export function OidcSettings() {
   const enabledList = publicProviders.data?.items ?? [];
   const linkedList = linkedAccounts.data?.items ?? [];
   const linkedBySlug = new Set(linkedList.map((item) => item.provider));
+  const enabledSlugs = new Set(enabledList.map((item) => item.slug));
+  const disconnectedLinked = linkedList.filter((item) => !enabledSlugs.has(item.provider));
 
   const showUserSection = enabledList.length > 0 || linkedList.length > 0;
   if (!showUserSection && !isAdmin) return null;
@@ -161,6 +163,27 @@ export function OidcSettings() {
               </div>
             );
           })}
+          {disconnectedLinked.map((account) => (
+            <div
+              key={account.id}
+              className="flex items-center justify-between rounded-sm border border-border px-3 py-2"
+            >
+              <div>
+                <p className="font-mono text-mono-sm text-ink">{account.provider}</p>
+                <p className="font-mono text-mono-sm text-ink-muted">
+                  {account.provider_account_id}
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => unlinkProvider.mutate(account.provider)}
+                disabled={unlinkProvider.isPending}
+              >
+                {t('oidc.settings.unlink')}
+              </Button>
+            </div>
+          ))}
         </div>
       ) : null}
 
