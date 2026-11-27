@@ -175,6 +175,8 @@ export function BoardView({ boardId }: { boardId: string }) {
   if (state.isError) {
     const status = state.error instanceof ApiError ? state.error.status : 0;
     if (status === 404 || status === 403) return <Unreadable />;
+    // No credential at all: a board URL is not a way in without one.
+    if (status === 401) return <NoCredential />;
     return (
       <div className="px-6 py-8">
         <p className="text-body-sm text-ink-muted">{t('common.error.generic')}</p>
@@ -251,6 +253,18 @@ export function BoardView({ boardId }: { boardId: string }) {
         }}
       />
     </BoardFrame>
+  );
+}
+
+function NoCredential() {
+  return (
+    <div className="mx-auto flex min-h-96 max-w-96 flex-col items-center justify-center gap-2 px-6 text-center">
+      <h1 className="text-h2">{t('board.error.title')}</h1>
+      <p className="text-body-sm text-ink-muted">{t('board.error.needCredential')}</p>
+      <Link to="/login" className="mt-2 text-body-sm text-ink underline-offset-4 hover:underline">
+        {t('common.action.signIn')}
+      </Link>
+    </div>
   );
 }
 

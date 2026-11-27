@@ -39,7 +39,8 @@ A link role is stored on the board (`link_role`), and `link_role: edit` means ev
 
 - `POST /boards/:id/links` → `{id, role, label?, url, token}`. The token is `<22+ base62>`, returned **once**.
 - Stored as `sha256(token)` (with `KLUI_TOKEN_PEPPER`), never in clear, never in a log, never in an event payload.
-- `/l/<token>` resolves the link, sets a scoped cookie (`klui_link_<boardId>`, `httpOnly`, `SameSite=Lax`, `noindex`), and redirects to the board with a `link` actor active. The token disappears from the URL bar; a later request authenticated by the cookie does not carry it.
+- `/l/<token>` resolves the link, sets a signed `klui_link` cookie holding `linkId.boardId` (`httpOnly`, `SameSite=Lax`, 30 days, `noindex`) and `302`s to the board with a `link` actor active. The cookie names a row, not the token: the row is re-read on every request, so revocation is effective immediately. One cookie covers every board the visitor holds a link for; `can()` still scopes each actor to its own board, and a second board answers `404`.
+- A token is only minted when the board's `link_role` is `read` or `edit`. Minting a credential the board would ignore is a `400`, not a dead URL.
 - Revoking sets `revoked_at`; the next request answers `404`. `last_used_at` updates at most once a minute (a write per request is a free amplification vector).
 - Rotation = create a new link + revoke the old one. There is no "same token, new secret".
 - The settings UI shows metadata forever and the token never again: "created 2026-11-26 · last used 3 min ago · revoke".

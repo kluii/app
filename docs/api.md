@@ -175,11 +175,11 @@ next request is `401` and the next login answers `403 banned`.
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/boards/:id/links` | `[{id, role, label, created_at, last_used_at, revoked_at}]`. Never the token. |
-| `POST` | `/boards/:id/links` | `{role:"read"|"edit", label?}`. `201` `{id, role, url:"https://host/l/<token>", token}` — token shown **once**, never retrievable again. |
+| `POST` | `/boards/:id/links` | `{role:"read"|"edit", label?}`. `201` `{id, role, url:"https://host/l/<token>", token}` — token shown **once**, never retrievable again. `400 validation_failed` naming `link_role` when the board's `link_role` is `none`: a token that could never read is not minted. |
 | `DELETE` | `/boards/:id/links/:linkId` | `204`; the URL answers `404` immediately after. |
 | `POST` | `/boards/:id/link-suffix/rotate` | `{confirm:true}` → new suffix, old URL `404`s. |
 
-`/l/<token>` is a server-rendered route: it resolves the link, sets a scoped cookie for that board and role, and redirects to the board with the link actor active. It is `noindex` and never appears in a log with the token intact.
+`/l/<token>` is a server-rendered route: it resolves the link, sets a signed `klui_link` cookie holding `linkId.boardId` (httpOnly, `SameSite=Lax`, 30 days), and `302`s to the board with the link actor active. The row is re-read on every request, so revoking a link ends the next call with no session refresh; a revoked or unknown token answers the `404` page, never a redirect. The route is `noindex` and never appears in a log with the token intact.
 
 ---
 

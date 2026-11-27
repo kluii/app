@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createRoute } from '@tanstack/react-router';
 import { BoardSummaryPage } from '../components/board/board-summary-page';
-import { authedRoute } from './authed';
+import { boardAccessRoute } from './board-access';
 
 /**
  * `/boards/$boardId/summary` is a sibling of the board route, not a child: the
@@ -9,7 +9,7 @@ import { authedRoute } from './authed';
  * page — a record you read and print.
  */
 export const boardSummaryRoute = createRoute({
-  getParentRoute: () => authedRoute,
+  getParentRoute: () => boardAccessRoute,
   path: '/boards/$boardId/summary',
   component: BoardSummaryRoute,
 });

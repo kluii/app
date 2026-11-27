@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createRouter } from '@tanstack/react-router';
 import { authedRoute } from './authed';
+import { boardAccessRoute } from './board-access';
 import { boardRoute } from './board';
 import { boardSummaryRoute } from './board-summary';
 import { boardsRoute } from './boards';
@@ -22,7 +23,8 @@ const routeTree = rootRoute.addChildren([
   styleguideRoute,
   profileRoute,
   publicBoardRoute,
-  authedRoute.addChildren([boardsRoute, boardRoute, boardSummaryRoute, settingsRoute]),
+  boardAccessRoute.addChildren([boardRoute, boardSummaryRoute]),
+  authedRoute.addChildren([boardsRoute, settingsRoute]),
 ]);
 
 export const router = createRouter({

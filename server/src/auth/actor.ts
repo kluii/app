@@ -10,6 +10,7 @@ import { AppError } from '../lib/errors.js';
 import { hashToken } from '../lib/hash.js';
 import { sessionCookieName } from '../contracts/auth.js';
 import type { Actor } from '../lib/authz.js';
+import { clearLinkCookie, findActiveLink, readLinkCookie, touchLink } from '../links/service.js';
 
 export function bearerToken(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization;
@@ -23,7 +24,7 @@ export async function resolveActor(
   db: Db,
   pepper: string,
   request: FastifyRequest,
-  _reply: FastifyReply,
+  reply: FastifyReply,
 ): Promise<void> {
   request.actor = null;
   request.sessionId = null;
@@ -32,7 +33,10 @@ export async function resolveActor(
   const bearer = bearerToken(request);
   const cookie = request.cookies[sessionCookieName];
   const raw = bearer ?? cookie;
-  if (!raw) return;
+  if (!raw) {
+    await resolveLinkActor(db, request, reply);
+    return;
+  }
 
   // A bearer credential wins over a cookie when both are present.
   const session = await db.session.findUnique({
@@ -41,6 +45,8 @@ export async function resolveActor(
 
   if (!session || session.revoked_at !== null || session.expires_at.getTime() <= Date.now()) {
     if (bearer) throw new AppError('invalid_credential');
+    // A stale session cookie is not a reason to ignore a valid link cookie.
+    await resolveLinkActor(db, request, reply);
     return;
   }
 
@@ -63,4 +69,31 @@ export async function resolveActor(
   if (Date.now() - session.last_seen_at.getTime() > 60_000) {
     await db.session.update({ where: { id: session.id }, data: { last_seen_at: new Date() } });
   }
+}
+
+/**
+ * The second credential: a visitor who opened `/l/<token>` holds a signed
+ * cookie naming one link. The link row is re-read here, so revoking it stops
+ * the next request without a session refresh.
+ */
+async function resolveLinkActor(
+  db: Db,
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const cookie = readLinkCookie(request);
+  if (!cookie) return;
+  const link = await findActiveLink(db, cookie);
+  if (!link) {
+    // Revoked or forged: drop the cookie and stay anonymous.
+    clearLinkCookie(reply, false);
+    return;
+  }
+  request.actor = {
+    kind: 'link',
+    boardId: link.board_id,
+    role: link.role,
+    linkId: link.id,
+  } satisfies Actor;
+  await touchLink(db, link.id);
 }

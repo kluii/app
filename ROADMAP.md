@@ -214,7 +214,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `private` | `link` | `public` enforced end to end; 4-char base32 suffix generated, stored, regenerable; old suffix `404`s after rotation; canonical URL per visibility; `noindex` on `link` and on every credentialed URL.
   **Exit:** a `link` board with the wrong suffix answers `404`; rotating the suffix invalidates the previous URL; a `public` board is listed on the owner profile and indexed.
 
-- [ ] **K3-02 — Link tokens** `M` · dep: K3-01
+- [x] **K3-02 — Link tokens** `M` · dep: K3-01
   `POST /boards/:id/links` (role, optional label), `DELETE /boards/:id/links/:linkId`, token `≥22` base62, stored as `sha256`, shown once, `last_used_at` tracked, `/l/<token>` resolves to an actor.
   **Exit:** the raw token appears nowhere after creation (grep the DB); revoking answers `404` on the next request; a `none` link role cannot read.
 

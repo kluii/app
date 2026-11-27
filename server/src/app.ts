@@ -32,6 +32,7 @@ import { registerResetRoutes } from './auth/reset-routes.js';
 import { registerAdminRoutes } from './admin/routes.js';
 import { registerExportRoutes } from './export/routes.js';
 import { registerImportRoutes } from './import/routes.js';
+import { registerLinkRoutes } from './links/routes.js';
 import { renderHtmlPage, robotsTxt, sitemapXml } from './public/pages.js';
 import type { Mailer } from './lib/mail.js';
 
@@ -158,6 +159,7 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.register(async (scoped) => {
     registerAuthRoutes(scoped, { ...context, hub });
     registerBoardRoutes(scoped, { ...context, hub });
+    registerLinkRoutes(scoped, { ...context, hub });
     registerColumnRoutes(scoped, { ...context, hub });
     registerCardRoutes(scoped, { ...context, hub });
     registerCommentRoutes(scoped, { ...context, hub });
@@ -183,6 +185,16 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     if (error instanceof AppError) {
       const { status, body } = toWire(error, String(request.id));
+      // A browser navigating to a dead URL gets the app's 404 page, not JSON;
+      // an API client gets the envelope it parses (docs/api.md §1).
+      if (status === 404 && assets && isSpaNavigation(request.url, request.headers.accept)) {
+        return reply
+          .code(404)
+          .header('cache-control', 'no-store')
+          .header('x-robots-tag', 'noindex')
+          .type('text/html; charset=utf-8')
+          .send(assets.indexHtml);
+      }
       return reply.code(status).send(body);
     }
     if (typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode < 500) {
