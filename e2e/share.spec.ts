@@ -4,7 +4,7 @@
  * and it never shows one it could not show again.
  */
 import { expect, test } from '@playwright/test';
-import { openBoard, uniqueUsername } from './support';
+import { openBoard, openBoardMenu, uniqueUsername } from './support';
 
 test('the sharing panel sets visibility, hands out one token, and rotates with confirmation', async ({
   page,
@@ -13,6 +13,7 @@ test('the sharing panel sets visibility, hands out one token, and rotates with c
   const username = uniqueUsername('sharing');
   const { boardId } = await openBoard(page, request, username, ['Alpha']);
 
+  await openBoardMenu(page);
   await page.getByTestId('open-share').click();
   const dialog = page.getByRole('dialog');
 
@@ -29,15 +30,14 @@ test('the sharing panel sets visibility, hands out one token, and rotates with c
   const firstUrl = await url.inputValue();
   expect(firstUrl).toMatch(new RegExp(`/${username}/board-under-test-[a-z2-9]{4}$`, 'u'));
 
-  // A write link on a members-only board would be dead on arrival: the panel
-  // says so, and the test chooses a role first.
+  // A share link is read-only: the panel states it and offers no role.
   await expect(
-    dialog.getByText('Choose "can read" or "can edit" above', { exact: false }),
+    dialog.getByText('A share link lets anyone read this board.', { exact: false }),
   ).toBeVisible();
-  await dialog.getByLabel('Readable link').selectOption('read');
-  await expect(
-    dialog.getByText('Choose "can read" or "can edit" above', { exact: false }),
-  ).toHaveCount(0);
+  await expect(dialog.getByLabel('Readable link')).toHaveCount(0);
+  await expect(dialog.getByLabel('Anonymous writes')).toHaveCount(0);
+  await dialog.getByTestId('enable-link').click();
+  await expect(dialog.getByTestId('enable-link')).toHaveCount(0);
 
   // One token, once.
   await dialog.getByTestId('create-link').click();
@@ -48,6 +48,7 @@ test('the sharing panel sets visibility, hands out one token, and rotates with c
 
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
+  await openBoardMenu(page);
   await page.getByTestId('open-share').click();
   const reopened = page.getByRole('dialog');
   await expect(reopened.getByLabel('Write link')).toHaveCount(0);

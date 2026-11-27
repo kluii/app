@@ -120,8 +120,15 @@ test('reduced motion collapses every animation to a static frame', async ({ page
     const style = getComputedStyle(sample);
     return { animation: style.animationDuration, transition: style.transitionDuration };
   });
-  expect(durations?.animation === '0s' || durations?.animation === '').toBe(true);
-  expect(durations?.transition === '0s' || durations?.transition === '').toBe(true);
+  // The tokens collapse to 0.01 ms under `reduce`, not to 0: a transition of
+  // exactly zero fires no `transitionend`, and some components wait for one.
+  const milliseconds = (value: string | undefined): number => {
+    if (value === undefined || value === '') return 0;
+    const number = Number.parseFloat(value);
+    return value.trim().endsWith('ms') ? number : number * 1000;
+  };
+  expect(milliseconds(durations?.animation)).toBeLessThan(1);
+  expect(milliseconds(durations?.transition)).toBeLessThan(1);
 });
 
 test('the sign-in form can be completed with the keyboard only', async ({ page, request }) => {

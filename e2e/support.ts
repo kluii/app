@@ -86,6 +86,16 @@ export async function openBoard(
   return seeded;
 }
 
+/**
+ * The board's chrome is a single settings menu: open it, then choose the entry.
+ * `open-share`, `open-members`, `open-board-data`, `open-moderation`,
+ * `open-activity` and `open-delete-board` only exist while it is open.
+ */
+export async function openBoardMenu(page: Page): Promise<void> {
+  await page.getByTestId('open-board-settings').click();
+  await expect(page.getByRole('menu')).toBeVisible();
+}
+
 export async function titlesIn(page: Page, column: Column): Promise<string[]> {
   return page.getByTestId(`column-${column.id}`).getByTestId('card-title').allTextContents();
 }

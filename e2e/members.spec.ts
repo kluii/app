@@ -5,7 +5,7 @@
  * server would refuse.
  */
 import { expect, request as playwrightRequest, test } from '@playwright/test';
-import { PASSWORD, openBoard, uniqueUsername } from './support';
+import { PASSWORD, openBoard, openBoardMenu, uniqueUsername } from './support';
 
 test('invite, change role, remove and transfer', async ({ page, request }) => {
   const username = uniqueUsername('team');
@@ -19,6 +19,7 @@ test('invite, change role, remove and transfer', async ({ page, request }) => {
     data: { email: `${guest}@klui.test`, username: guest, password: PASSWORD },
   });
 
+  await openBoardMenu(page);
   await page.getByTestId('open-members').click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText(`${username}`)).toBeVisible();
@@ -36,6 +37,7 @@ test('invite, change role, remove and transfer', async ({ page, request }) => {
   await expect(guestSelect).toHaveValue('viewer');
   await page.keyboard.press('Escape');
   await page.reload({ waitUntil: 'domcontentloaded' });
+  await openBoardMenu(page);
   await page.getByTestId('open-members').click();
   await expect(
     page.getByRole('dialog').locator('li', { hasText: guest }).getByRole('combobox'),
@@ -84,6 +86,7 @@ test('invite, change role, remove and transfer', async ({ page, request }) => {
  */
 test('a refusal shows the server explanation, not a generic apology', async ({ page, request }) => {
   await openBoard(page, request, uniqueUsername('explain'), ['Alpha']);
+  await openBoardMenu(page);
   await page.getByTestId('open-members').click();
   const dialog = page.getByRole('dialog');
 

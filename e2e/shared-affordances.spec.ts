@@ -7,8 +7,16 @@
  * column" prompt has been lied to three times. The tests below open the same
  * board as three actors and assert the surface, not the API.
  */
-import { expect, request as playwrightRequest, test } from '@playwright/test';
-import { BOARD_NAME, PASSWORD, patch, post, seedBoard, uniqueUsername } from './support';
+import { expect, test } from '@playwright/test';
+import {
+  BOARD_NAME,
+  PASSWORD,
+  openBoardMenu,
+  patch,
+  post,
+  seedBoard,
+  uniqueUsername,
+} from './support';
 
 type Link = { id: string; token: string; url: string; role: string };
 
@@ -18,10 +26,12 @@ async function linkBoard(
 ): Promise<{ boardId: string; columns: { id: string }[]; link: Link }> {
   const username = uniqueUsername(`shared-${options.role}`);
   const seeded = await seedBoard(request, username, ['Alpha']);
+  // The board itself is always readable: `link_role: edit` is refused by the
+  // API now. The link *row* can still carry `edit`, which is the point of the
+  // `role: 'edit'` fixture: a stored capability that grants nothing.
   await patch(request, `/api/v1/boards/${seeded.boardId}`, {
     visibility: 'link',
-    link_role: options.role,
-    ...(options.anonWrite === undefined ? {} : { anon_write: options.anonWrite }),
+    link_role: 'read',
   });
   const link = await post<Link>(request, `/api/v1/boards/${seeded.boardId}/links`, {
     role: options.role,
@@ -66,66 +76,43 @@ test('a read-only link sees no edit affordance at all, not a disabled one', asyn
   await context.close();
 });
 
-test('a write link says so, and its empty column offers the write it can do', async ({
-  browser,
-  request,
-}) => {
+test('a writer link reads and offers no write at all', async ({ browser, request }) => {
   const { columns, link } = await linkBoard(request, { role: 'edit' });
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto(link.url, { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByTestId('caller-chip')).toHaveText('You can edit');
+  // The stored role says `edit`; the capability is retired, so the chip reads
+  // as a reader and no composer is offered.
+  await expect(page.getByTestId('caller-chip')).toHaveText('Read-only link');
   const second = columns[1];
   if (!second) throw new Error('no second column');
   await expect(
     page.getByTestId(`column-${second.id}`).getByRole('button', { name: 'Add card' }),
-  ).toBeVisible();
-  // A write link is not a member: sharing and membership stay closed to it.
+  ).toHaveCount(0);
+  // A link is not a member: sharing and membership stay closed to it.
   await expect(page.getByTestId('open-members')).toHaveCount(0);
+  await expect(page.getByTestId('open-delete-board')).toHaveCount(0);
   await context.close();
 });
 
-test('the owner sees how many cards are waiting for review in the header', async ({
-  browser,
-  request,
-}) => {
+test('the owner sees the moderation entry, with no count to show', async ({ browser, request }) => {
   const username = uniqueUsername('modbanner');
   const seeded = await seedBoard(request, username, ['Alpha']);
   await patch(request, `/api/v1/boards/${seeded.boardId}`, {
     visibility: 'link',
     link_role: 'read',
-    anon_write: 'moderated',
   });
-
-  // A visitor submits a card: the board must say so without being asked. A
-  // cookie-free context, because the fixture's jar holds the owner's session and
-  // a cookie-authenticated write needs the CSRF header.
-  const visitor = await playwrightRequest.newContext({
-    baseURL: test.info().project.use.baseURL,
-  });
-  const joined = await visitor.post(`/api/v1/boards/${seeded.boardId}/anon`, {
-    data: { label: 'Reviewer bait' },
-  });
-  expect(joined.status()).toBe(200);
-  const column = seeded.columns[0];
-  if (!column) throw new Error('no column');
-  const submitted = await visitor.post(`/api/v1/boards/${seeded.boardId}/cards`, {
-    data: { column: column.id, title: 'Please review me' },
-  });
-  expect(submitted.status()).toBe(202);
-  await visitor.dispose();
 
   const page = await browser.newPage();
   await page.context().addCookies((await request.storageState()).cookies);
   await page.goto(`/boards/${seeded.boardId}`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { level: 1, name: BOARD_NAME })).toBeVisible();
-  await expect(page.getByTestId('open-moderation')).toHaveText('1 waiting');
-
-  // The owner is a member: export and import are both theirs to see.
-  await page.getByTestId('open-board-data').click();
-  await expect(page.getByTestId('export-json')).toBeVisible();
-  await expect(page.getByTestId('import-file')).toBeAttached();
+  await expect(page.getByTestId('open-board-settings')).toBeVisible();
+  // Nothing can be queued any more, so the gear carries no badge.
+  await expect(page.getByTestId('moderation-badge')).toHaveCount(0);
+  await openBoardMenu(page);
+  await expect(page.getByTestId('open-moderation')).toHaveText('Moderation');
+  await page.context().close();
 });
 
 test('an empty board tells a visitor who can add the columns, not "add the first one"', async ({

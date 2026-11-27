@@ -4,7 +4,7 @@
  * board turns read-only, and the summary page is what the link opens.
  */
 import { expect, test } from '@playwright/test';
-import { csrf, openBoard, patch, uniqueUsername } from './support';
+import { csrf, openBoard, openBoardMenu, patch, uniqueUsername } from './support';
 
 test('closing a board freezes it and opens a summary a reader can use', async ({
   page,
@@ -20,18 +20,22 @@ test('closing a board freezes it and opens a summary a reader can use', async ({
   // Mark one card done through the API so the summary has both sections.
   await patch(request, `/api/v1/cards/${first.id}`, { done: true });
 
+  // Closing a board is no longer reachable from the board chrome (the settings
+  // menu offers Delete instead). The feature survives, and so does this test:
+  // the API closes, the page renders the frozen board, the summary is the door.
+  const closed = await request.post(`/api/v1/boards/${boardId}/close`, {
+    headers: { 'x-klui-csrf': await csrf(request) },
+    data: { confirm: true, note: 'Cut the export scope, shipped the rest.' },
+  });
+  expect(closed.status()).toBe(200);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByTestId('open-close-board').click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  // Irreversible, so the confirm stays disabled until it is acknowledged.
-  await expect(dialog.getByTestId('close-board-confirm')).toBeDisabled();
-  await dialog.getByTestId('close-board-ack').check();
-  await dialog.getByTestId('close-board-note').fill('Cut the export scope, shipped the rest.');
-  await dialog.getByTestId('close-board-confirm').click();
 
   await expect(page.getByTestId('board-closed-chip')).toBeVisible();
-  await expect(page.getByTestId('open-close-board')).toHaveCount(0);
+  // No write affordance survives: no composer button, no close entry.
+  await expect(page.getByTestId('open-board-settings')).toHaveCount(1);
+  await openBoardMenu(page);
+  await expect(page.getByTestId('open-delete-board')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   // No write affordance survives: no composer button, no card tick.
   await expect(page.getByTestId(`card-reopen-${first.id}`)).toHaveCount(0);
 

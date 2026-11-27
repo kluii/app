@@ -88,7 +88,7 @@ test('two filters narrow the board, and removing one chip restores the count', a
 
   await expect(page.getByText('4 of 4 cards')).toBeVisible();
 
-  await page.getByRole('button', { name: /^Filter/ }).click();
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
   // `exact` because a card's button carries its tag names as part of its name.
   await page.getByRole('button', { name: 'docs', exact: true }).click();
   await page.getByRole('button', { name: 'bug', exact: true }).click();
@@ -120,8 +120,8 @@ test('a text filter keeps the stored order and clears with one action', async ({
 }) => {
   await openBoard(page, request, uniqueUsername('filter-text'));
 
-  await page.getByRole('button', { name: /^Filter/ }).click();
-  await page.getByLabel('Text').fill('release');
+  await page.getByRole('button', { name: 'Filter', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Text' }).fill('release');
   await expect(page.getByText('1 of 4 cards')).toBeVisible();
 
   await page.getByRole('button', { name: 'Clear' }).click();

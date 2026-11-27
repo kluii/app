@@ -7,7 +7,7 @@
  * opens with no input in it, because the composer appears only when asked for.
  */
 import { expect, test } from '@playwright/test';
-import { openBoard, patch, uniqueUsername } from './support';
+import { openBoard, openBoardMenu, patch, uniqueUsername } from './support';
 
 test('a comment is written from the card, marked when edited, and survives a reload', async ({
   page,
@@ -57,7 +57,8 @@ test('the activity feed groups by day and keeps only the actor kind asked for', 
 
   await patch(request, `/api/v1/cards/${card.id}`, { done: true });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: 'Activity' }).click();
+  await openBoardMenu(page);
+  await page.getByTestId('open-activity').click();
 
   const list = page.getByTestId('activity-list');
   await expect(list).toBeVisible();

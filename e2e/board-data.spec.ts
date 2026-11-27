@@ -9,7 +9,7 @@
  * into an empty instance" sentence describes.
  */
 import { expect, test } from '@playwright/test';
-import { openBoard, uniqueUsername } from './support';
+import { openBoard, openBoardMenu, uniqueUsername } from './support';
 
 test('the Data dialog downloads the JSON and the markdown of the board', async ({
   page,
@@ -17,6 +17,7 @@ test('the Data dialog downloads the JSON and the markdown of the board', async (
 }) => {
   const { boardId } = await openBoard(page, request, uniqueUsername('data'), ['Wire the digest']);
 
+  await openBoardMenu(page);
   await page.getByTestId('open-board-data').click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -61,6 +62,7 @@ test('an imported file appears on the board, and says what it carried', async ({
     ],
   };
 
+  await openBoardMenu(page);
   await page.getByTestId('open-board-data').click();
   const dialog = page.getByRole('dialog');
   await dialog.getByTestId('import-file').setInputFiles({
@@ -86,6 +88,7 @@ test('a file that is not an export is refused, and the board is untouched', asyn
   const { columns } = await openBoard(page, request, uniqueUsername('badimport'), ['Untouched']);
   expect(columns.length).toBeGreaterThan(0);
 
+  await openBoardMenu(page);
   await page.getByTestId('open-board-data').click();
   const dialog = page.getByRole('dialog');
   await dialog.getByTestId('import-file').setInputFiles({

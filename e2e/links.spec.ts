@@ -9,13 +9,14 @@ import { BOARD_NAME, csrf, patch, post, seedBoard, uniqueUsername } from './supp
 
 type Link = { id: string; token: string; url: string; role: string };
 
-test('a write link is a credential a stranger can use, and revoking it ends that', async ({
+test('a link opens the board read-only, and revoking it ends the visit', async ({
   browser,
   request,
 }) => {
   const username = uniqueUsername('linkdoor');
   const { boardId, columns } = await seedBoard(request, username, ['Alpha']);
   await patch(request, `/api/v1/boards/${boardId}`, { visibility: 'link', link_role: 'read' });
+  // The row can still say `edit`; a link is read-only whatever it stores.
   const link = await post<Link>(request, `/api/v1/boards/${boardId}/links`, { role: 'edit' });
 
   const stranger = await browser.newContext();
@@ -26,15 +27,16 @@ test('a write link is a credential a stranger can use, and revoking it ends that
   expect(page.url()).not.toContain(link.token);
   await expect(page).toHaveURL(new RegExp(`/boards/${boardId}$`, 'u'));
 
-  // The link actor can write: the add-card affordance is there and works.
+  // No write: no composer, and the API refuses a card from this cookie.
   const column = columns[0];
   if (!column) throw new Error('no column');
-  await page.getByTestId(`column-${column.id}`).getByRole('button', { name: 'Add card' }).click();
-  await page.getByLabel('Card title').fill('Added from a link');
-  await page.getByRole('button', { name: 'Create card' }).click();
   await expect(
-    page.getByTestId('card-title').filter({ hasText: 'Added from a link' }),
-  ).toBeVisible();
+    page.getByTestId(`column-${column.id}`).getByRole('button', { name: 'Add card' }),
+  ).toHaveCount(0);
+  const refused = await page.request.post(`/api/v1/boards/${boardId}/cards`, {
+    data: { column: column.id, title: 'Added from a link' },
+  });
+  expect(refused.status()).toBe(403);
 
   // Revoking ends the link on the next request, with no session to refresh.
   const revoked = await request.delete(`/api/v1/boards/${boardId}/links/${link.id}`, {
