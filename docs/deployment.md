@@ -177,6 +177,7 @@ docker compose up -d
 ## 7. Health and observability
 
 - `GET /healthz` → `{"status":"ok","version":"<package version>","db":"up"}`. `503` with `db:"down"` when the database is unreachable. No auth, no detail beyond that.
+- One `warn` is logged per process the first time `X-Forwarded-For` arrives while `KLUI_TRUSTED_PROXY_HOPS=0`, naming the variable and this section. The header is client-written, so it is not trusted and the default is not changed: the line exists because this section is the fix.
 - The version in that body is the `package.json` of the running build, the tag `compose.yaml` builds (`klui:${KLUI_VERSION:-<that version>}`) and the three `package.json` files are held together by `server/test/version.test.ts`: bump one alone and the suite fails.
 - The version comes from `package.json`. A version bump is the only honest deploy proof; a container that still reports the old version did not deploy.
 - `/metrics` is off by default. When enabled, expose it on loopback and scrape it from the host, or protect it with `KLUI_METRICS_TOKEN`.

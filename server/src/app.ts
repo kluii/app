@@ -14,6 +14,7 @@ import { appErrorToRpc } from './mcp/errors.js';
 import { loggerOptions } from './lib/logger.js';
 import { registerHealth } from './settings/health.js';
 import { registerRateLimit } from './settings/ratelimit.js';
+import { warnOnUntrustedProxy } from './settings/proxy.js';
 import {
   contentSecurityPolicy,
   isSpaNavigation,
@@ -152,6 +153,9 @@ export function buildApp(context: AppContext): FastifyInstance {
 
   // 7b. Request buckets, after the actor is known and before any route exists
   // (settings/ratelimit.ts explains why this is global rather than opt-in).
+  // 7a first: one warn when a proxy is in front and no hop is trusted, because
+  // the buckets below are keyed on `request.ip` and that address is the proxy's.
+  warnOnUntrustedProxy(app, context.env);
   registerRateLimit(app, context.env);
 
   // 8. CSRF double submit for cookie-authenticated writes; bearer is exempt.
