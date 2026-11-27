@@ -308,7 +308,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Sections in order (Done / In progress / Overdue / Assigned to you / Next top-3), built from `events` since the account's previous send, per-account hour + IANA timezone, channels webhook/email/RSS, empty digest sends nothing, unsubscribe token in the footer working without sign-in.
   **Exit:** golden test on a fixed event log; a digest with no content performs zero sends (asserted); the RSS token is hashed at rest and `noindex`.
 
-- [ ] **K5-06 — Optional LLM layer** `S` · dep: K5-05
+- [x] **K5-06 — Optional LLM layer** `S` · dep: K5-05 — verified in `docs/verify/k5.md` § K5-06
   `KLUI_DIGEST_LLM_URL` + `KLUI_DIGEST_LLM_KEY`; unset means nothing leaves the instance. Set means the model rewrites the already-computed payload, never decides content, length-capped, silent fallback to deterministic text on any failure.
   **Exit:** with the URL unset, a test asserts no outbound call; with a fake endpoint returning garbage, the deterministic text is sent.
 
