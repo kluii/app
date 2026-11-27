@@ -96,9 +96,10 @@ describe('the MCP transport', () => {
     );
 
     for (const name of listed) {
-      expect(TOOL_HANDLERS[name as (typeof TOOL_NAMES)[number]], `${name} has no handler`).toBeTypeOf(
-        'function',
-      );
+      expect(
+        TOOL_HANDLERS[name as (typeof TOOL_NAMES)[number]],
+        `${name} has no handler`,
+      ).toBeTypeOf('function');
     }
     const served = TOOL_NAMES.filter((name) => TOOL_HANDLERS[name] !== undefined);
     expect([...listed].sort()).toEqual([...served].sort());

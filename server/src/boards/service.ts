@@ -272,10 +272,7 @@ export type BoardWrite = {
   hub?: Hub;
 };
 
-export async function createBoard(
-  context: BoardWrite,
-  input: CreateBoardInput,
-): Promise<BoardDto> {
+export async function createBoard(context: BoardWrite, input: CreateBoardInput): Promise<BoardDto> {
   const { db, actor } = context;
   if (actor.kind !== 'user' && actor.kind !== 'agent') {
     throw new AppError('forbidden', {

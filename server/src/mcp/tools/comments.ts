@@ -4,7 +4,7 @@
  * functions `GET` and `POST /cards/:id/comments` call, so an agent reads the
  * same page a human does and writes the same event.
  */
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { ToolContext } from '../registry.js';
 import { handler, requireCardInBoard } from '../registry.js';
 import { createComment, listComments } from '../../comments/service.js';
@@ -29,7 +29,11 @@ async function createCommentTool(
   args: Args<'create_comment'>,
 ): Promise<unknown> {
   await requireCardInBoard(context.db, args.board, args.card);
-  return createComment({ db: context.db, actor: context.actor, hub: context.hub }, args.card, args.body);
+  return createComment(
+    { db: context.db, actor: context.actor, hub: context.hub },
+    args.card,
+    args.body,
+  );
 }
 
 export const commentTools = {

@@ -23,11 +23,7 @@ export function registerColumnRoutes(app: FastifyInstance, context: AppContext):
         hint: 'Send {"name":"Doing"}.',
       });
     }
-    const column = await createColumn(
-      { db: database(), actor, hub: context.hub },
-      id,
-      parsed.data,
-    );
+    const column = await createColumn({ db: database(), actor, hub: context.hub }, id, parsed.data);
     return reply.code(201).send(column);
   });
 

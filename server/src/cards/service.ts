@@ -336,9 +336,7 @@ export async function createCard(
   assertAllowed(loaded.decision);
   await requireColumnInBoard(db, boardId, input.column);
   const assignee =
-    input.assignee !== undefined
-      ? await resolveAssignee(db, boardId, input.assignee)
-      : null;
+    input.assignee !== undefined ? await resolveAssignee(db, boardId, input.assignee) : null;
 
   const card = await db.$transaction(async (tx) => {
     // Inside the transaction and behind the column lock: two creators must not
@@ -480,7 +478,10 @@ export async function readCard(
   const [tagColors, assignee, commentsCount] = await Promise.all([
     boardTagColors(db, card.board_id),
     card.assignee_id
-      ? db.user.findUnique({ where: { id: card.assignee_id }, select: { id: true, username: true } })
+      ? db.user.findUnique({
+          where: { id: card.assignee_id },
+          select: { id: true, username: true },
+        })
       : Promise.resolve(null),
     db.comment.count({ where: { card_id: card.id } }),
   ]);
@@ -657,10 +658,7 @@ export async function moveCard(
   };
 }
 
-export async function deleteCard(
-  context: CardWrite,
-  cardId: string,
-): Promise<void> {
+export async function deleteCard(context: CardWrite, cardId: string): Promise<void> {
   const { db, actor } = context;
   const card = await db.card.findUnique({ where: { id: cardId } });
   if (!card) throw new AppError('card_not_found');

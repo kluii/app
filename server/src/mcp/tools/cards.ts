@@ -12,7 +12,7 @@
  *   (-32003) a stale REST write gets.
  * - `{board, card}` must name a card in that board, or `card_not_found`.
  */
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { ToolContext } from '../registry.js';
 import { handler, requireCardInBoard, requireColumnInBoard, toTagRows } from '../registry.js';
 import {

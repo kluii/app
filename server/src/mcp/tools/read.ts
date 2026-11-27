@@ -8,7 +8,7 @@
  * makes `export_board` byte-identical to `GET /boards/:id/export.json|.md`: one
  * serialiser, one ordering, one `exported_at` format.
  */
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { ToolContext } from '../registry.js';
 import { handler } from '../registry.js';
 import { listActivity } from '../../activity/service.js';
@@ -22,10 +22,7 @@ type Args<T extends keyof typeof TOOL_SCHEMAS> = z.infer<(typeof TOOL_SCHEMAS)[T
 /** docs/mcp.md §4: inline under 256 KB, an error naming REST above it. */
 export const INLINE_EXPORT_LIMIT = 256 * 1024;
 
-async function searchCardsTool(
-  context: ToolContext,
-  args: Args<'search_cards'>,
-): Promise<unknown> {
+async function searchCardsTool(context: ToolContext, args: Args<'search_cards'>): Promise<unknown> {
   const { board, tags, ...query } = args;
   return searchCards(context.db, context.actor, board, {
     ...query,
@@ -33,20 +30,14 @@ async function searchCardsTool(
   });
 }
 
-async function getActivityTool(
-  context: ToolContext,
-  args: Args<'get_activity'>,
-): Promise<unknown> {
+async function getActivityTool(context: ToolContext, args: Args<'get_activity'>): Promise<unknown> {
   return listActivity(context.db, context.actor, args.board, {
     since: args.since,
     limit: args.limit,
   });
 }
 
-async function exportBoardTool(
-  context: ToolContext,
-  args: Args<'export_board'>,
-): Promise<unknown> {
+async function exportBoardTool(context: ToolContext, args: Args<'export_board'>): Promise<unknown> {
   const document = await exportDocument(context.db, context.actor, args.board, args.format, {
     rateLimit: context.env.KLUI_RATE_LIMIT === 'on',
   });

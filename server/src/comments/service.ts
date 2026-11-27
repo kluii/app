@@ -101,7 +101,10 @@ export async function listComments(
   page: { limit: number; cursor: string | null },
 ): Promise<{ items: CommentDto[]; next_cursor: string | null }> {
   const { db, actor } = context;
-  const card = await db.card.findUnique({ where: { id: cardId }, select: { id: true, board_id: true } });
+  const card = await db.card.findUnique({
+    where: { id: cardId },
+    select: { id: true, board_id: true },
+  });
   if (!card) throw new AppError('card_not_found');
   const loaded = await loadBoardFor(db, actor, card.board_id, 'board.read');
   assertAllowed(loaded.decision);
@@ -138,7 +141,10 @@ export async function createComment(
   body: string,
 ): Promise<CommentDto> {
   const { db, actor } = context;
-  const card = await db.card.findUnique({ where: { id: cardId }, select: { id: true, board_id: true } });
+  const card = await db.card.findUnique({
+    where: { id: cardId },
+    select: { id: true, board_id: true },
+  });
   if (!card) throw new AppError('card_not_found');
   const loaded = await loadBoardFor(db, actor, card.board_id, 'comment.create');
   assertAllowed(loaded.decision);

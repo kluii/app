@@ -13,7 +13,13 @@ import type { Actor } from '../lib/authz.js';
 import { AppError } from '../lib/errors.js';
 import { credentialLimiter, EXPORT_PER_BOARD, exportKey } from '../lib/ratelimit.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
-import { exportFileName, loadBoardSnapshot, serializeExportV2, toExportV2, toMarkdown } from './v2.js';
+import {
+  exportFileName,
+  loadBoardSnapshot,
+  serializeExportV2,
+  toExportV2,
+  toMarkdown,
+} from './v2.js';
 
 export type ExportFormat = 'json' | 'md';
 

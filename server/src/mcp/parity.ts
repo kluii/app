@@ -47,7 +47,12 @@ export const PARITY: ParityRow[] = [
     route: '/api/v1/boards/:id/columns',
     app: 'Board → Add column',
   },
-  { tool: 'update_column', method: 'PATCH', route: '/api/v1/columns/:id', app: 'Column menu → Rename' },
+  {
+    tool: 'update_column',
+    method: 'PATCH',
+    route: '/api/v1/columns/:id',
+    app: 'Column menu → Rename',
+  },
   {
     tool: 'delete_column',
     method: 'DELETE',

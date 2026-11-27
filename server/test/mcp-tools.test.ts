@@ -40,7 +40,10 @@ beforeAll(async () => {
   harness = await startServer({ env: { KLUI_AGENT_WRITES: 10_000, KLUI_AGENT_READS: 10_000 } });
   owner = harness.client();
   await owner.signup(`mcp-tools-${owner.suffix}`);
-  const created = await owner.request('POST', '/api/v1/agent-keys', { name: 'tools', scope: 'user' });
+  const created = await owner.request('POST', '/api/v1/agent-keys', {
+    name: 'tools',
+    scope: 'user',
+  });
   expect(created.statusCode).toBe(201);
   key = (created.json() as { key: string }).key;
   const board = await owner.request('POST', '/api/v1/boards', { name: 'Tools board' });
@@ -53,10 +56,7 @@ afterAll(async () => {
   await harness.close();
 });
 
-async function rpc(
-  payload: unknown,
-  bearer = key,
-): Promise<{ statusCode: number; body: Rpc }> {
+async function rpc(payload: unknown, bearer = key): Promise<{ statusCode: number; body: Rpc }> {
   const response = await harness.app.inject({
     method: 'POST',
     url: '/mcp',
@@ -225,7 +225,7 @@ describe('card tools (K4-04)', () => {
       column: first.id,
       title: 'Wire the digest',
       description: 'Daily, 08:00',
-      assignee: owner.suffix === '' ? 'nobody' : (await username()),
+      assignee: owner.suffix === '' ? 'nobody' : await username(),
       tags: ['api', { name: 'web', color: '#8B5CF6' }],
       due_at: '2026-12-02T09:00:00.000Z',
     });
@@ -405,9 +405,9 @@ describe('reading tools (K4-05)', () => {
     ]);
 
     const activity = await call('get_activity', { board: board.id });
-    const comments = (activity.items as { type: string; payload: { body_excerpt?: string } }[]).filter(
-      (event) => event.type === 'comment.created',
-    );
+    const comments = (
+      activity.items as { type: string; payload: { body_excerpt?: string } }[]
+    ).filter((event) => event.type === 'comment.created');
     expect(comments[0]?.payload.body_excerpt).toBe('Picked this up.');
   });
 
@@ -458,10 +458,7 @@ describe('reading tools (K4-05)', () => {
     if (!first) throw new Error('no column');
     await call('create_card', { board: board.id, column: first.id, title: 'Through REST' });
 
-    const response = await owner.request(
-      'GET',
-      `/api/v1/boards/${board.id}/search?q=rest`,
-    );
+    const response = await owner.request('GET', `/api/v1/boards/${board.id}/search?q=rest`);
     expect(response.statusCode).toBe(200);
     const body = response.json() as { items: { title: string }[]; truncated: boolean };
     expect(body.items.map((card) => card.title)).toEqual(['Through REST']);

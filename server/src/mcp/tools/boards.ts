@@ -4,11 +4,17 @@
  * and nothing else: the same function `POST /boards`, `PATCH /boards/:id` and
  * `DELETE /boards/:id` call, so an agent cannot reach a state a human cannot.
  */
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { ToolContext } from '../registry.js';
 import { handler } from '../registry.js';
 import { boardStateFor } from '../../boards/state.js';
-import { createBoard, deleteBoard, toBoardDto, toPolicy, updateBoard } from '../../boards/service.js';
+import {
+  createBoard,
+  deleteBoard,
+  toBoardDto,
+  toPolicy,
+  updateBoard,
+} from '../../boards/service.js';
 import { can } from '../../lib/authz.js';
 import { AppError } from '../../lib/errors.js';
 import type { TOOL_SCHEMAS } from '../schemas.js';
@@ -59,10 +65,7 @@ async function getBoard(context: ToolContext, args: Args<'get_board'>): Promise<
   };
 }
 
-async function createBoardTool(
-  context: ToolContext,
-  args: Args<'create_board'>,
-): Promise<unknown> {
+async function createBoardTool(context: ToolContext, args: Args<'create_board'>): Promise<unknown> {
   // Templates are deliberately not exposed to agents (docs/mcp.md §3): an
   // agent-created board gets the classic columns, never a half-built one.
   return createBoard(
@@ -76,10 +79,7 @@ async function createBoardTool(
   );
 }
 
-async function updateBoardTool(
-  context: ToolContext,
-  args: Args<'update_board'>,
-): Promise<unknown> {
+async function updateBoardTool(context: ToolContext, args: Args<'update_board'>): Promise<unknown> {
   const { board, ...input } = args;
   return updateBoard(
     {
@@ -93,10 +93,7 @@ async function updateBoardTool(
   );
 }
 
-async function deleteBoardTool(
-  context: ToolContext,
-  args: Args<'delete_board'>,
-): Promise<unknown> {
+async function deleteBoardTool(context: ToolContext, args: Args<'delete_board'>): Promise<unknown> {
   await deleteBoard(
     {
       db: context.db,

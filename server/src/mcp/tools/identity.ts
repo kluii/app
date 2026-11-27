@@ -4,7 +4,7 @@
  * which is what the setup panel's "Test connection" reports. It reads the same
  * rows `GET /me` does.
  */
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { ToolContext } from '../registry.js';
 import { handler } from '../registry.js';
 import { AppError } from '../../lib/errors.js';

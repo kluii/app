@@ -29,7 +29,9 @@ export type ToolHandler = (context: ToolContext, args: never) => Promise<unknown
  * One cast, here: the registry stores handlers of many argument shapes, and
  * `tools/call` has already validated the arguments against the tool's schema.
  */
-export function handler<Args>(tool: (context: ToolContext, args: Args) => Promise<unknown>): ToolHandler {
+export function handler<Args>(
+  tool: (context: ToolContext, args: Args) => Promise<unknown>,
+): ToolHandler {
   return tool as unknown as ToolHandler;
 }
 

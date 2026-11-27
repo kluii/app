@@ -7,7 +7,7 @@
  * `{board, column}` must name a column of that board: a mismatch is
  * `column_not_found`, never a write to a column the caller only guessed.
  */
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { ToolContext } from '../registry.js';
 import { handler, requireColumnInBoard } from '../registry.js';
 import { createColumn, deleteColumn, updateColumn } from '../../columns/service.js';
