@@ -21,6 +21,7 @@ import { CardDisplayModal, cardFromState } from './card-display-modal';
 import { CardEditorModal } from './card-editor-modal';
 import { CardRow } from './card-row';
 import { MembersButton } from './members-dialog';
+import { ShareButton } from './share-dialog';
 import { ModerationButton } from './moderation-dialog';
 import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
 import { useKeyboardDrag } from './use-keyboard-drag';
@@ -440,6 +441,7 @@ function BoardFrame({
             members={members}
             shown={visible.length}
           />
+          <ShareButton boardState={boardState} />
           <MembersButton boardState={boardState} />
           {caller.can_moderate ? (
             <ModerationButton boardId={board.id} count={boardState.pending_count} />

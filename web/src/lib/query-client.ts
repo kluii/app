@@ -26,4 +26,5 @@ export const queryKeys = {
   profile: (username: string) => ['profile', username.toLowerCase()] as const,
   pending: (boardId: string) => ['pending', boardId] as const,
   members: (boardId: string) => ['members', boardId] as const,
+  links: (boardId: string) => ['links', boardId] as const,
 };

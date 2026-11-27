@@ -65,6 +65,16 @@ export type Card = {
   updated_at: string;
 };
 
+/** Metadata of a write link; the token appears once, at creation. */
+export type BoardLink = {
+  id: string;
+  role: 'read' | 'edit';
+  label: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
 /** A moderated write, before anyone approved it (K3-04). */
 export type PendingCard = {
   id: string;

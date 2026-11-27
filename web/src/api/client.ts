@@ -2,6 +2,8 @@
 import type {
   AnonWrite,
   Board,
+  BoardLink,
+  LinkRole,
   BoardState,
   Card,
   Column,
@@ -183,6 +185,27 @@ export const api = {
   createBoard: (input: { name: string; template?: 'classic' | 'blank' }) =>
     request<Board>('POST', '/boards', input),
   boardState: (boardId: string) => request<BoardState>('GET', `/boards/${boardId}/state`),
+  updateBoard: (
+    boardId: string,
+    input: {
+      name?: string;
+      slug?: string;
+      visibility?: Visibility;
+      link_role?: LinkRole;
+      anon_write?: AnonWrite;
+      expected_updated_at?: string;
+    },
+  ) => request<Board>('PATCH', `/boards/${boardId}`, input),
+  rotateSuffix: (boardId: string) =>
+    request<Board>('POST', `/boards/${boardId}/link-suffix/rotate`, { confirm: true }),
+  links: (boardId: string) => request<{ items: BoardLink[] }>('GET', `/boards/${boardId}/links`),
+  createLink: (boardId: string, role: 'read' | 'edit', label?: string) =>
+    request<BoardLink & { token: string; url: string }>('POST', `/boards/${boardId}/links`, {
+      role,
+      ...(label ? { label } : {}),
+    }),
+  revokeLink: (boardId: string, linkId: string) =>
+    request<void>('DELETE', `/boards/${boardId}/links/${linkId}`),
   members: (boardId: string) => request<{ items: Member[] }>('GET', `/boards/${boardId}/members`),
   inviteMember: (boardId: string, username: string, role: MemberRole) =>
     request<Member>('POST', `/boards/${boardId}/members`, { username, role }),
