@@ -68,10 +68,10 @@ Actions are a closed union. Adding one means adding a column to the matrix test 
 
 1. **Credential → actor.** No credential → `401 unauthenticated`. An invalid/revoked/expired credential → `401 invalid_credential` (never `404`; the credential itself is the subject).
 2. **Board scope.** An `agent` with `scope: 'board'` whose `boardId` differs from the target board is `not_found`. A `link`/`anon` actor carries its own `boardId`; a mismatch is `not_found`.
-3. **Readability.** `private` board: only members. `link`/`public`: members, link actors with role `read`/`edit`, and anon actors (on `public`, or on `link` with an anon policy that requires write). A `link_role: none` board is members-only for reading. Not readable → `not_found`.
+3. **Readability.** `private` board: only members. `link`/`public`: members, link holders, and anonymous visitors (on `public`, or on `link` with a link role other than `none`). A `link_role: none` board is members-only for reading. Not readable → `not_found`.
 4. **Frozen state.** A closed board allows reads, `board.export` and `board.summary` only. Every write is `forbidden` — including for the owner. There is no archived state (D-53).
 5. **Role.** Resolve the effective permission from the matrix below and intersect with the key scope when the actor is an agent.
-6. **Anonymous write policy.** For `anon` actors, `off` denies everything; `open` allows the four actions in §4.3; `moderated` allows only `card.create`, and only into `pending_cards`.
+6. **Writers are members.** A link holder reads, an anonymous visitor reads, and neither writes — whatever the row stores. See §4.2 and §4.3.
 
 The order matters: readability is decided before role, so a non-member never learns whether a board is closed, how many members it has, or whether their role would have allowed the action.
 
@@ -132,24 +132,25 @@ Rules baked into the table:
 | `member.*`, `link.*`, `moderation.*` | — | — | 404 |
 | `comment.create` | — | — | 404 |
 
-A link holder is not anonymous (they hold a secret), but they are still unattributable beyond `last_used_at`. They may move work; they may not destroy it (D-09), reshape the board, or exfiltrate it in bulk.
+A link holder is not anonymous (they hold a secret), but they are still unattributable beyond `last_used_at`. The rule is that **a board is written by its members**: a share link is read-only, so every link action above is `forbidden` and the actor keeps `board.read` and `board.summary`. `link_role: "edit"` survives in the schema and in old rows — the literal is still accepted, the capability is retired — and the API refuses to set it again (`400 validation_failed`, `a share link is read-only`).
 
 ### 4.3 Anonymous actors
 
-| Action | `anon_write: off` | `open` | `moderated` |
-|---|---|---|---|
-| read (via `link`/`public` URL) | Y | Y | Y |
-| `card.create` | — | Y (direct) | Y → `pending_cards` |
-| `card.update` on a card with their `anon_actor_id` | — | Y | — |
-| `card.complete` on their own card | — | Y | — |
-| `card.update` on any other card | — | — | — |
-| `card.move`, `card.delete` | — | — | — |
-| `comment.create` | — | — | — |
-| everything else | — | — | — |
+**Nobody writes without an account.** An anonymous visitor reads a shared board and nothing else; the gate that gives them a name and a cookie is a convenience for reading, not a way in.
+
+| Action | any `anon_write` value |
+|---|---|
+| read (via `link`/`public` URL) | Y |
+| `card.create`, `card.update`, `card.complete` | — |
+| `card.move`, `card.delete` | — |
+| `comment.create` | — |
+| everything else | — |
+
+`anon_write` is kept for compatibility: existing rows keep `open` or `moderated` and it grants nothing, and the API refuses to set either again (`400 validation_failed`, `anonymous writes are no longer available`). Only `off` can still be written. A queue that already holds `pending_cards` rows keeps working — approval creates the card — but no new row can be created.
 
 `private` forces `link_role: none` and `anon_write: off`. The API rejects a PATCH that would leave a private board with either set — the check runs on the merged next state, so a payload that never mentions `visibility` cannot slip past it — and the database refuses it too, through the `boards_private_has_no_share_policy` CHECK constraint. Sending `visibility: "private"` in the same request coerces both fields to `none`/`off`; naming a value that contradicts it is a `400` rather than a silent rewrite.
 
-Moderated writes produce a `PendingCard` and a `pending.created` event visible only to owner/admin. Approval creates the card with the anon label preserved and records `pending.approved` with the approver as actor.
+A `PendingCard` is visible only to owner/admin. Approval creates the card with the visitor's label preserved and records `pending.approved` with the approver as actor; expiry is the sweeper's job.
 
 ### 4.4 Agents
 

@@ -8,7 +8,7 @@ import { cn } from '../../lib/cn';
  * A variant is added here, never at the call site.
  */
 export const buttonVariants = cva(
-  'inline-flex select-none items-center justify-center gap-1.5 rounded-sm text-label font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+  'inline-flex select-none items-center justify-center gap-1.5 rounded-full text-label font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
   {
     variants: {
       variant: {

@@ -17,27 +17,7 @@ import { Input, Select } from '../ui/input';
 
 const MANAGEABLE: MemberRole[] = ['admin', 'editor', 'viewer'];
 
-export function MembersButton({ boardState }: { boardState: BoardState }) {
-  const [open, setOpen] = useState(false);
-  // Reading the roster is cheap, but every control in it needs `member.manage`:
-  // a visitor who cannot invite anyone gets no button (K3-08).
-  if (!boardState.caller.can_manage) return null;
-  return (
-    <>
-      <Button
-        size="sm"
-        variant="secondary"
-        onClick={() => setOpen(true)}
-        data-testid="open-members"
-      >
-        {t('board.members.open')}
-      </Button>
-      <MembersDialog boardState={boardState} open={open} onClose={() => setOpen(false)} />
-    </>
-  );
-}
-
-function MembersDialog({
+export function MembersDialog({
   boardState,
   open,
   onClose,

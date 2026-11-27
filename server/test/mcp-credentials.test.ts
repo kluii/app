@@ -9,7 +9,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
-import { addressWrites } from '../src/anon/limits.js';
+import { setLegacyPolicy } from './helpers/legacy.js';
 import { newId } from '../src/lib/ids.js';
 
 type Rpc = {
@@ -44,10 +44,12 @@ beforeAll(async () => {
 
   const opened = await owner.request('PATCH', `/api/v1/boards/${boardId}`, {
     visibility: 'public',
-    link_role: 'edit',
-    anon_write: 'open',
+    link_role: 'read',
   });
   expect(opened.statusCode).toBe(200);
+  // A legacy row: the cookie has to be obtainable for this file to test that
+  // /mcp refuses it. The write it used to allow is refused by `can()` now.
+  await setLegacyPolicy(harness.db, boardId, { anonWrite: 'open' });
 
   const state = await owner.request('GET', `/api/v1/boards/${boardId}/state`);
   columnId = (state.json() as { columns: { id: string }[] }).columns[0]?.id ?? '';
@@ -195,7 +197,7 @@ describe('/mcp credential kinds (D1)', () => {
       const body = response.json() as Rpc;
       expect(body.error?.code).toBe(-32001);
 
-      // REST also refuses the banned address with 403 banned.
+      // REST refuses it too, and writes nothing either way.
       const rest = await harness.app.inject({
         method: 'POST',
         url: `/api/v1/boards/${boardId}/cards`,
@@ -204,15 +206,16 @@ describe('/mcp credential kinds (D1)', () => {
         payload: JSON.stringify({ column: columnId, title: 'Banned REST' }),
       });
       expect(rest.statusCode).toBe(403);
-      expect((rest.json() as { error: { code: string } }).error.code).toBe('banned');
+      expect(
+        await harness.db.card.count({ where: { board_id: boardId, title: 'Banned REST' } }),
+      ).toBe(0);
     } finally {
       await harness.db.ban.deleteMany({ where: { id: banId } });
     }
   });
 
-  it('leaves the anon bucket untouched by MCP traffic and keeps REST anonymous writes working', async () => {
+  it('refuses the anon cookie on both transports, and writes nothing', async () => {
     const cleanIp = '198.51.100.7';
-    // Hammer /mcp 5 times with the anon cookie (cap is 2).
     for (let index = 0; index < 5; index += 1) {
       const response = await mcpWithCookie(
         anonCookie,
@@ -229,9 +232,8 @@ describe('/mcp credential kinds (D1)', () => {
       );
       expect(response.statusCode).toBe(401);
     }
-    expect(addressWrites(cleanIp)).toBe(0);
 
-    // Both REST anonymous writes succeed (bucket was completely untouched by MCP).
+    // The browser door answers the same way: an anonymous cookie writes no card.
     for (let index = 0; index < 2; index += 1) {
       const rest = await harness.app.inject({
         method: 'POST',
@@ -240,18 +242,9 @@ describe('/mcp credential kinds (D1)', () => {
         headers: { 'content-type': 'application/json', cookie: anonCookie },
         payload: JSON.stringify({ column: columnId, title: `REST ${index}` }),
       });
-      expect(rest.statusCode).toBe(201);
+      expect(rest.statusCode).toBe(403);
     }
-
-    // The 3rd REST anonymous write trips the per-IP cap of 2.
-    const capped = await harness.app.inject({
-      method: 'POST',
-      url: `/api/v1/boards/${boardId}/cards`,
-      remoteAddress: cleanIp,
-      headers: { 'content-type': 'application/json', cookie: anonCookie },
-      payload: JSON.stringify({ column: columnId, title: 'REST capped' }),
-    });
-    expect(capped.statusCode).toBe(429);
+    expect(await harness.db.card.count({ where: { board_id: boardId } })).toBe(0);
   });
 
   it('still accepts both user sessions and agent keys', async () => {

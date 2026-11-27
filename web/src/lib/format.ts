@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-/** `12 Mar` in the reader's locale: a board date is a label, never a timestamp. */
+import { getLocale } from '../i18n';
+
+/**
+ * `12 Mar` in the reader's locale: a board date is a label, never a timestamp.
+ * The locale is the UI language, not `undefined`: switching to French has to
+ * switch the month names with it.
+ */
 export function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(
+  return new Intl.DateTimeFormat(getLocale(), { day: 'numeric', month: 'short' }).format(
     new Date(value),
   );
 }

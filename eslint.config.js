@@ -122,6 +122,14 @@ export default tseslint.config(
     },
   },
   {
+    // Vendored MIT code (laurentpayot/minidenticons): its `hsl()` fill is the
+    // hue its hash picks, not a design colour. The string rule still applies.
+    files: ['web/src/lib/identicon.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...noLiteralString],
+    },
+  },
+  {
     files: ['web/src/data/**/*.ts', 'web/src/data/**/*.tsx'],
     rules: {
       'no-restricted-imports': [

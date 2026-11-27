@@ -68,7 +68,7 @@ export function Dialog({
       )}
       aria-labelledby={titleId}
     >
-      <h2 id={titleId} className="text-h2">
+      <h2 id={titleId} className="font-display text-h2">
         {title}
       </h2>
       {description ? <p className="mt-1 text-body-sm text-ink-muted">{description}</p> : null}

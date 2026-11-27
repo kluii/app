@@ -256,21 +256,25 @@ function memberDecision(role: MemberRole, action: Action, context: DecisionConte
   return ALLOW;
 }
 
+/**
+ * A share link is read-only. The `edit` value is retired as a *capability* and
+ * kept as a *literal*: rows written before the rule still say `edit`, and
+ * rewriting them would be a migration for a word. Whatever the row says, the
+ * link reads and does not write — the rule is "a board is written by its
+ * members", and a link holder is not a member.
+ */
 function linkDecision(role: 'read' | 'edit', action: Action): Decision {
+  void role;
   if (action === 'board.read' || action === 'board.summary') return ALLOW;
-  if (role === 'edit') {
-    if (
-      action === 'card.create' ||
-      action === 'card.update' ||
-      action === 'card.move' ||
-      action === 'card.complete'
-    ) {
-      return ALLOW;
-    }
-  }
   return FORBIDDEN;
 }
 
+/**
+ * Nobody writes without an account: an anonymous actor reads a shared board and
+ * nothing more, whatever the stored `anon_write` says. The column survives for
+ * compatibility — old rows keep their value, the API refuses to set a new one —
+ * but it no longer grants anything, not even a comment.
+ */
 function anonDecision(
   policy: AnonWrite,
   actor: Extract<Actor, { kind: 'anon' }>,
@@ -279,14 +283,10 @@ function anonDecision(
 ): Decision {
   // Reading is allowed whatever the write policy: `off` removes the write
   // affordance, not the page (docs/permissions.md §4.3).
-  if (action === 'board.read' || action === 'board.summary') return ALLOW;
-  if (policy === 'off') return FORBIDDEN;
-  if (action === 'card.create') return ALLOW;
-  if (policy === 'open' && (action === 'card.update' || action === 'card.complete')) {
-    return context.isOwnCard === true ? ALLOW : FORBIDDEN;
-  }
-  // Moderation swallows every anon write except the create.
+  void policy;
   void actor;
+  void context;
+  if (action === 'board.read' || action === 'board.summary') return ALLOW;
   return FORBIDDEN;
 }
 

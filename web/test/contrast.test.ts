@@ -164,11 +164,11 @@ describe('the palette', () => {
   });
 
   it('uses only the two radii the system allows', () => {
-    expect(CSS).toContain('--radius-sm: 4px');
-    expect(CSS).toContain('--radius-md: 8px');
+    expect(CSS).toContain('--radius-sm: 8px');
+    expect(CSS).toContain('--radius-full: 9999px');
     const radii = [...CSS.matchAll(/--radius-[a-z]+:\s*([^;]+);/g)].map((match) =>
       match[1]?.trim(),
     );
-    expect(new Set(radii)).toEqual(new Set(['4px', '8px']));
+    expect(new Set(radii)).toEqual(new Set(['8px', '9999px']));
   });
 });

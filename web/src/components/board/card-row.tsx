@@ -26,12 +26,16 @@ export function CardRow({
   canDelete,
   canTick,
   lifted,
+  settling,
   onOpen,
   onMove,
   onMoveTo,
   onDelete,
   onToggleDone,
   onKeyDown,
+  onHover,
+  onHoverEnd,
+  onSettle,
 }: {
   card: Card;
   cards: Card[];
@@ -40,12 +44,16 @@ export function CardRow({
   canDelete: boolean;
   canTick: boolean;
   lifted: boolean;
+  settling: boolean;
   onOpen: () => void;
   onMove: (request: MoveRequest) => void;
   onMoveTo: (columnId: string) => void;
   onDelete: () => void;
   onToggleDone: () => void;
   onKeyDown: (card: Card, event: KeyboardEvent<HTMLButtonElement>) => boolean;
+  onHover: (below: boolean) => void;
+  onHoverEnd: () => void;
+  onSettle: (cardId: string) => void;
 }) {
   const due = card.due_at ? formatDue(card.due_at) : null;
   const { ref, dragging, consumeDragClick } = useCardDnd({
@@ -53,20 +61,24 @@ export function CardRow({
     cards,
     canWrite: canMove,
     onMove,
+    onHover,
+    onHoverEnd,
+    onSettle,
   });
 
   return (
     <li
+      data-dragging={dragging ? 'true' : undefined}
+      data-settling={settling ? 'true' : undefined}
       className={cn(
-        'group relative',
+        'group relative rounded-sm',
         lifted && 'rounded-sm outline-2 outline-dashed outline-focus outline-offset-2',
       )}
     >
       <div
         className={cn(
           'flex w-full flex-col gap-2 rounded-sm border border-border bg-card px-3 py-2.5',
-          'transition-colors group-hover:border-border-strong',
-          dragging && 'opacity-40',
+          'transition-colors duration-[var(--dur-fast)] group-hover:border-border-strong',
         )}
       >
         <span className="flex items-start gap-1.5">
@@ -124,7 +136,6 @@ export function CardRow({
           if (onKeyDown(card, event)) event.stopPropagation();
         }}
         data-testid={`card-${card.id}`}
-        data-dragging={dragging ? 'true' : undefined}
         aria-label={t('board.card.openNamed', { title: card.title })}
         aria-describedby={canMove ? `card-move-hint-${card.id}` : undefined}
         className="absolute inset-0 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"

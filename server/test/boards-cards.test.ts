@@ -106,16 +106,19 @@ describe('boards', () => {
   it('forces a private board to keep no link role and no anonymous writes', async () => {
     const c = harness.client();
     const { board } = await boardWithColumns(c);
+    // A private board cannot carry a share policy, and a share policy is read or
+    // none: both refusals are payload-level now, so neither depends on
+    // `visibility` being in the same body.
     const invalid = await c.request('PATCH', `/api/v1/boards/${board.id}`, {
       visibility: 'private',
-      link_role: 'edit',
+      link_role: 'read',
     });
     expect(invalid.statusCode).toBe(400);
+    expect((invalid.json() as { error: { code: string } }).error.code).toBe('validation_failed');
 
     const shared = await c.request('PATCH', `/api/v1/boards/${board.id}`, {
       visibility: 'link',
-      link_role: 'edit',
-      anon_write: 'open',
+      link_role: 'read',
     });
     expect(shared.statusCode).toBe(200);
     const sharedBody = shared.json() as { link_suffix: string | null; url: string | null };
@@ -342,15 +345,15 @@ describe('a private board share policy', () => {
     const c = harness.client();
     const { board } = await boardWithColumns(c);
 
-    const link = await patchBoard(c, board.id, { visibility: 'link', link_role: 'edit' });
+    const link = await patchBoard(c, board.id, { visibility: 'link', link_role: 'read' });
     expect(link.statusCode).toBe(200);
-    expect((link.json() as { link_role: string }).link_role).toBe('edit');
+    expect((link.json() as { link_role: string }).link_role).toBe('read');
 
-    const back = await patchBoard(c, board.id, { visibility: 'private', link_role: 'edit' });
+    const back = await patchBoard(c, board.id, { visibility: 'private', link_role: 'read' });
     expect(back.statusCode).toBe(400);
 
     const kept = await harness.db.board.findUniqueOrThrow({ where: { id: board.id } });
-    expect(kept.link_role).toBe('edit');
+    expect(kept.link_role).toBe('read');
     expect(kept.visibility).toBe('link');
   });
 

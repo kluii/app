@@ -6,7 +6,7 @@
  * usable rather than a black hole.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+
 import { api } from '../../api/client';
 import type { Column, PendingCard } from '../../api/types';
 import { t } from '../../i18n';
@@ -14,25 +14,7 @@ import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
 
-export function ModerationButton({ boardId, count }: { boardId: string; count: number }) {
-  const [open, setOpen] = useState(false);
-  if (count === 0) return null;
-  return (
-    <>
-      <Button
-        size="sm"
-        variant="secondary"
-        onClick={() => setOpen(true)}
-        data-testid="open-moderation"
-      >
-        {t('board.moderation.waiting', { count })}
-      </Button>
-      <ModerationDialog boardId={boardId} open={open} onClose={() => setOpen(false)} />
-    </>
-  );
-}
-
-function ModerationDialog({
+export function ModerationDialog({
   boardId,
   open,
   onClose,

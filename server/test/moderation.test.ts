@@ -2,13 +2,19 @@
 /**
  * K3-04 — the moderation queue.
  *
- * A moderated write creates nothing public. Approval is the only road from a
- * `PendingCard` to a card, the author's label survives it, and expiry is the
- * sweeper's job — proven by moving the clock, not by waiting seven days.
+ * Approval is the only road from a `PendingCard` to a card, the author's label
+ * survives it, and expiry is the sweeper's job — proven by moving the clock, not
+ * by waiting seven days.
+ *
+ * Nothing writes into the queue any more: an anonymous write is refused before
+ * moderation can swallow it (a board is written by its members). The rows are
+ * therefore seeded the way a deployed instance holds them — already there — and
+ * the queue's own behaviour is what this file gates.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
 import { sweepExpiredPendingCards } from '../src/moderation/service.js';
+import { insertPendingCard, setLegacyPolicy } from './helpers/legacy.js';
 
 const WEB_DIR = new URL('./fixtures/web', import.meta.url).pathname;
 
@@ -34,8 +40,9 @@ async function moderatedBoard(owner: TestClient): Promise<{ board: Board; column
   const board = created.json() as Board;
   const patched = await owner.request('PATCH', `/api/v1/boards/${board.id}`, {
     link_role: 'read',
-    anon_write: 'moderated',
   });
+  // A legacy row: the column survives the rule that retires it.
+  await setLegacyPolicy(harness.db, board.id, { anonWrite: 'moderated' });
   const state = await owner.request('GET', `/api/v1/boards/${board.id}/state`);
   const columns = (state.json() as { columns: { id: string }[] }).columns;
   const [column] = columns;
@@ -56,22 +63,16 @@ async function joinAs(visitor: TestClient, boardId: string, label: string): Prom
   return raw?.split(';')[0] ?? '';
 }
 
+/** A row the old anonymous door would have written; the API cannot any more. */
 async function pendingFrom(
-  visitor: TestClient,
   boardId: string,
   columnId: string,
   title: string,
   label: string,
 ): Promise<Pending> {
-  const cookie = await joinAs(visitor, boardId, label);
-  const created = await visitor.app.inject({
-    method: 'POST',
-    url: `/api/v1/boards/${boardId}/cards`,
-    headers: { 'content-type': 'application/json', cookie },
-    payload: JSON.stringify({ column: columnId, title }),
-  });
-  expect(created.statusCode).toBe(202);
-  return created.json() as Pending;
+  const id = `pnd_${crypto.randomUUID().replaceAll('-', '').slice(0, 22)}`;
+  await insertPendingCard(harness.db, { id, boardId, columnId, title, label });
+  return { id, title, actor_label: label, column_id: columnId };
 }
 
 /** The same board, writing live: the policy the moderation queue is not. */
@@ -82,10 +83,8 @@ async function openBoard(owner: TestClient): Promise<{ board: Board; columnId: s
     visibility: 'link',
   });
   const board = created.json() as Board;
-  await owner.request('PATCH', `/api/v1/boards/${board.id}`, {
-    link_role: 'edit',
-    anon_write: 'open',
-  });
+  await owner.request('PATCH', `/api/v1/boards/${board.id}`, { link_role: 'read' });
+  await setLegacyPolicy(harness.db, board.id, { anonWrite: 'open' });
   const state = await owner.request('GET', `/api/v1/boards/${board.id}/state`);
   const [column] = (state.json() as { columns: { id: string }[] }).columns;
   if (!column) throw new Error('no column');
@@ -112,7 +111,7 @@ describe('the queue', () => {
   it('is readable by owner and admin, refused to editor and stranger', async () => {
     const owner = harness.client();
     const { board, columnId } = await moderatedBoard(owner);
-    await pendingFrom(harness.client(), board.id, columnId, 'Waiting one', 'Someone');
+    await pendingFrom(board.id, columnId, 'Waiting one', 'Someone');
 
     const listed = await owner.request('GET', `/api/v1/boards/${board.id}/pending`);
     expect(listed.statusCode).toBe(200);
@@ -144,13 +143,7 @@ describe('the queue', () => {
   it('approves into a real card, keeps the label, and records the approver', async () => {
     const owner = harness.client();
     const { board, columnId } = await moderatedBoard(owner);
-    const pending = await pendingFrom(
-      harness.client(),
-      board.id,
-      columnId,
-      'Please add me',
-      'A visitor',
-    );
+    const pending = await pendingFrom(board.id, columnId, 'Please add me', 'A visitor');
 
     const approved = await owner.request(
       'POST',
@@ -185,7 +178,7 @@ describe('the queue', () => {
   it('rejects without creating anything, and records it', async () => {
     const owner = harness.client();
     const { board, columnId } = await moderatedBoard(owner);
-    const pending = await pendingFrom(harness.client(), board.id, columnId, 'Spam', 'Spammer');
+    const pending = await pendingFrom(board.id, columnId, 'Spam', 'Spammer');
 
     const rejected = await owner.request(
       'POST',
@@ -203,70 +196,33 @@ describe('the queue', () => {
 });
 
 describe('the bulk door', () => {
-  it('queues every item on a moderated board, and approving them makes the cards', async () => {
+  it('refuses an anonymous bulk write on a moderated board, and queues nothing', async () => {
     const owner = harness.client();
     const { board, columnId } = await moderatedBoard(owner);
     const visitor = harness.client();
     const cookie = await joinAs(visitor, board.id, 'Bulk visitor');
 
     const queued = await bulkFrom(visitor, board.id, columnId, ['One', 'Two', 'Three'], cookie);
-    expect(queued.statusCode).toBe(202);
-    const body = JSON.parse(queued.body) as {
-      status: string;
-      items: { id: string; title: string }[];
-    };
-    expect(body.status).toBe('pending');
-    expect(body.items.map((item) => item.title)).toEqual(['One', 'Two', 'Three']);
+    expect(queued.statusCode).toBe(403);
+    expect((JSON.parse(queued.body) as { error: { code: string } }).error.code).toBe('forbidden');
 
-    // Nothing reached the board, and no card event was written: a moderated
-    // write is a row in a queue, whatever door it came through.
-    const state = await owner.request('GET', `/api/v1/boards/${board.id}/state`);
-    expect((state.json() as { cards: unknown[] }).cards).toEqual([]);
+    expect(await harness.db.pendingCard.count({ where: { board_id: board.id } })).toBe(0);
+    expect(await harness.db.card.count({ where: { board_id: board.id } })).toBe(0);
     expect(
       await harness.db.event.count({ where: { board_id: board.id, type: 'card_created' } }),
     ).toBe(0);
-
-    // Three rows written in one transaction share the transaction timestamp, so
-    // `created_at` cannot order them: the queue is a set, and the ids travel in
-    // the 202 body above.
-    const listed = await owner.request('GET', `/api/v1/boards/${board.id}/pending`);
-    expect((listed.json() as { items: Pending[] }).items.map((item) => item.title).sort()).toEqual([
-      'One',
-      'Three',
-      'Two',
-    ]);
-
-    for (const item of body.items) {
-      const approved = await owner.request(
-        'POST',
-        `/api/v1/boards/${board.id}/pending/${item.id}/approve`,
-        {},
-      );
-      expect(approved.statusCode).toBe(201);
-    }
-    const after = await owner.request('GET', `/api/v1/boards/${board.id}/state`);
-    expect(
-      (after.json() as { cards: { title: string }[] }).cards.map((card) => card.title).sort(),
-    ).toEqual(['One', 'Three', 'Two']);
-    expect(await harness.db.pendingCard.count({ where: { board_id: board.id } })).toBe(0);
   });
 
-  it('leaves an open board writing live cards, in one transaction', async () => {
+  it('refuses the same door on a board whose stored policy is open', async () => {
     const owner = harness.client();
     const { board, columnId } = await openBoard(owner);
     const visitor = harness.client();
     const cookie = await joinAs(visitor, board.id, 'Open visitor');
 
     const written = await bulkFrom(visitor, board.id, columnId, ['A', 'B', 'C'], cookie);
-    expect(written.statusCode).toBe(201);
-    const created = (JSON.parse(written.body) as { created: { id: string }[] }).created;
-    expect(created).toHaveLength(3);
-
-    expect(await harness.db.card.count({ where: { board_id: board.id } })).toBe(3);
+    expect(written.statusCode).toBe(403);
+    expect(await harness.db.card.count({ where: { board_id: board.id } })).toBe(0);
     expect(await harness.db.pendingCard.count({ where: { board_id: board.id } })).toBe(0);
-    expect(
-      await harness.db.event.count({ where: { board_id: board.id, type: 'card_created' } }),
-    ).toBe(3);
   });
 });
 
@@ -274,8 +230,8 @@ describe('expiry', () => {
   it('purges an expired row as the system, and keeps a fresh one', async () => {
     const owner = harness.client();
     const { board, columnId } = await moderatedBoard(owner);
-    const stale = await pendingFrom(harness.client(), board.id, columnId, 'Too old', 'Slowpoke');
-    const fresh = await pendingFrom(harness.client(), board.id, columnId, 'Still fresh', 'Quick');
+    const stale = await pendingFrom(board.id, columnId, 'Too old', 'Slowpoke');
+    const fresh = await pendingFrom(board.id, columnId, 'Still fresh', 'Quick');
 
     await harness.db.pendingCard.update({
       where: { id: stale.id },
@@ -297,7 +253,7 @@ describe('expiry', () => {
   it('is a no-op the second time', async () => {
     const owner = harness.client();
     const { board, columnId } = await moderatedBoard(owner);
-    const stale = await pendingFrom(harness.client(), board.id, columnId, 'One shot', 'Someone');
+    const stale = await pendingFrom(board.id, columnId, 'One shot', 'Someone');
     await harness.db.pendingCard.update({
       where: { id: stale.id },
       data: { expires_at: new Date(Date.now() - 1000) },

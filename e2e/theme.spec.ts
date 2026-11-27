@@ -10,8 +10,8 @@ import { expect, test, type Page } from '@playwright/test';
  * The pair of images this file writes to `test-results/theme` is recorded for
  * the verify file; the assertion does not depend on them.
  */
-const LIGHT_CANVAS = 'rgb(255, 255, 255)';
-const DARK_CANVAS = 'rgb(12, 12, 12)';
+const LIGHT_CANVAS = 'rgb(247, 245, 240)';
+const DARK_CANVAS = 'rgb(18, 17, 16)';
 
 async function backgroundAtLoad(page: Page): Promise<string> {
   const value = await page.evaluate(() => {

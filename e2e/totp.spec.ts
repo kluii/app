@@ -108,7 +108,9 @@ test('the account page reveals the secret and the recovery codes once', async ({
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Account' }).click();
+  // The bar has one control for one identity: the avatar opens the way in.
+  await page.getByTestId('account-avatar').click();
+  await page.getByRole('menuitem', { name: 'Account settings' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Account' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Turn on two-factor' }).click();

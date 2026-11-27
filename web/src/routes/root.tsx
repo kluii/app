@@ -18,7 +18,7 @@ function NotFoundPage() {
   return (
     <AppShell>
       <div className="flex min-h-96 flex-col items-center justify-center gap-3 px-6 text-center">
-        <h1 className="text-h1">{t('notFound.title')}</h1>
+        <h1 className="font-display text-h1">{t('notFound.title')}</h1>
         <p className="text-body-sm text-ink-muted">{t('notFound.body')}</p>
         <Link to="/boards" className={buttonVariants({ variant: 'secondary' })}>
           {t('notFound.action')}

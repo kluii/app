@@ -1,21 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * K3-03 — participation without an account.
+ * A visitor without an account.
  *
- * The exits: an anonymous visitor creates a card and can mark it done, cannot
- * comment, delete or move, cannot touch someone else's card, and a private board
- * never accepts any of it.
+ * The rule is "a board is written by its members": an anonymous visitor reads a
+ * shared board, names themselves so the page is not a wall, and writes nothing —
+ * no card, no comment, no move, whatever the stored `anon_write` says. The
+ * display-name gate therefore outlives the writes it was built for, and the
+ * column survives as a legacy value the API refuses to set.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
-import { anonLimiter } from '../src/anon/limits.js';
+import { setLegacyPolicy } from './helpers/legacy.js';
 
 const WEB_DIR = new URL('./fixtures/web', import.meta.url).pathname;
 
 let harness: Awaited<ReturnType<typeof startServer>>;
+/** The harness this file's boards belong to; `board()` reaches the row directly. */
+let db: Awaited<ReturnType<typeof startServer>>['db'];
 
 beforeAll(async () => {
   harness = await startServer({ webDir: WEB_DIR });
+  db = harness.db;
 });
 
 afterAll(async () => {
@@ -30,6 +35,11 @@ type Board = {
   link_role: string;
 };
 
+/**
+ * A board as the API can write it today, plus — when a test needs one — the
+ * policy a row written before the rule still carries. The PATCH cannot set it:
+ * that refusal is itself asserted below.
+ */
 async function board(
   c: TestClient,
   input: { visibility?: 'link' | 'public'; anon_write?: 'off' | 'open' | 'moderated' },
@@ -39,11 +49,11 @@ async function board(
     name: 'Open house',
     visibility: input.visibility ?? 'link',
   });
-  const patched = await c.request('PATCH', `/api/v1/boards/${(created.json() as Board).id}`, {
-    link_role: 'read',
-    anon_write: input.anon_write ?? 'open',
-  });
+  const id = (created.json() as Board).id;
+  const patched = await c.request('PATCH', `/api/v1/boards/${id}`, { link_role: 'read' });
   expect(patched.statusCode).toBe(200);
+  const stored = input.anon_write ?? 'open';
+  if (stored !== 'off') await setLegacyPolicy(db, id, { anonWrite: stored });
   return patched.json() as Board;
 }
 
@@ -145,7 +155,7 @@ describe('the display-name gate', () => {
 });
 
 describe('what an anonymous actor can do', () => {
-  it('creates a card and marks it done, with the label on both', async () => {
+  it('reads the board and writes nothing: no card, no comment, no move', async () => {
     const owner = harness.client();
     const created = await board(owner, { anon_write: 'open' });
     const visitor = new AnonClient(harness.client());
@@ -156,39 +166,22 @@ describe('what an anonymous actor can do', () => {
       column,
       title: 'From the street',
     });
-    expect(card.statusCode).toBe(201);
-    const body = JSON.parse(card.body) as { id: string; actor_label: string; mine: boolean };
-    expect(body.actor_label).toBe('Guest worker');
-    expect(body.mine).toBe(true);
+    expect(card.statusCode).toBe(403);
+    expect((JSON.parse(card.body) as { error: { code: string } }).error.code).toBe('forbidden');
+    expect(await db.card.count({ where: { board_id: created.id } })).toBe(0);
 
-    const done = await visitor.request('PATCH', `/api/v1/cards/${body.id}`, { done: true });
-    expect(done.statusCode).toBe(200);
-    expect((JSON.parse(done.body) as { done: boolean }).done).toBe(true);
-
-    const event = await harness.db.event.findFirst({
-      where: { board_id: created.id, type: 'card_created' },
-    });
-    expect(event?.actor_kind).toBe('anon');
-    expect(event?.actor_label).toBe('Guest worker');
-    expect(event?.actor_anon_id).not.toBeNull();
-  });
-
-  it('cannot comment, delete or move', async () => {
-    const owner = harness.client();
-    const created = await board(owner, { anon_write: 'open' });
-    const visitor = new AnonClient(harness.client());
-    await visitor.join(created.id, 'Read only by policy');
-    const column = await firstColumn(visitor, created.id);
-    const card = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
+    // A card that exists, put there by its owner: the visitor still cannot
+    // comment on it, move it, tick it or delete it.
+    const owned = await owner.request('POST', `/api/v1/boards/${created.id}/cards`, {
       column,
-      title: 'Mine',
+      title: 'The owner wrote this',
     });
-    const id = (JSON.parse(card.body) as { id: string }).id;
+    expect(owned.statusCode).toBe(201);
+    const id = (JSON.parse(owned.body) as { id: string }).id;
 
     expect(
       (await visitor.request('POST', `/api/v1/cards/${id}/comments`, { body: 'hello' })).statusCode,
     ).toBe(403);
-    expect((await visitor.request('DELETE', `/api/v1/cards/${id}`)).statusCode).toBe(403);
     expect(
       (
         await visitor.request('POST', `/api/v1/cards/${id}/move`, {
@@ -198,32 +191,14 @@ describe('what an anonymous actor can do', () => {
         })
       ).statusCode,
     ).toBe(403);
-  });
-
-  it('cannot touch a card another anonymous actor created', async () => {
-    const owner = harness.client();
-    const created = await board(owner, { anon_write: 'open' });
-    const first = new AnonClient(harness.client());
-    await first.join(created.id, 'First one');
-    const second = new AnonClient(harness.client());
-    await second.join(created.id, 'Second one');
-    const column = await firstColumn(first, created.id);
-
-    const card = await first.request('POST', `/api/v1/boards/${created.id}/cards`, {
-      column,
-      title: 'First card',
-    });
-    const id = (JSON.parse(card.body) as { id: string }).id;
-
-    expect(
-      (await second.request('PATCH', `/api/v1/cards/${id}`, { title: 'Hijacked' })).statusCode,
-    ).toBe(403);
-    expect((await second.request('PATCH', `/api/v1/cards/${id}`, { done: true })).statusCode).toBe(
+    expect((await visitor.request('PATCH', `/api/v1/cards/${id}`, { done: true })).statusCode).toBe(
       403,
     );
-    const fresh = await harness.db.card.findUnique({ where: { id } });
-    expect(fresh?.title).toBe('First card');
-    expect(fresh?.done).toBe(false);
+    expect((await visitor.request('DELETE', `/api/v1/cards/${id}`)).statusCode).toBe(403);
+
+    // Nothing was written by the refusal, and nothing was logged as if it were.
+    expect(await db.card.count({ where: { board_id: created.id } })).toBe(1);
+    expect(await db.event.count({ where: { board_id: created.id, actor_kind: 'anon' } })).toBe(0);
   });
 
   it('cannot read another board with the same cookie', async () => {
@@ -242,18 +217,7 @@ describe('what an anonymous actor can do', () => {
     expect(foreign.statusCode).toBe(404);
   });
 
-  it('can read a public board without joining it first', async () => {
-    const owner = harness.client();
-    const created = await board(owner, { visibility: 'public', anon_write: 'open' });
-    const visitor = new AnonClient(harness.client());
-    await visitor.join(created.id, 'Guest');
-    const state = await visitor.request('GET', `/api/v1/boards/${created.id}/state`);
-    expect(state.statusCode).toBe(200);
-  });
-});
-
-describe('moderated writes', () => {
-  it('creates a pending row and no card, with no event', async () => {
+  it('cannot reach the moderation queue with a card it may not write', async () => {
     const owner = harness.client();
     const created = await board(owner, { anon_write: 'moderated' });
     const visitor = new AnonClient(harness.client());
@@ -264,138 +228,50 @@ describe('moderated writes', () => {
       column,
       title: 'Under review',
     });
-    expect(response.statusCode).toBe(202);
-    const body = JSON.parse(response.body) as { status: string; id: string };
-    expect(body.status).toBe('pending');
+    expect(response.statusCode).toBe(403);
+    expect(await db.pendingCard.count({ where: { board_id: created.id } })).toBe(0);
+  });
 
-    expect(await harness.db.card.count({ where: { board_id: created.id } })).toBe(0);
-    // No card, and nothing in the log that implies one: the board's own
-    // creation events are not this write's business.
-    expect(
-      await harness.db.event.count({
-        where: { board_id: created.id, type: { in: ['card_created', 'pending_created'] } },
-      }),
-    ).toBe(0);
-    const pending = await harness.db.pendingCard.findUnique({ where: { id: body.id } });
-    expect(pending?.actor_label).toBe('Waiting');
-    expect(pending?.title).toBe('Under review');
+  it('can read a public board without joining it first', async () => {
+    const owner = harness.client();
+    const created = await board(owner, { visibility: 'public', anon_write: 'open' });
+    const visitor = new AnonClient(harness.client());
+    await visitor.join(created.id, 'Guest');
+    const state = await visitor.request('GET', `/api/v1/boards/${created.id}/state`);
+    expect(state.statusCode).toBe(200);
   });
 });
 
-/**
- * K3-07 — the abuse controls that exist because a display name is free.
- *
- * Both harnesses below state small explicit limits: a per-board cap that only
- * fires at 30 writes is a cap nobody has proven, and `docs/api.md` §1 publishes
- * the default, not the test's.
- */
-describe('anonymous write caps', () => {
-  it('answers the per-board hourly cap with 429 and Retry-After, and writes nothing', async () => {
-    const limited = await startServer({ env: { KLUI_ANON_WRITES_PER_BOARD: 2 } });
-    try {
-      anonLimiter.clear();
-      const owner = limited.client();
-      const created = await board(owner, { anon_write: 'open' });
-      const visitor = new AnonClient(limited.client());
-      expect((await visitor.join(created.id, 'Busy')).statusCode).toBe(200);
-      const column = await firstColumn(visitor, created.id);
+describe('the retired policies', () => {
+  it('refuses to set anonymous writes, and keeps a stored value readable', async () => {
+    const owner = harness.client();
+    await owner.signup(`anon-retired-${owner.suffix}`);
+    const created = await owner.request('POST', '/api/v1/boards', {
+      name: 'Retired policy',
+      visibility: 'link',
+    });
+    const id = (created.json() as Board).id;
 
-      for (const title of ['One', 'Two']) {
-        const response = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
-          column,
-          title,
-        });
-        expect(response.statusCode).toBe(201);
-      }
-
-      const blocked = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
-        column,
-        title: 'Three',
-      });
-      expect(blocked.statusCode).toBe(429);
-      expect((JSON.parse(blocked.body) as { error: { code: string } }).error.code).toBe(
-        'rate_limited',
-      );
-      expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
-      // A refused write is not a silent success: the board still holds two.
-      expect(await limited.db.card.count({ where: { board_id: created.id } })).toBe(2);
-    } finally {
-      await limited.close();
+    for (const anon_write of ['open', 'moderated'] as const) {
+      const patch = await owner.request('PATCH', `/api/v1/boards/${id}`, { anon_write });
+      expect(patch.statusCode).toBe(400);
+      const body = JSON.parse(patch.body) as { error: { code: string; message: string } };
+      expect(body.error.code).toBe('validation_failed');
+      expect(body.error.message).toBe('anonymous writes are no longer available');
     }
-  });
 
-  it('counts the board, not the process: another board still accepts a write', async () => {
-    const limited = await startServer({ env: { KLUI_ANON_WRITES_PER_BOARD: 1 } });
-    try {
-      anonLimiter.clear();
-      const first = await board(limited.client(), { anon_write: 'open' });
-      const second = await board(limited.client(), { anon_write: 'open' });
+    // `off` is still accepted, and a legacy row keeps what it stored.
+    const off = await owner.request('PATCH', `/api/v1/boards/${id}`, {
+      link_role: 'read',
+      anon_write: 'off',
+    });
+    expect(off.statusCode).toBe(200);
+    await setLegacyPolicy(db, id, { anonWrite: 'open' });
+    const row = await db.board.findUniqueOrThrow({ where: { id } });
+    expect(row.anon_write).toBe('open');
 
-      const visitor = new AnonClient(limited.client());
-      expect((await visitor.join(first.id, 'Roamer')).statusCode).toBe(200);
-      const firstColumnId = await firstColumn(visitor, first.id);
-      expect(
-        (
-          await visitor.request('POST', `/api/v1/boards/${first.id}/cards`, {
-            column: firstColumnId,
-            title: 'First board',
-          })
-        ).statusCode,
-      ).toBe(201);
-      expect(
-        (
-          await visitor.request('POST', `/api/v1/boards/${first.id}/cards`, {
-            column: firstColumnId,
-            title: 'Over the cap',
-          })
-        ).statusCode,
-      ).toBe(429);
-
-      // A second cookie on the second board: the board bucket above must not be
-      // the visitor's identity.
-      const other = new AnonClient(limited.client());
-      expect((await other.join(second.id, 'Roamer')).statusCode).toBe(200);
-      const secondColumnId = await firstColumn(other, second.id);
-      expect(
-        (
-          await other.request('POST', `/api/v1/boards/${second.id}/cards`, {
-            column: secondColumnId,
-            title: 'Second board',
-          })
-        ).statusCode,
-      ).toBe(201);
-    } finally {
-      await limited.close();
-    }
-  });
-
-  it('refuses a banned address on the next request, with no restart', async () => {
-    const created = await board(harness.client(), { anon_write: 'open' });
     const visitor = new AnonClient(harness.client());
-    const joined = await visitor.join(created.id, 'Banned');
-    expect(joined.statusCode).toBe(200);
-
-    // The address the suite runs from; inject() reports 127.0.0.1 unless told
-    // otherwise, and a ban is on the address, not on the cookie.
-    const ip = '127.0.0.1';
-    await harness.db.ban.create({
-      data: { id: `ban_${Date.now().toString(36)}`, subject: ip, subject_kind: 'ip' },
-    });
-    try {
-      const blocked = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
-        column: await firstColumn(visitor, created.id),
-        title: 'Blocked',
-      });
-      expect(blocked.statusCode).toBe(403);
-      expect((JSON.parse(blocked.body) as { error: { code: string } }).error.code).toBe('banned');
-    } finally {
-      await harness.db.ban.deleteMany({ where: { subject: ip, subject_kind: 'ip' } });
-    }
-
-    const after = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
-      column: await firstColumn(visitor, created.id),
-      title: 'Allowed again',
-    });
-    expect(after.statusCode).toBe(201);
+    expect((await visitor.join(id, 'Reader')).statusCode).toBe(200);
+    expect((await visitor.request('GET', `/api/v1/boards/${id}/state`)).statusCode).toBe(200);
   });
 });

@@ -394,6 +394,26 @@ export async function updateBoard(
     toBoardDto(loaded.board, publicUrl),
   );
 
+  // A board is written by its members. Two policies are retired, and the API
+  // refuses to set them again: a link is read-only, and no one writes without an
+  // account. Existing rows keep their stored value; only new writes are refused.
+  if (input.anon_write !== undefined && input.anon_write !== 'off') {
+    const message = 'anonymous writes are no longer available';
+    throw new AppError('validation_failed', {
+      message,
+      hint: 'Send anon_write: "off". A board is written by its members.',
+      details: [{ path: 'anon_write', code: 'custom', message }],
+    });
+  }
+  if (input.link_role === 'edit') {
+    const message = 'a share link is read-only';
+    throw new AppError('validation_failed', {
+      message,
+      hint: 'Send link_role: "read" or "none". A share link never grants a write.',
+      details: [{ path: 'link_role', code: 'custom', message }],
+    });
+  }
+
   // The rule is about the state the request produces, not the payload it
   // carries: `{link_role}` alone has no `visibility` to check against.
   // `visibility: 'private'` coerces both fields in the same request, so the
