@@ -30,4 +30,7 @@ export const queryKeys = {
   /** Board-scoped, and deliberately not `board(id)`: a different shape per key. */
   tagColors: (boardId: string) => ['tag-colors', boardId] as const,
   agentKeys: ['agent-keys'] as const,
+  oidcProviders: ['oidc-providers'] as const,
+  linkedOidc: ['linked-oidc'] as const,
+  adminOidcProviders: ['admin-oidc-providers'] as const,
 };

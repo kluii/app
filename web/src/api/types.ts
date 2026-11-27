@@ -175,3 +175,37 @@ export type AgentKeyTest =
       key: string;
     }
   | { ok: false; via: 'mcp' | 'inline' | null; reason: AgentKeyRefusal };
+
+export type PublicOidcProvider = {
+  slug: string;
+  name: string;
+};
+
+export type AdminOidcProvider = {
+  id: string;
+  slug: string;
+  name: string;
+  issuer_url: string;
+  client_id: string;
+  scopes: string;
+  enabled: boolean;
+  has_secret: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LinkedOidcAccount = {
+  id: string;
+  provider: string;
+  provider_account_id: string;
+  created_at: string;
+};
+
+export type OidcTestResult =
+  | {
+      ok: true;
+      issuer: string;
+      authorization_endpoint: string;
+      token_endpoint: string;
+    }
+  | { ok: false; error: string };

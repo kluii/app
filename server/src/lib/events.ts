@@ -45,6 +45,8 @@ export type EventTypeName =
   | 'security.totp_enabled'
   | 'security.totp_disabled'
   | 'security.session_revoked'
+  | 'security.oidc_linked'
+  | 'security.oidc_unlinked'
   | 'security.user_banned'
   | 'security.user_unbanned'
   | 'security.ip_banned'

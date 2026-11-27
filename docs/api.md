@@ -116,9 +116,12 @@ Positions are serialized as **strings** (`"1024"`, `"1536"`) because they are `D
 | `POST` | `/auth/reset/request` | `{email}`. Always `202`, whether or not the account exists. `503 email_not_configured` when SMTP is unset (fail closed, never a fake success). |
 | `POST` | `/auth/reset/confirm` | `{token, password}`. Single-use; revokes every session on success. |
 | `POST` | `/admin/users/:id/reset` | Instance admin only. `201` `{url, expires_at}`: a one-time link for out-of-band delivery, the documented path when SMTP is unset. The link is a credential and is never logged. |
-| `GET` | `/auth/oidc/:provider/start` | `302` to the provider; `state` + PKCE in a signed cookie. |
-| `GET` | `/auth/oidc/:provider/callback` | Creates or links, then `302` to `/boards`. Linking requires an authenticated local session. |
-| `POST` | `/auth/oidc/:provider/link` | Explicit link for an already-signed-in user. |
+| `GET` | `/auth/oidc/providers` | Public list of enabled OIDC providers (`{items:[{slug, name}]}`); empty when none are enabled. |
+| `GET` | `/auth/oidc/:provider/start` | `302` to the provider; `state`, `nonce` and PKCE (S256) in a signed `httpOnly` cookie. |
+| `GET` | `/auth/oidc/:provider/callback` | Creates or links, then `302` to `/boards` (or `/settings?oidc=linked`). Never auto-links an existing local account by email (`409` / link prompt). |
+| `POST` | `/auth/oidc/:provider/link` | Explicit link for an already-signed-in user (`200 {url}`). |
+| `GET` | `/me/oidc` | `{items:[{id, provider, provider_account_id, created_at}]}` linked to the caller. |
+| `DELETE` | `/me/oidc/:provider` | `204`; unlinks that OIDC provider from the caller. |
 | `GET` | `/me` | `{id, email, username, display_name, totp_enabled, is_instance_admin, created_at}`. |
 | `PATCH` | `/me` | `{username?, display_name?, email?}`. Username change reserves the old value 90 days. |
 | `POST` | `/me/rotate` | `204`; revokes the current session and issues a new one in the same response, so a stolen cookie stops following the account. |
@@ -142,6 +145,11 @@ never grants board content. An admin who is not a board member gets the same
 | `GET` | `/admin/bans` | `{items:[{id, subject, subject_kind:"user"|"ip", reason, expires_at, created_at}]}`: every active ban, both kinds, newest first, 100 maximum. |
 | `POST` | `/admin/bans/ip` | `{ip, confirm:true, reason?, expires_at?}` → `201 {banned_until}`. `400` for an address that is not IPv4/IPv6. |
 | `DELETE` | `/admin/bans/ip/:ip` | `204`; lifts every ban on that address. `404` when it was not banned. |
+| `GET` | `/admin/oidc/providers` | `{items:[…]}` OIDC provider settings without `client_secret` (returns `has_secret: true`). |
+| `POST` | `/admin/oidc/providers` | `{slug, name, issuer_url, client_id, client_secret, scopes?, enabled?}` → `201`. Off by default; secret sealed with AES-256-GCM. |
+| `PATCH` | `/admin/oidc/providers/:slug` | Updates OIDC provider settings or toggles `enabled`. |
+| `DELETE` | `/admin/oidc/providers/:slug` | `204`; deletes the provider configuration. |
+| `POST` | `/admin/oidc/providers/:slug/test` | Performs live OIDC discovery (`/.well-known/openid-configuration`) and answers `200 {ok:true, issuer, authorization_endpoint, token_endpoint}` or `{ok:false, error}`. |
 
 A user ban is enforced before authorization: the credential stops resolving, so
 the next request is `401` and the next login answers `403 banned`. An address
@@ -320,7 +328,4 @@ names a roadmap id that does not exist.
 
 | Method | Path | Serves it |
 |---|---|---|
-| `GET` | `/auth/oidc/:provider/start` | K5-09 |
-| `GET` | `/auth/oidc/:provider/callback` | K5-09 |
-| `POST` | `/auth/oidc/:provider/link` | K5-09 |
 | `DELETE` | `/me` | K5-08 |

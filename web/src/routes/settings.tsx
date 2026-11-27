@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createRoute } from '@tanstack/react-router';
 import { AgentsSettings } from '../components/settings/agents-settings';
+import { OidcSettings } from '../components/settings/oidc-settings';
 import { SecuritySettings } from '../components/settings/security-settings';
 import { t } from '../i18n';
 import { authedRoute } from './authed';
@@ -18,6 +19,7 @@ function SettingsPage() {
       <div className="mt-6 flex flex-col gap-10">
         <AgentsSettings />
         <SecuritySettings />
+        <OidcSettings />
       </div>
     </div>
   );
