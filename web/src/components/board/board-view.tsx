@@ -242,6 +242,7 @@ export function BoardView({ boardId }: { boardId: string }) {
         <CardCreateModal
           boardId={boardId}
           column={createColumn}
+          boardState={state.data}
           onClose={() => setComposer({ kind: 'closed' })}
         />
       ) : null}

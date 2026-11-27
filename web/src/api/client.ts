@@ -273,8 +273,17 @@ export const api = {
 
   createColumn: (boardId: string, input: { name: string }) =>
     request<Column>('POST', `/boards/${boardId}/columns`, input),
-  createCard: (boardId: string, input: { column: string; title: string; description?: string }) =>
-    request<Card>('POST', `/boards/${boardId}/cards`, input),
+  createCard: (
+    boardId: string,
+    input: {
+      column: string;
+      title: string;
+      description?: string;
+      tags?: { name: string; color: string | null }[];
+      due_at?: string;
+      assignee?: string;
+    },
+  ) => request<Card>('POST', `/boards/${boardId}/cards`, input),
   updateCard: (cardId: string, input: Record<string, unknown>) =>
     request<Card>('PATCH', `/cards/${cardId}`, input),
   deleteCard: (cardId: string) => request<void>('DELETE', `/cards/${cardId}`),
