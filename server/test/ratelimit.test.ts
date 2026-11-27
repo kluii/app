@@ -11,6 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
 import { credentialLimiter, LOGIN_ACCOUNT, loginAccountKey } from '../src/lib/ratelimit.js';
 import { sessionLimiter } from '../src/settings/ratelimit.js';
+import { anonLimiter } from '../src/anon/limits.js';
 
 const PASSWORD = 'a-long-enough-password';
 
@@ -186,5 +187,73 @@ describe('session buckets', () => {
     for (let index = 0; index < 10; index += 1) {
       expect((await c.request('GET', '/api/v1/me')).statusCode).toBe(200);
     }
+  });
+});
+
+/**
+ * K3-07 — `KLUI_TRUSTED_PROXY_HOPS`.
+ *
+ * A header is data, not identity: `X-Forwarded-For` is written by the client and
+ * stays a lie until a proxy this instance was told to trust rewrites it. The
+ * bucket key is `request.ip`, so the two configurations below are the whole
+ * question: with zero hops a spoofed header must not buy a fresh bucket, with
+ * one hop a real proxy's header must be honoured.
+ */
+describe('trusted proxy hops', () => {
+  const SPOOF = '198.51.100.7';
+  const OTHER = '203.0.113.9';
+
+  async function joinAttempts(hops: number): Promise<{ statuses: number[]; codes: string[] }> {
+    const harness = await startServer({
+      env: { KLUI_TRUSTED_PROXY_HOPS: hops, KLUI_ANON_JOINS_PER_IP: 2 },
+    });
+    try {
+      // A board that accepts anonymous writes, created through the normal API.
+      const owner = harness.client();
+      await owner.signup(`proxy-${owner.suffix}`);
+      const created = await owner.request('POST', '/api/v1/boards', {
+        name: 'Proxy hops',
+        visibility: 'link',
+      });
+      const boardId = (created.json() as { id: string }).id;
+      await owner.request('PATCH', `/api/v1/boards/${boardId}`, {
+        link_role: 'read',
+        anon_write: 'open',
+      });
+
+      const statuses: number[] = [];
+      const codes: string[] = [];
+      const attempts = [SPOOF, SPOOF, OTHER];
+      for (const forwarded of attempts) {
+        const response = await harness.app.inject({
+          method: 'POST',
+          url: `/api/v1/boards/${boardId}/anon`,
+          headers: { 'content-type': 'application/json', 'x-forwarded-for': forwarded },
+          payload: JSON.stringify({ label: 'proxy' }),
+        });
+        statuses.push(response.statusCode);
+        codes.push(response.statusCode === 200 ? 'ok' : errorCode(response.body));
+      }
+      return { statuses, codes };
+    } finally {
+      await harness.close();
+    }
+  }
+
+  beforeEach(() => {
+    anonLimiter.clear();
+  });
+
+  it('ignores a spoofed X-Forwarded-For when no proxy is trusted', async () => {
+    const { statuses, codes } = await joinAttempts(0);
+    // Both spoofed addresses are the same connection, so the third call is the
+    // same bucket: a header cannot mint a new one.
+    expect(statuses).toEqual([200, 200, 429]);
+    expect(codes[2]).toBe('rate_limited');
+  });
+
+  it('honours the header when one proxy hop is trusted', async () => {
+    const { statuses } = await joinAttempts(1);
+    expect(statuses).toEqual([200, 200, 200]);
   });
 });

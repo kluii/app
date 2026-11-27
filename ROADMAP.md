@@ -234,7 +234,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Visibility control, link role select, anon policy, copy link, rotate suffix, create/revoke write links with the token shown once and a warning.
   **Exit:** the panel never displays a token it cannot show again (a reload shows "created", not the token); rotating requires confirmation.
 
-- [ ] **K3-07 — Abuse controls** `M` · dep: K3-03
+- [x] **K3-07 — Abuse controls** `M` · dep: K3-03
   Per-IP, per-session, per-key token buckets; per-board hourly cap for anonymous writes; `KLUI_TRUSTED_PROXY_HOPS` parsing; bans table with TTL and admin view; Cap captcha behind a threshold, off by default.
   **Exit:** the anon cap answers `429` with `Retry-After`; a spoofed `X-Forwarded-For` from an untrusted hop is ignored (test with two hop configurations); a ban blocks the next request without a deploy.
 

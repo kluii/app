@@ -122,6 +122,8 @@ enum EventType {
   security_oidc_unlinked
   security_user_banned
   security_user_unbanned
+  security_ip_banned
+  security_ip_unbanned
   security_profile_updated
 }
 

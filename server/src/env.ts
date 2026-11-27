@@ -30,6 +30,11 @@ export type Env = {
   KLUI_METRICS_TOKEN: string | null;
   KLUI_CAPTCHA_ENABLED: boolean;
   KLUI_CAPTCHA_URL: string | null;
+  KLUI_CAPTCHA_SECRET: string | null;
+  KLUI_CAPTCHA_THRESHOLD: number;
+  KLUI_ANON_WRITES_PER_BOARD: number;
+  KLUI_ANON_WRITES_PER_IP: number;
+  KLUI_ANON_JOINS_PER_IP: number;
   KLUI_DIGEST_LLM_URL: string | null;
   KLUI_DIGEST_LLM_KEY: string | null;
   KLUI_RETENTION_EVENTS_DAYS: number;
@@ -64,6 +69,11 @@ const EXAMPLES: Record<string, string> = {
   KLUI_SMTP_FROM: 'boards@example.com',
   KLUI_ANALYTICS_URL: 'https://analytics.example.com/script.js',
   KLUI_METRICS_TOKEN: 'openssl rand -hex 24',
+  KLUI_CAPTCHA_URL: 'https://cap.example.com',
+  KLUI_CAPTCHA_SECRET: 'openssl rand -hex 32',
+  KLUI_ANON_WRITES_PER_BOARD: '30',
+  KLUI_ANON_WRITES_PER_IP: '10',
+  KLUI_ANON_JOINS_PER_IP: '20',
   KLUI_RETENTION_EVENTS_DAYS: '365',
   KLUI_LOG_LEVEL: 'info',
   KLUI_RATE_LIMIT: 'on',
@@ -201,6 +211,11 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): EnvResult {
     KLUI_METRICS_TOKEN: text('KLUI_METRICS_TOKEN', null),
     KLUI_CAPTCHA_ENABLED: boolean('KLUI_CAPTCHA_ENABLED', false),
     KLUI_CAPTCHA_URL: url('KLUI_CAPTCHA_URL', null),
+    KLUI_CAPTCHA_SECRET: text('KLUI_CAPTCHA_SECRET', null),
+    KLUI_CAPTCHA_THRESHOLD: integer('KLUI_CAPTCHA_THRESHOLD', 3, 1, 1000),
+    KLUI_ANON_WRITES_PER_BOARD: integer('KLUI_ANON_WRITES_PER_BOARD', 30, 1, 100_000),
+    KLUI_ANON_WRITES_PER_IP: integer('KLUI_ANON_WRITES_PER_IP', 10, 1, 100_000),
+    KLUI_ANON_JOINS_PER_IP: integer('KLUI_ANON_JOINS_PER_IP', 20, 1, 100_000),
     KLUI_DIGEST_LLM_URL: url('KLUI_DIGEST_LLM_URL', null),
     KLUI_DIGEST_LLM_KEY: text('KLUI_DIGEST_LLM_KEY', null),
     KLUI_RETENTION_EVENTS_DAYS: integer('KLUI_RETENTION_EVENTS_DAYS', 365, 1, 3650),
@@ -217,6 +232,16 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): EnvResult {
   };
 
   problems.push(...productionProblems(env));
+  // A captcha that is on but unverifiable would accept every token: boot is the
+  // only place to catch that (D-46).
+  if (env.KLUI_CAPTCHA_ENABLED && env.KLUI_CAPTCHA_URL === null) {
+    problems.push({
+      variable: 'KLUI_CAPTCHA_URL',
+      expected: EXAMPLES.KLUI_CAPTCHA_URL ?? 'https://cap.example.com',
+      problem:
+        'required when KLUI_CAPTCHA_ENABLED is true: a captcha nobody can verify is not a captcha',
+    });
+  }
 
   if (problems.length > 0) {
     return { ok: false, problems, message: formatProblems(problems) };
@@ -308,6 +333,11 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     KLUI_METRICS_TOKEN: null,
     KLUI_CAPTCHA_ENABLED: false,
     KLUI_CAPTCHA_URL: null,
+    KLUI_CAPTCHA_SECRET: null,
+    KLUI_CAPTCHA_THRESHOLD: 3,
+    KLUI_ANON_WRITES_PER_BOARD: 30,
+    KLUI_ANON_WRITES_PER_IP: 10,
+    KLUI_ANON_JOINS_PER_IP: 20,
     KLUI_DIGEST_LLM_URL: null,
     KLUI_DIGEST_LLM_KEY: null,
     KLUI_RETENTION_EVENTS_DAYS: 365,

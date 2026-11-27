@@ -44,13 +44,19 @@ Base path `/api/v1`. OpenAPI 3.1 is generated from the Zod schemas in `server/sr
 | Session reads | 600 / minute per user, per IP while signed out | yes, `KLUI_RATE_LIMIT_READS` |
 | Login attempts | 5 / 15 min per account, 20 / hour per IP | yes |
 | Signup | 5 / hour per IP | yes |
-| Agent key writes | 60 / minute | with the agent surface (K3) |
-| Agent key reads | 600 / minute | with the agent surface (K3) |
-| Anonymous writes per board | 30 / hour (configurable per instance) | with anonymous write (K2-13) |
-| Import | 3 / hour per board | with import (K2-11) |
-| Export | 10 / hour per board | with export (K2-11) |
+| Anonymous writes per board | 30 / hour, `KLUI_ANON_WRITES_PER_BOARD` | yes |
+| Anonymous writes per address | 10 / hour, `KLUI_ANON_WRITES_PER_IP` | yes |
+| Anonymous joins per address | 20 / hour, `KLUI_ANON_JOINS_PER_IP` | yes |
+| Agent key writes | 60 / minute | with the agent surface (K4) |
+| Agent key reads | 600 / minute | with the agent surface (K4) |
+| Import | 3 / hour per board | yes |
+| Export | 10 / hour per board | yes |
 
-The session buckets are one bucket per user across every route, not one per endpoint: a route added tomorrow is covered without being remembered. `GET /healthz` and the SSE stream are never counted. The login bucket counts failed attempts and is cleared by a successful one, so four typos then the right password is not a lockout. `KLUI_RATE_LIMIT=off` disables every bucket at once and is the default outside production.
+The session buckets are one bucket per user across every route, not one per endpoint: a route added tomorrow is covered without being remembered. `GET /healthz` and the SSE stream are never counted. The login bucket counts failed attempts and is cleared by a successful one, so four typos then the right password is not a lockout. `KLUI_RATE_LIMIT=off` disables the session buckets and is the default outside production; the credential, join and anonymous-write buckets are separate and stay on, because a test suite that signs up fifty times from one address is not a production login storm.
+
+The anonymous buckets are keyed on `request.ip`, which only honours `X-Forwarded-For` up to `KLUI_TRUSTED_PROXY_HOPS` proxies. With the default of `0` a spoofed header buys nothing; behind one proxy set `1` and the header's client address is used.
+
+**Captcha.** `KLUI_CAPTCHA_ENABLED=true` turns on Cap for anonymous writes only, past `KLUI_CAPTCHA_THRESHOLD` writes from one address in the current hour (default 3). The write then needs `cap_token` in the body; without it the answer is `400 captcha_required`, with a token the instance could not verify it is `400 captcha_failed`, and when the Cap instance is unreachable it is `503 service_unavailable` — a captcha that cannot be checked never lets the write through. Klui posts `{token}` to `{KLUI_CAPTCHA_URL}/siteverify` with `Authorization: Bearer ${KLUI_CAPTCHA_SECRET}` and expects `{"success": true}`. Off by default, and no request leaves the instance while it is off.
 
 **Versioning.** The path carries the major version. Additive fields are not a breaking change; removing or renaming one is, and requires a new path version plus a deprecation window documented in the changelog.
 
@@ -129,9 +135,15 @@ never grants board content. An admin who is not a board member gets the same
 | `GET` | `/admin/users` | `{items:[{id, username, email, is_instance_admin, created_at, banned, banned_until}], next_cursor}`, 50 per page, newest last, `?q=` filters on username or email. |
 | `POST` | `/admin/users/:id/ban` | `{confirm:true, reason?, expires_at?}` → `201 {banned_until}`. Revokes every session of the target. An instance admin cannot be banned (`403`). |
 | `DELETE` | `/admin/users/:id/ban` | `204`; lifts every active ban for that account. |
+| `GET` | `/admin/bans` | `{items:[{id, subject, subject_kind:"user"|"ip", reason, expires_at, created_at}]}`: every active ban, both kinds, newest first, 100 maximum. |
+| `POST` | `/admin/bans/ip` | `{ip, confirm:true, reason?, expires_at?}` → `201 {banned_until}`. `400` for an address that is not IPv4/IPv6. |
+| `DELETE` | `/admin/bans/ip/:ip` | `204`; lifts every ban on that address. `404` when it was not banned. |
 
-A ban is enforced before authorization: the credential stops resolving, so the
-next request is `401` and the next login answers `403 banned`.
+A user ban is enforced before authorization: the credential stops resolving, so
+the next request is `401` and the next login answers `403 banned`. An address
+ban is enforced on the anonymous paths — joining a board and writing a card —
+and answers `403 banned` there; it never applies to an account signed in from
+the same address. Both take effect on the next request, with no restart.
 
 ## 4. Boards
 
@@ -195,7 +207,7 @@ next request is `401` and the next login answers `403 banned`.
 | `POST` | `/boards/:id/columns` | `{name, position?}` where `position` is `{before?, after?}` (column ids) or omitted (append). |
 | `PATCH` | `/columns/:id` | `{name?, position?, expected_updated_at?}`. |
 | `DELETE` | `/columns/:id` | `409 column_not_empty` unless `{move_cards_to:"<column id>"}` or `{delete_cards:true}`. |
-| `POST` | `/boards/:id/cards` | `{column, title, description?, assignee?, due_at?, tags?, done?}`. `column` is a column id, not a name. |
+| `POST` | `/boards/:id/cards` | `{column, title, description?, assignee?, due_at?, tags?, done?, cap_token?}`. `column` is a column id, not a name. `cap_token` is only read for an anonymous actor past the captcha threshold. |
 | `POST` | `/boards/:id/cards/bulk` | `{column, items:[…]}` max 200; one transaction; returns `{created:[Card]}`. Partial failure rolls back everything. `column` must belong to this board, or `404 column_not_found` and no card is written. |
 | `GET` | `/cards/:id` | Card + `comments_count`. |
 | `PATCH` | `/cards/:id` | Any of `{title, description, assignee, assignee_label, due_at, tags, done, expected_updated_at}`. |

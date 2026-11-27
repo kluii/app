@@ -188,6 +188,85 @@ describe('registration and administration', () => {
     expect(unbanned.statusCode).toBe(204);
   });
 
+  it('bans an address, shows it in the admin view, and blocks the next join with no restart', async () => {
+    const admin = harness.client();
+    const adminUser = await admin.signup(`ops3-${admin.suffix}`);
+    await harness.db.user.update({
+      where: { id: adminUser.id },
+      data: { is_instance_admin: true },
+    });
+
+    const owner = harness.client();
+    await owner.signup(`owner-${owner.suffix}`);
+    const created = await owner.request('POST', '/api/v1/boards', {
+      name: 'Address ban',
+      visibility: 'link',
+    });
+    const boardId = (created.json() as { id: string }).id;
+    await owner.request('PATCH', `/api/v1/boards/${boardId}`, {
+      link_role: 'read',
+      anon_write: 'open',
+    });
+
+    const join = async (): Promise<{ statusCode: number; body: string }> => {
+      const response = await harness.app.inject({
+        method: 'POST',
+        url: `/api/v1/boards/${boardId}/anon`,
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({ label: 'Flooder' }),
+      });
+      return { statusCode: response.statusCode, body: response.body };
+    };
+
+    expect((await join()).statusCode).toBe(200);
+
+    const banned = await admin.request('POST', '/api/v1/admin/bans/ip', {
+      ip: '127.0.0.1',
+      confirm: true,
+      reason: 'flooding the demo board',
+    });
+    expect(banned.statusCode).toBe(201);
+
+    const listed = await admin.request('GET', '/api/v1/admin/bans');
+    expect(listed.statusCode).toBe(200);
+    const rows = (listed.json() as { items: { subject: string; subject_kind: string }[] }).items;
+    expect(rows.some((row) => row.subject === '127.0.0.1' && row.subject_kind === 'ip')).toBe(true);
+
+    const blocked = await join();
+    expect(blocked.statusCode).toBe(403);
+    expect((JSON.parse(blocked.body) as { error: { code: string } }).error.code).toBe('banned');
+
+    // A member signed in from the same address is untouched: the address ban is
+    // for anonymous actors, not a network-wide lockout.
+    expect((await owner.request('GET', '/api/v1/me')).statusCode).toBe(200);
+
+    const lifted = await admin.request('DELETE', '/api/v1/admin/bans/ip/127.0.0.1');
+    expect(lifted.statusCode).toBe(204);
+    expect((await join()).statusCode).toBe(200);
+  });
+
+  it('refuses a malformed address and a ban by a non-admin', async () => {
+    const member = harness.client();
+    await member.signup(`plain-${member.suffix}`);
+    const nonAdmin = await member.request('POST', '/api/v1/admin/bans/ip', {
+      ip: '198.51.100.4',
+      confirm: true,
+    });
+    expect(nonAdmin.statusCode).toBe(403);
+
+    const admin = harness.client();
+    const adminUser = await admin.signup(`ops4-${admin.suffix}`);
+    await harness.db.user.update({
+      where: { id: adminUser.id },
+      data: { is_instance_admin: true },
+    });
+    const malformed = await admin.request('POST', '/api/v1/admin/bans/ip', {
+      ip: 'not-an-address',
+      confirm: true,
+    });
+    expect(malformed.statusCode).toBe(400);
+  });
+
   it('refuses to ban an instance admin', async () => {
     const admin = harness.client();
     const adminUser = await admin.signup(`ops2-${admin.suffix}`);

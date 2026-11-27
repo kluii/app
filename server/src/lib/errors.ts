@@ -31,6 +31,8 @@ export type ErrorCode =
   | 'email_not_configured'
   | 'rate_limited'
   | 'too_many_attempts'
+  | 'captcha_required'
+  | 'captcha_failed'
   | 'payload_too_large'
   | 'unsupported_schema'
   | 'unsupported_media_type'
@@ -82,6 +84,8 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   unsupported_media_type: 415,
   rate_limited: 429,
   too_many_attempts: 429,
+  captcha_required: 400,
+  captcha_failed: 400,
   internal: 500,
   service_unavailable: 503,
   email_not_configured: 503,
@@ -144,6 +148,10 @@ export function defaultMessage(code: ErrorCode): string {
       return 'Too many requests.';
     case 'too_many_attempts':
       return 'Too many attempts.';
+    case 'captcha_required':
+      return 'This instance asks for a captcha token past a few anonymous writes.';
+    case 'captcha_failed':
+      return 'The captcha token was not accepted.';
     case 'column_not_empty':
       return 'The column still holds cards.';
     case 'board_closed':

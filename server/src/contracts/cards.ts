@@ -71,8 +71,16 @@ export const cardItemSchema = z
   })
   .strict();
 
+/**
+ * `cap_token` is a Cap solution, present only on an instance that enables the
+ * captcha and only for an anonymous actor past the threshold (K3-07). It is
+ * accepted on both write shapes and ignored when the gate is off, so a client
+ * that always sends it is never punished.
+ */
+export const capTokenSchema = z.string().trim().min(1).max(4096).optional();
+
 export const createCardSchema = cardItemSchema
-  .extend({ column: idSchema('col') })
+  .extend({ column: idSchema('col'), cap_token: capTokenSchema })
   .superRefine(exclusiveAssignee);
 
 export const bulkItemSchema = cardItemSchema.superRefine(exclusiveAssignee);
@@ -81,6 +89,7 @@ export const bulkCreateSchema = z
   .object({
     column: idSchema('col'),
     items: z.array(bulkItemSchema).min(1).max(200),
+    cap_token: capTokenSchema,
   })
   .strict();
 

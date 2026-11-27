@@ -10,6 +10,7 @@ import { recordEvent } from '../lib/events.js';
 import { commitEvent } from '../realtime/events.js';
 import { conflictIfStale } from '../lib/concurrency.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
+import { guardAnonWrite } from '../anon/limits.js';
 import {
   boardTagColors,
   createPendingCard,
@@ -42,6 +43,11 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
 
     const loaded = await loadBoardFor(db, actor, id, 'card.create');
     assertAllowed(loaded.decision);
+    // Anonymous writes are the only writes without an accountable actor, so they
+    // carry both an address budget and a per-board cap (K3-07).
+    if (actor.kind === 'anon') {
+      await guardAnonWrite(request, reply, context.env, db, id, parsed.data.cap_token);
+    }
     // A moderated board accepts the write and shows it to nobody until an owner
     // approves it: no card, no event, one pending row (K3-03 → K3-04).
     if (actor.kind === 'anon' && loaded.board.anon_write === 'moderated') {
@@ -83,6 +89,9 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
 
     const loaded = await loadBoardFor(db, actor, id, 'card.create');
     assertAllowed(loaded.decision);
+    if (actor.kind === 'anon') {
+      await guardAnonWrite(request, reply, context.env, db, id, parsed.data.cap_token);
+    }
 
     // The column must belong to *this* board: `card.create` on board A is not
     // permission to write into a column of board B (PROMPT.md §3.3).

@@ -8,6 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
+import { anonLimiter } from '../src/anon/limits.js';
 
 const WEB_DIR = new URL('./fixtures/web', import.meta.url).pathname;
 
@@ -70,7 +71,11 @@ class AnonClient {
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     url: string,
     payload?: unknown,
-  ): Promise<{ statusCode: number; body: string }> {
+  ): Promise<{
+    statusCode: number;
+    body: string;
+    headers: Record<string, string | string[] | number | undefined>;
+  }> {
     const response = await this.client.app.inject({
       method,
       url,
@@ -80,7 +85,7 @@ class AnonClient {
       },
       ...(payload ? { payload: JSON.stringify(payload) } : {}),
     });
-    return { statusCode: response.statusCode, body: response.body };
+    return { statusCode: response.statusCode, body: response.body, headers: response.headers };
   }
 }
 
@@ -274,5 +279,123 @@ describe('moderated writes', () => {
     const pending = await harness.db.pendingCard.findUnique({ where: { id: body.id } });
     expect(pending?.actor_label).toBe('Waiting');
     expect(pending?.title).toBe('Under review');
+  });
+});
+
+/**
+ * K3-07 — the abuse controls that exist because a display name is free.
+ *
+ * Both harnesses below state small explicit limits: a per-board cap that only
+ * fires at 30 writes is a cap nobody has proven, and `docs/api.md` §1 publishes
+ * the default, not the test's.
+ */
+describe('anonymous write caps', () => {
+  it('answers the per-board hourly cap with 429 and Retry-After, and writes nothing', async () => {
+    const limited = await startServer({ env: { KLUI_ANON_WRITES_PER_BOARD: 2 } });
+    try {
+      anonLimiter.clear();
+      const owner = limited.client();
+      const created = await board(owner, { anon_write: 'open' });
+      const visitor = new AnonClient(limited.client());
+      expect((await visitor.join(created.id, 'Busy')).statusCode).toBe(200);
+      const column = await firstColumn(visitor, created.id);
+
+      for (const title of ['One', 'Two']) {
+        const response = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
+          column,
+          title,
+        });
+        expect(response.statusCode).toBe(201);
+      }
+
+      const blocked = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
+        column,
+        title: 'Three',
+      });
+      expect(blocked.statusCode).toBe(429);
+      expect((JSON.parse(blocked.body) as { error: { code: string } }).error.code).toBe(
+        'rate_limited',
+      );
+      expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+      // A refused write is not a silent success: the board still holds two.
+      expect(await limited.db.card.count({ where: { board_id: created.id } })).toBe(2);
+    } finally {
+      await limited.close();
+    }
+  });
+
+  it('counts the board, not the process: another board still accepts a write', async () => {
+    const limited = await startServer({ env: { KLUI_ANON_WRITES_PER_BOARD: 1 } });
+    try {
+      anonLimiter.clear();
+      const first = await board(limited.client(), { anon_write: 'open' });
+      const second = await board(limited.client(), { anon_write: 'open' });
+
+      const visitor = new AnonClient(limited.client());
+      expect((await visitor.join(first.id, 'Roamer')).statusCode).toBe(200);
+      const firstColumnId = await firstColumn(visitor, first.id);
+      expect(
+        (
+          await visitor.request('POST', `/api/v1/boards/${first.id}/cards`, {
+            column: firstColumnId,
+            title: 'First board',
+          })
+        ).statusCode,
+      ).toBe(201);
+      expect(
+        (
+          await visitor.request('POST', `/api/v1/boards/${first.id}/cards`, {
+            column: firstColumnId,
+            title: 'Over the cap',
+          })
+        ).statusCode,
+      ).toBe(429);
+
+      // A second cookie on the second board: the board bucket above must not be
+      // the visitor's identity.
+      const other = new AnonClient(limited.client());
+      expect((await other.join(second.id, 'Roamer')).statusCode).toBe(200);
+      const secondColumnId = await firstColumn(other, second.id);
+      expect(
+        (
+          await other.request('POST', `/api/v1/boards/${second.id}/cards`, {
+            column: secondColumnId,
+            title: 'Second board',
+          })
+        ).statusCode,
+      ).toBe(201);
+    } finally {
+      await limited.close();
+    }
+  });
+
+  it('refuses a banned address on the next request, with no restart', async () => {
+    const created = await board(harness.client(), { anon_write: 'open' });
+    const visitor = new AnonClient(harness.client());
+    const joined = await visitor.join(created.id, 'Banned');
+    expect(joined.statusCode).toBe(200);
+
+    // The address the suite runs from; inject() reports 127.0.0.1 unless told
+    // otherwise, and a ban is on the address, not on the cookie.
+    const ip = '127.0.0.1';
+    await harness.db.ban.create({
+      data: { id: `ban_${Date.now().toString(36)}`, subject: ip, subject_kind: 'ip' },
+    });
+    try {
+      const blocked = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
+        column: await firstColumn(visitor, created.id),
+        title: 'Blocked',
+      });
+      expect(blocked.statusCode).toBe(403);
+      expect((JSON.parse(blocked.body) as { error: { code: string } }).error.code).toBe('banned');
+    } finally {
+      await harness.db.ban.deleteMany({ where: { subject: ip, subject_kind: 'ip' } });
+    }
+
+    const after = await visitor.request('POST', `/api/v1/boards/${created.id}/cards`, {
+      column: await firstColumn(visitor, created.id),
+      title: 'Allowed again',
+    });
+    expect(after.statusCode).toBe(201);
   });
 });

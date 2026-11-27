@@ -90,8 +90,13 @@ Names are a contract: compose files, docs and the site depend on them.
 | `KLUI_ANALYTICS_URL` | unset | Unset → no script tag, no outbound request (asserted by test) |
 | `KLUI_METRICS_ENABLED` | `false` | When true, bind to loopback or require a token |
 | `KLUI_METRICS_TOKEN` | unset | Bearer token for `/metrics` |
-| `KLUI_CAPTCHA_ENABLED` | `false` | Cap, self-hosted |
-| `KLUI_CAPTCHA_URL` | unset | Cap instance URL |
+| `KLUI_CAPTCHA_ENABLED` | `false` | Cap, self-hosted, anonymous writes only, past the threshold |
+| `KLUI_CAPTCHA_URL` | unset | Cap instance URL; required when the captcha is enabled, or boot fails |
+| `KLUI_CAPTCHA_SECRET` | unset | Sent as `Authorization: Bearer` to `{URL}/siteverify` |
+| `KLUI_CAPTCHA_THRESHOLD` | `3` | Anonymous writes from one address before a token is demanded |
+| `KLUI_ANON_WRITES_PER_BOARD` | `30` | Per board per hour |
+| `KLUI_ANON_WRITES_PER_IP` | `10` | Per address per hour |
+| `KLUI_ANON_JOINS_PER_IP` | `20` | Display-name joins per address per hour |
 | `KLUI_OIDC_DISCORD_CLIENT_ID` / `_SECRET` | unset | Provider flags default off |
 | `KLUI_OIDC_GITHUB_CLIENT_ID` / `_SECRET` | unset | |
 | `KLUI_OIDC_GENERIC_{NAME}_ISSUER` / `_CLIENT_ID` / `_SECRET` | unset | `{NAME}` uppercased, e.g. `KLUI_OIDC_GENERIC_AUTHENTIK_ISSUER` |

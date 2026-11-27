@@ -14,6 +14,7 @@ import { AppError, boardNotFound, fromZod } from '../lib/errors.js';
 import { joinBoardSchema } from '../contracts/boards.js';
 import { toPolicy } from '../boards/service.js';
 import { newAnonId, setAnonCookie } from './service.js';
+import { assertAddressAllowed, assertSpent, spendJoin } from './limits.js';
 
 export function registerAnonRoutes(app: FastifyInstance, context: AppContext): void {
   const database = (): Db => {
@@ -26,6 +27,9 @@ export function registerAnonRoutes(app: FastifyInstance, context: AppContext): v
     const parsed = joinBoardSchema.safeParse(request.body);
     if (!parsed.success) throw fromZod(parsed.error);
     const db = database();
+    // A banned address is refused before the label is even read: a ban is not a
+    // validation error and leaks nothing about the board.
+    await assertAddressAllowed(db, request.ip);
 
     const board = await db.board.findUnique({ where: { id } });
     // Unreadable is non-existent: a private board is not a place to ask.
@@ -45,6 +49,7 @@ export function registerAnonRoutes(app: FastifyInstance, context: AppContext): v
       });
     }
 
+    assertSpent(reply, spendJoin(context.env, request.ip), 'Too many visitors from this address.');
     setAnonCookie(reply, identity, context.env.KLUI_ENV === 'production');
     reply.header('cache-control', 'no-store').header('x-robots-tag', 'noindex');
     return { board_id: id, label: identity.label, actor_kind: 'anon' };
