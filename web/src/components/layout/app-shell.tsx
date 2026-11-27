@@ -10,6 +10,7 @@ import { t } from '../../i18n';
 import whiteLogo from '../../assets/klui-logo-white.png';
 import blackLogo from '../../assets/klui-logo-black.png';
 import { AccountMenu } from './account-menu';
+import { NotificationBell } from './notification-bell';
 
 /**
  * 56 px bar, canvas ground, hairline bottom, no shadow (DESIGN.md §4).
@@ -62,7 +63,12 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
           {actions}
         </div>
         <div className="flex items-center gap-1.5">
-          {me.data ? <AccountMenu me={me.data} /> : null}
+          {me.data ? (
+            <>
+              <NotificationBell />
+              <AccountMenu me={me.data} />
+            </>
+          ) : null}
         </div>
       </header>
 

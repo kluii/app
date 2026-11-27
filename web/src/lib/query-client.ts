@@ -33,4 +33,6 @@ export const queryKeys = {
   oidcProviders: ['oidc-providers'] as const,
   linkedOidc: ['linked-oidc'] as const,
   adminOidcProviders: ['admin-oidc-providers'] as const,
+  notifications: ['notifications'] as const,
+  notificationPrefs: ['notification-prefs'] as const,
 };

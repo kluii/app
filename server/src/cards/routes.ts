@@ -14,6 +14,7 @@ import { requireActor } from '../auth/request.js';
 import { AppError, fromZod } from '../lib/errors.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
 import { guardAnonWrite } from '../anon/limits.js';
+import { notify } from '../notifications/service.js';
 import { createPendingCard, createPendingCards } from './service.js';
 import {
   bulkCreateCards,
@@ -62,6 +63,18 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
           label: actor.label,
           anonId: actor.anonId,
         });
+        const moderators = await db.boardMember.findMany({
+          where: { board_id: id, role: { in: ['owner', 'admin'] } },
+          select: { user_id: true },
+        });
+        for (const mod of moderators) {
+          await notify(db, {
+            userId: mod.user_id,
+            kind: 'moderation_pending',
+            eventId: `pending:${pending.id}:${mod.user_id}`,
+            payload: { board_id: id, pending_id: pending.id, title: pending.title },
+          }).catch(() => undefined);
+        }
         return reply.code(202).send({
           status: 'pending',
           id: pending.id,

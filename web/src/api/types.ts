@@ -229,3 +229,25 @@ export type OidcTestResult =
       token_endpoint: string;
     }
   | { ok: false; error: string };
+export type NotificationKind =
+  'assignment' | 'mention' | 'due_soon' | 'moderation_pending' | 'invitation' | 'board_closed';
+
+export type NotificationItem = {
+  id: string;
+  kind: string;
+  event_id: string | null;
+  payload: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type NotificationList = {
+  items: NotificationItem[];
+  unread_count: number;
+};
+
+export type NotificationPrefs = {
+  muted_kinds: NotificationKind[];
+  webhook_url: string | null;
+  failures: number;
+};

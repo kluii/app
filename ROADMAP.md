@@ -300,7 +300,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `/metrics` off unless `KLUI_METRICS_ENABLED=true`, then loopback-bound or bearer-protected.
   **Exit:** `404` when off; `401` without the token when on; `200` with it.
 
-- [ ] **K5-04 — Notifications** `M` · dep: K2-10
+- [x] **K5-04 — Notifications** `M` · dep: K2-10 — verified in `docs/verify/k5.md` § K5-04
   Assignment, mention, due-soon, moderation pending, invitation. In-app bell with unread count + webhook (Discord/Slack-compatible JSON). Per-type mute. Deduplicated by event id.
   **Exit:** the same event delivered twice notifies once; an unconfigured webhook logs a single failed delivery, not a retry storm.
 

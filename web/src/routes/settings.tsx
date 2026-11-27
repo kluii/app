@@ -5,6 +5,7 @@ import { DangerSettings } from '../components/settings/danger-settings';
 import { DigestSettings } from '../components/settings/digest-settings';
 import { OidcSettings } from '../components/settings/oidc-settings';
 import { ProfileSettings } from '../components/settings/profile-settings';
+import { NotificationsSettings } from '../components/settings/notifications-settings';
 import { SecuritySettings } from '../components/settings/security-settings';
 import { SessionsSettings } from '../components/settings/sessions-settings';
 import { t } from '../i18n';
@@ -24,6 +25,7 @@ function SettingsPage() {
         <ProfileSettings />
         <SessionsSettings />
         <DigestSettings />
+        <NotificationsSettings />
         <AgentsSettings />
         <SecuritySettings />
         <OidcSettings />

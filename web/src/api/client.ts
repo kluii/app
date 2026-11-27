@@ -19,6 +19,9 @@ import type {
   Page,
   Member,
   MemberRole,
+  NotificationKind,
+  NotificationList,
+  NotificationPrefs,
   PendingCard,
   PublicBoard,
   PublicOidcProvider,
@@ -388,4 +391,13 @@ export const api = {
     request<void>('DELETE', `/admin/oidc/providers/${encodeURIComponent(slug)}`),
   testAdminOidcProvider: (slug: string) =>
     request<OidcTestResult>('POST', `/admin/oidc/providers/${encodeURIComponent(slug)}/test`, {}),
+  notifications: () => request<NotificationList>('GET', '/me/notifications'),
+  markNotificationRead: (id: string) =>
+    request<void>('POST', `/me/notifications/${encodeURIComponent(id)}/read`, {}),
+  markAllNotificationsRead: () => request<void>('POST', '/me/notifications/read-all', {}),
+  notificationPrefs: () => request<NotificationPrefs>('GET', '/me/notifications/prefs'),
+  updateNotificationPrefs: (input: {
+    muted_kinds?: NotificationKind[];
+    webhook_url?: string | null;
+  }) => request<NotificationPrefs>('PATCH', '/me/notifications/prefs', input),
 };
