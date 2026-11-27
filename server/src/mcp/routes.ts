@@ -161,6 +161,10 @@ async function handleMessage(
   }
 }
 
+function isMcpActor(actor: FastifyRequest['actor']): boolean {
+  return actor !== null && (actor.kind === 'user' || actor.kind === 'agent');
+}
+
 export function registerMcpRoutes(app: FastifyInstance, context: AppContext): void {
   app.get('/mcp', async (_request: FastifyRequest, reply: FastifyReply) => {
     reply.header('allow', 'POST');
@@ -175,60 +179,80 @@ export function registerMcpRoutes(app: FastifyInstance, context: AppContext): vo
     });
   });
 
-  app.post('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
-    const contentType = request.headers['content-type'] ?? '';
-    if (!contentType.toLowerCase().includes('application/json')) {
-      throw new AppError('unsupported_media_type', {
-        message: 'The MCP endpoint reads application/json.',
-        hint: 'Send Content-Type: application/json.',
-      });
-    }
-    if (!request.actor) {
-      reply.header('www-authenticate', 'Bearer');
-      return reply.code(401).send(
-        errorOf(null, -32001, 'Unauthenticated: MCP needs a bearer credential.', {
-          hint: 'Send Authorization: Bearer kb_… (an agent key).',
-        }),
-      );
-    }
-
-    const body = request.body;
-    const batch = Array.isArray(body);
-    const messages = batch ? body : [body];
-
-    // The bucket is charged here, and only here: `params.name` is what says a
-    // call reads or writes, and it exists only after the body is parsed
-    // (docs/mcp.md §5, mcp/ratelimit.ts). A batch is charged for every message
-    // before any of them runs, so a refused batch does nothing.
-    if (request.agentKeyId !== null) {
-      for (const message of messages) {
-        const charge = chargeMcp(reply, context.env, request.agentKeyId, message);
-        if (!charge.allowed) {
-          reply.header('retry-after', String(charge.retryAfter));
-          return reply.code(429).send(
-            errorOf(
-              idOf(message as RpcRequest),
-              -32004,
-              `Too many ${charge.bucket} calls for this agent key.`,
-              {
-                code: 'rate_limited',
-                bucket: charge.bucket,
-                limit: charge.limit,
-                retry_after_s: charge.retryAfter,
-                hint: refusalHint(charge.retryAfter),
-              },
-            ),
+  app.post(
+    '/mcp',
+    {
+      // Refuse unauthenticated, anonymous (`klui_anon`) and link (`klui_link`)
+      // requests before the body is read, regardless of the method or tool
+      // (docs/mcp.md §1).
+      preParsing: async (request, reply, payload) => {
+        if (!isMcpActor(request.actor)) {
+          reply.header('www-authenticate', 'Bearer');
+          await reply.code(401).send(
+            errorOf(null, -32001, 'Unauthenticated: MCP needs a bearer credential.', {
+              hint: 'Send Authorization: Bearer kb_… (an agent key) or a user session.',
+            }),
           );
+          return;
+        }
+        return payload;
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const contentType = request.headers['content-type'] ?? '';
+      if (!contentType.toLowerCase().includes('application/json')) {
+        throw new AppError('unsupported_media_type', {
+          message: 'The MCP endpoint reads application/json.',
+          hint: 'Send Content-Type: application/json.',
+        });
+      }
+      if (!isMcpActor(request.actor)) {
+        reply.header('www-authenticate', 'Bearer');
+        return reply.code(401).send(
+          errorOf(null, -32001, 'Unauthenticated: MCP needs a bearer credential.', {
+            hint: 'Send Authorization: Bearer kb_… (an agent key) or a user session.',
+          }),
+        );
+      }
+
+      const body = request.body;
+      const batch = Array.isArray(body);
+      const messages = batch ? body : [body];
+
+      // The bucket is charged here, and only here: `params.name` is what says a
+      // call reads or writes, and it exists only after the body is parsed
+      // (docs/mcp.md §5, mcp/ratelimit.ts). A batch is charged for every message
+      // before any of them runs, so a refused batch does nothing.
+      if (request.agentKeyId !== null) {
+        for (const message of messages) {
+          const charge = chargeMcp(reply, context.env, request.agentKeyId, message);
+          if (!charge.allowed) {
+            reply.header('retry-after', String(charge.retryAfter));
+            return reply.code(429).send(
+              errorOf(
+                idOf(message as RpcRequest),
+                -32004,
+                `Too many ${charge.bucket} calls for this agent key.`,
+                {
+                  code: 'rate_limited',
+                  bucket: charge.bucket,
+                  limit: charge.limit,
+                  retry_after_s: charge.retryAfter,
+                  hint: refusalHint(charge.retryAfter),
+                },
+              ),
+            );
+          }
         }
       }
-    }
 
-    const responses: RpcResponse[] = [];
-    for (const message of messages) {
-      const response = await handleMessage(context, request, message);
-      if (response !== null) responses.push(response);
-    }
-    if (responses.length === 0) return reply.code(202).send();
-    return batch ? responses : responses[0];
-  });
+      const responses: RpcResponse[] = [];
+      for (const message of messages) {
+        const response = await handleMessage(context, request, message);
+        if (response !== null) responses.push(response);
+      }
+      if (responses.length === 0) return reply.code(202).send();
+      return batch ? responses : responses[0];
+    },
+  );
 }
