@@ -28,4 +28,7 @@ export const queryKeys = {
   members: (boardId: string) => ['members', boardId] as const,
   links: (boardId: string) => ['links', boardId] as const,
   agentKeys: ['agent-keys'] as const,
+  oidcProviders: ['oidc-providers'] as const,
+  linkedOidc: ['linked-oidc'] as const,
+  adminOidcProviders: ['admin-oidc-providers'] as const,
 };

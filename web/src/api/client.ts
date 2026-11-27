@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {
+  AdminOidcProvider,
   AgentKey,
   AgentKeyTest,
   AnonWrite,
   Board,
   BoardLink,
   LinkRole,
+  LinkedOidcAccount,
   BoardState,
   Card,
   Column,
   CreatedAgentKey,
   EventDto,
   Me,
+  OidcTestResult,
   Page,
   Member,
   MemberRole,
   PendingCard,
   PublicBoard,
+  PublicOidcProvider,
   Visibility,
 } from './types';
 
@@ -313,4 +317,37 @@ export const api = {
       `/cards/${cardId}/move`,
       input,
     ),
+
+  oidcProviders: () => request<{ items: PublicOidcProvider[] }>('GET', '/auth/oidc/providers'),
+  linkedOidcAccounts: () => request<{ items: LinkedOidcAccount[] }>('GET', '/me/oidc'),
+  linkOidcProvider: (slug: string) =>
+    request<{ url: string }>('POST', `/auth/oidc/${encodeURIComponent(slug)}/link`, {}),
+  unlinkOidcProvider: (slug: string) =>
+    request<void>('DELETE', `/me/oidc/${encodeURIComponent(slug)}`),
+  adminOidcProviders: () => request<{ items: AdminOidcProvider[] }>('GET', '/admin/oidc/providers'),
+  createAdminOidcProvider: (input: {
+    slug: string;
+    name: string;
+    issuer_url: string;
+    client_id: string;
+    client_secret: string;
+    scopes?: string;
+    enabled?: boolean;
+  }) => request<AdminOidcProvider>('POST', '/admin/oidc/providers', input),
+  updateAdminOidcProvider: (
+    slug: string,
+    input: {
+      name?: string;
+      issuer_url?: string;
+      client_id?: string;
+      client_secret?: string;
+      scopes?: string;
+      enabled?: boolean;
+    },
+  ) =>
+    request<AdminOidcProvider>('PATCH', `/admin/oidc/providers/${encodeURIComponent(slug)}`, input),
+  deleteAdminOidcProvider: (slug: string) =>
+    request<void>('DELETE', `/admin/oidc/providers/${encodeURIComponent(slug)}`),
+  testAdminOidcProvider: (slug: string) =>
+    request<OidcTestResult>('POST', `/admin/oidc/providers/${encodeURIComponent(slug)}/test`, {}),
 };
