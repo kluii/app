@@ -31,6 +31,7 @@ export const ID_PREFIXES = [
   'rcv',
   'dgt',
   'not',
+  'ake',
 ] as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[number];

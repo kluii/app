@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { createDb, type Db } from '../src/db.js';
 import { testEnv } from '../src/env.js';
+import { readVersion } from '../src/lib/version.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -220,7 +221,7 @@ describe('boot gate', () => {
       const response = await fetch(`${address}/healthz`);
       expect(response.status).toBe(200);
       const body = (await response.json()) as { status: string; db: string; version: string };
-      expect(body).toEqual({ status: 'ok', version: '0.1.0', db: 'up' });
+      expect(body).toEqual({ status: 'ok', version: readVersion(), db: 'up' });
     } finally {
       await app.close();
     }

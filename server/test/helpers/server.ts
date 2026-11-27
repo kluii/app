@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { LightMyRequestResponse } from 'fastify';
 import { buildApp } from '../../src/app.js';
-import { testEnv } from '../../src/env.js';
+import { testEnv, type Env } from '../../src/env.js';
 import { createHub } from '../../src/realtime/events.js';
 import { ensureInstanceSettings } from '../../src/auth/service.js';
 import { testDatabaseUrl, testDb } from './db.js';
@@ -14,26 +14,54 @@ export const TEST_SECRETS = {
   encryptionKey: Buffer.alloc(32, 9),
 };
 
-export async function startServer(options: { mail?: Mailer | null } = {}): Promise<{
+export async function startServer(
+  options: { mail?: Mailer | null; env?: Partial<Env>; webDir?: string; listen?: boolean } = {},
+): Promise<{
   app: ReturnType<typeof buildApp>;
   db: Db;
+  env: Env;
+  /** The real origin, when `listen` was asked for: the agent-key probe calls it. */
+  origin: string | null;
   client: () => TestClient;
   close: () => Promise<void>;
 }> {
   const db = testDb();
   // The boot creates the settings row; the test harness must mirror the boot.
-  await ensureInstanceSettings(db, testEnv({ DATABASE_URL: testDatabaseUrl() }));
+  const env = testEnv({
+    DATABASE_URL: testDatabaseUrl(),
+    KLUI_PUBLIC_URL: 'http://localhost:8099',
+    ...options.env,
+  });
+  await ensureInstanceSettings(db, env);
   const app = buildApp({
-    env: testEnv({ DATABASE_URL: testDatabaseUrl(), KLUI_PUBLIC_URL: 'http://localhost:8099' }),
+    env,
     db,
     secrets: TEST_SECRETS,
     hub: createHub(),
     ...(options.mail === undefined ? {} : { mail: options.mail }),
+    ...(options.webDir === undefined ? {} : { webDir: options.webDir }),
   });
   await app.ready();
+
+  // A test that exercises a self-call (the agent-key probe, docs/mcp.md §7)
+  // needs a listener, and the port is only known after `listen`. Route handlers
+  // read `context.env` per request, so the origin is assigned rather than
+  // rebuilt: no rebuild can disagree with the socket that is actually open.
+  let origin: string | null = null;
+  if (options.listen === true) {
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const address = app.server.address();
+    if (typeof address === 'object' && address !== null) {
+      origin = `http://127.0.0.1:${address.port}`;
+      env.KLUI_PUBLIC_URL = origin;
+    }
+  }
+
   return {
     app,
     db,
+    env,
+    origin,
     client: () => new TestClient(app, db),
     close: async () => {
       await app.close();

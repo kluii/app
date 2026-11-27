@@ -135,6 +135,82 @@ export async function banUser(
   return { banned_until: expires_at?.toISOString() ?? null };
 }
 
+export type AdminBan = {
+  id: string;
+  subject: string;
+  subject_kind: 'user' | 'ip';
+  reason: string | null;
+  expires_at: string | null;
+  created_at: string;
+};
+
+/**
+ * The admin view of the ban table: every active ban, both kinds, newest first.
+ * One page of 100 is enough for a self-hosted instance and honest about it —
+ * there is no cursor here because a ban list that needs paging is an incident.
+ */
+export async function listBans(db: Db, adminId: string): Promise<{ items: AdminBan[] }> {
+  await requireInstanceAdmin(db, adminId);
+  const bans = await db.ban.findMany({
+    where: { OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }] },
+    orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+    take: 100,
+  });
+  return {
+    items: bans.map((ban) => ({
+      id: ban.id,
+      subject: ban.subject,
+      subject_kind: ban.subject_kind,
+      reason: ban.reason,
+      expires_at: ban.expires_at?.toISOString() ?? null,
+      created_at: ban.created_at.toISOString(),
+    })),
+  };
+}
+
+export async function banAddress(
+  db: Db,
+  adminId: string,
+  input: { ip: string; reason?: string; expires_at?: string | null; confirm: true },
+): Promise<{ banned_until: string | null }> {
+  await requireInstanceAdmin(db, adminId);
+  const expires_at = input.expires_at ? new Date(input.expires_at) : null;
+  await db.$transaction(async (tx) => {
+    await tx.ban.create({
+      data: {
+        id: newId('ban'),
+        subject: input.ip,
+        subject_kind: 'ip',
+        reason: input.reason ?? null,
+        expires_at,
+      },
+    });
+    await recordEvent(tx, {
+      boardId: null,
+      actor: { kind: 'user', userId: adminId },
+      type: 'security.ip_banned',
+      payload: { ip: input.ip, expires_at: expires_at?.toISOString() ?? null },
+    });
+  });
+  return { banned_until: expires_at?.toISOString() ?? null };
+}
+
+export async function unbanAddress(db: Db, adminId: string, ip: string): Promise<void> {
+  await requireInstanceAdmin(db, adminId);
+  await db.$transaction(async (tx) => {
+    const lifted = await tx.ban.deleteMany({ where: { subject: ip, subject_kind: 'ip' } });
+    if (lifted.count === 0) {
+      throw new AppError('not_found', { message: 'That address is not banned.' });
+    }
+    await recordEvent(tx, {
+      boardId: null,
+      actor: { kind: 'user', userId: adminId },
+      type: 'security.ip_unbanned',
+      payload: { ip },
+    });
+  });
+}
+
 export async function unbanUser(db: Db, adminId: string, userId: string): Promise<void> {
   await requireInstanceAdmin(db, adminId);
   await db.$transaction(async (tx) => {

@@ -41,7 +41,7 @@ Rules:
 `POST /boards/:id/import` with `{format:"v2"|"v1"|"trello", data}` or a multipart `file`. Returns `202 {job_id}`; progress over SSE (`import.progress`), completion recorded as `import.completed` with counts.
 
 - Import into an **existing** board: columns are matched by name (case-insensitive); unmatched columns are created; cards keep their relative order inside the matched column, appended after existing cards.
-- Import into an **empty** board (the common case) reproduces the export exactly.
+- Import into an **empty** board (the common case) reproduces the export exactly. A column the import creates on a board that had none keeps the file's positions when they are distinct, so an export → import → export round-trip is byte-identical; a column that already holds cards appends after its maximum in 1024 steps.
 - **Idempotent on `(board_id, source_hash)`**: importing the same file twice does not duplicate content; the second call returns the first job's result.
 - Limits: 5 MB, 5 000 cards, 200 columns, 20 000 comments. Over the limit → `413` with the limit named.
 - Validation is all-or-nothing: one invalid card rolls back the whole import. A partial import that "mostly worked" is worse than a rejection.
@@ -76,7 +76,7 @@ The importer accepts exactly the Appendix A shape; unknown fields are ignored, m
 | `cards[].name` | `title` |
 | `cards[].desc` | `description` (raw markdown/text) |
 | `cards[].due` | `due_at` |
-| `cards[].labels[]` | `tags` with `name` (normalised; a colour-only label becomes `label-<colour>`) and `color` mapped from Trello's colour name to the palette (`green` → `--tag-green`, `yellow` → `--tag-amber`, `orange` → `--tag-orange`, `red` → `--tag-red`, `purple` → `--tag-violet`, `blue` → `--tag-blue`, `sky` → `--tag-sky`, `lime` → `--tag-lime`, `pink` → `--tag-pink`, `black` → `--tag-gray`, `null` → no colour) |
+| `cards[].labels[]` | `tags` with `name` (normalised; a colour-only label becomes `label-<colour>`) and `color: null`. Trello names a colour, Klui stores a hex, and the only hexes in this repository are the tokens in `web/src/styles/tokens.css` — a server-side palette would be a second source of colour, which DESIGN.md §15 forbids. The colour is dropped and counted as `labels_colour_dropped`; the tag renders with the neutral chip. |
 | `cards[].idMembers` | `assignee_label` from the member's `fullName` — never a user account |
 | `cards[].pos` | order within the list |
 | `checklists`, attachments, `actions` | not imported; counted in the job result so the user knows what was left behind |

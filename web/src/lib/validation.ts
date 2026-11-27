@@ -31,6 +31,7 @@ export const RESERVED_WORDS = [
   'settings',
   'account',
   'boards',
+  'styleguide',
   'board',
   'l',
   'u',

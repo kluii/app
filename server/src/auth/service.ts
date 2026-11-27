@@ -4,6 +4,7 @@
  * No user enumeration on login: the same body and a comparable duration for an
  * unknown account and a wrong password.
  */
+import { Prisma } from '@prisma/client';
 import type { ZodType } from 'zod';
 import type { Db } from '../db.js';
 import type { Env } from '../env.js';
@@ -24,6 +25,8 @@ export type AuthenticatedUser = {
   display_name: string | null;
   is_instance_admin: boolean;
   locale: string;
+  /** The row's creation date, so `/me` never invents one. */
+  created_at: Date;
 };
 
 export async function ensureInstanceSettings(db: Db, env: Env): Promise<void> {
@@ -36,6 +39,19 @@ export async function ensureInstanceSettings(db: Db, env: Env): Promise<void> {
     },
     update: {},
   });
+}
+
+/** The one shape a duplicate account answers with (docs/api.md §3). */
+function taken(usernameTaken: boolean): AppError {
+  return usernameTaken
+    ? new AppError('conflict', {
+        message: 'That username is taken.',
+        hint: 'Pick another one; usernames are unique regardless of case.',
+      })
+    : new AppError('conflict', {
+        message: 'An account already uses this address.',
+        hint: 'Sign in instead, or reset the password.',
+      });
 }
 
 export async function registrationOpen(db: Db, env: Env): Promise<boolean> {
@@ -77,22 +93,19 @@ export async function signup(
     where: { OR: [{ email }, { username }] },
     select: { email: true, username: true },
   });
-  if (existing) {
-    // The username is the only hint allowed: the user chose it (docs/api.md §3).
-    if (existing.username === username) {
-      throw new AppError('conflict', {
-        message: 'That username is taken.',
-        hint: 'Pick another one; usernames are unique regardless of case.',
-      });
-    }
-    throw new AppError('conflict', {
-      message: 'An account already uses this address.',
-      hint: 'Sign in instead, or reset the password.',
-    });
-  }
+  if (existing) throw taken(existing.username === username);
 
-  const user = await db.$transaction(
-    async (tx) => {
+  // One signup at a time, per database. The bootstrap decision reads the whole
+  // user table, so two signups arriving together must not both see it empty; the
+  // advisory lock is what makes that true, and it is taken *inside* the
+  // transaction so it is released on commit or rollback. `Serializable` was the
+  // first attempt and it was not enough: with eight concurrent signups Postgres
+  // aborted one with 40001 even with the lock held, and the retry gave up after
+  // five attempts (test/tx.test.ts). A queue with no aborts beats a race with
+  // retries, and signing up is rare enough that the queue is free.
+  const user = await db
+    .$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('klui:signup'))`;
       const count = await tx.user.count();
       const created = await tx.user.create({
         data: {
@@ -115,9 +128,17 @@ export async function signup(
         payload: { method: 'password', action: 'signup' },
       });
       return created;
-    },
-    { isolationLevel: 'Serializable' },
-  );
+    })
+    .catch((error: unknown) => {
+      // The pre-check ran before the lock, so two signups naming the same address
+      // can both pass it. The unique index is the arbiter, and its violation is the
+      // same 409 the pre-check would have answered, not a 500.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const target = String((error.meta as { target?: unknown } | undefined)?.target ?? '');
+        throw taken(/username/u.test(target));
+      }
+      throw error;
+    });
 
   const session = await issueSession(db, {
     userId: user.id,
@@ -243,6 +264,7 @@ export function toAuthenticated(user: {
   display_name: string | null;
   is_instance_admin: boolean;
   locale: string;
+  created_at: Date;
 }): AuthenticatedUser {
   return {
     id: user.id,
@@ -251,6 +273,7 @@ export function toAuthenticated(user: {
     display_name: user.display_name,
     is_instance_admin: user.is_instance_admin,
     locale: user.locale,
+    created_at: user.created_at,
   };
 }
 

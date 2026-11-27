@@ -132,10 +132,17 @@ export function useKeyboardDrag(input: {
   const onKeyDown = useCallback(
     (card: Card, event: React.KeyboardEvent<HTMLButtonElement>): boolean => {
       const lifted = drag?.cardId === card.id;
-      if (event.key === ' ' || event.key === 'Enter') {
+      // Space is the drag affordance, Enter is activation (K2-15): a keyboard
+      // user must be able to open a card, and only Space may prevent its click.
+      if (event.key === ' ') {
         event.preventDefault();
         if (!lifted) lift(card);
         else drop();
+        return true;
+      }
+      if (event.key === 'Enter' && lifted) {
+        event.preventDefault();
+        drop();
         return true;
       }
       if (!lifted) return false;

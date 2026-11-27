@@ -2,6 +2,15 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const PASSWORD = 'a-long-passphrase-9';
+// The suite runs against a schema that may hold earlier runs (a targeted
+// `npx playwright test e2e/…` does not reset it). A fixed username turns the
+// second run into a 409 on signup and a red that has nothing to do with the
+// product; the suffix costs nothing and keeps the test re-runnable.
+const RUN = Date.now().toString(36);
+
+function identity(name: string): { email: string; username: string } {
+  return { email: `${name}-${RUN}@klui.test`, username: `${name}-${RUN}` };
+}
 
 async function signUp(page: Page, input: { email: string; username: string }): Promise<void> {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
@@ -19,7 +28,7 @@ async function signUp(page: Page, input: { email: string; username: string }): P
 test('signs up, creates a board with a column and a card, and keeps them across a reload', async ({
   page,
 }) => {
-  await signUp(page, { email: 'first@klui.test', username: 'first-user' });
+  await signUp(page, identity('first'));
 
   await page.getByRole('button', { name: 'New board' }).click();
   await page.getByLabel('Board name').fill('Launch plan');
@@ -53,7 +62,7 @@ test('a second account gets the same answer for a foreign board as for one that 
 }) => {
   const owner = await browser.newContext();
   const ownerPage = await owner.newPage();
-  await signUp(ownerPage, { email: 'owner@klui.test', username: 'board-owner' });
+  await signUp(ownerPage, identity('owner'));
 
   await ownerPage.getByRole('button', { name: 'New board' }).click();
   await ownerPage.getByLabel('Board name').fill('Owner only');
@@ -66,7 +75,7 @@ test('a second account gets the same answer for a foreign board as for one that 
 
   const stranger = await browser.newContext();
   const strangerPage = await stranger.newPage();
-  await signUp(strangerPage, { email: 'stranger@klui.test', username: 'stranger-one' });
+  await signUp(strangerPage, identity('stranger'));
 
   await strangerPage.goto(foreignUrl, { waitUntil: 'domcontentloaded' });
   await expect(

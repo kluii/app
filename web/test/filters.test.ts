@@ -16,6 +16,8 @@ function card(overrides: Partial<Card>): Card {
     description: null,
     assignee: null,
     assignee_label: null,
+    actor_label: null,
+    mine: false,
     due_at: null,
     done: false,
     position: '1000',

@@ -60,6 +60,7 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 | D-29 | **SSE is the only push channel.** One stream per session, `Last-Event-ID` replay from a 5-minute ring buffer, heartbeat every 25 s. | WebSockets buy nothing here; SSE survives proxies and reconnects with `EventSource`. | ADR-0015 |
 | D-30 | **The client merges by server id on every path**, including the mutation's own response. | Echo-before-response is real and produces duplicated cards that look like a server bug. | ADR-0015 |
 | D-31 | **OpenAPI 3.1 is generated from the Zod schemas**, and the web client is generated from that document. | A hand-written client is a second contract waiting to drift. | ADR-0014 |
+| D-54 | **Deleting a board writes two `board.deleted` events in the delete transaction**: one board-scoped (it dies with the cascade and carries the SSE payload) and one with `board_id: null`, which survives. | D-23 says every mutation records itself, and the one mutation that destroys the audit trail is exactly the one that must not be able to lose its record. The instance row also keeps the deleted board's name, owner and counts for an operator after the board is gone. | ADR-0013 |
 
 ## Agents and MCP
 
@@ -113,3 +114,58 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 | O-03 | SMTP transport for the pilot instance. | K5-05 email channel | Email channel disabled; webhook and RSS ship. |
 | O-04 | Which OIDC providers are enabled on the pilot. | K5-09 | Discord and GitHub scaffolded, generic provider documented, all flags off. |
 | O-05 | Digest default hour for the pilot (08:00 assumed). | K5-05 | 08:00 account timezone. |
+
+### D-56 — An agent key carries its issuer's role; there is no read-only key
+
+`docs/mcp.md` §7 asks the setup panel to offer "a read-only key alongside a
+write key". The key row has no role column: `createAgentKey` records
+`(user_id, scope, board_id)` and the actor resolves to
+`{kind:'agent', userId, scope, boardId}`, so `can()` grants exactly the role the
+issuer holds on that board. A viewer's key can read and cannot write; an
+editor's key can do what an editor does.
+
+Two ways to keep the sentence and the code together: add `role` to `agent_keys`
+(a migration, a second source of truth for permissions, and a `can()` branch
+that caps an agent below its own membership), or say what the product does. We
+say what it does. The panel states it plainly — "There is no read-only key: a
+key always carries your own role, so it can write wherever you can" — and the
+board-scoped copy changes when `GET /boards` reports a viewer, because then the
+key really is read-only.
+
+Revisit if an agent-to-agent handoff ever needs a credential narrower than the
+person who created it. Until then a second permission source is the bug, not
+the feature.
+
+### D-57 — One agent bucket for MCP, until the transport can classify a call
+
+**Closed 2026-11-27.** The transport now classifies the call:
+`settings/ratelimit.ts` keeps the REST buckets and skips `/mcp`, and the `/mcp`
+route charges after the JSON-RPC body is parsed, through `mcp/ratelimit.ts`,
+using the tool's bucket from `TOOL_KINDS` beside the registry (a tool without a
+classification fails `mcp-parity.test.ts`). A batch is charged per message
+before any of them runs, the refusal is `-32004` with `data.retry_after_s` and
+an HTTP `429`, and `x-ratelimit-limit` / `x-ratelimit-remaining` describe the
+bucket that was actually charged. The proof is "the MCP bucket → lets 100 reads
+through, refuses the 61st write, and spares a second key" in
+`server/test/ratelimit.test.ts` (`npx vitest run test/ratelimit.test.ts`): 100
+reads spend the read bucket, the 61st write is refused, a second key of the same
+account writes, and the exhausted key can still read. The original entry is kept
+below, because the reasoning that made it the right shape is the reasoning this
+fix follows.
+
+`docs/mcp.md` §5 separates reads (600/min per key) from writes (60/min, burst
+20). The bucket is filled in `onRequest` by `settings/ratelimit.ts`, which
+decides "write" from the HTTP method — and every MCP call is a `POST /mcp`.
+So an agent painting a board is throttled at 60 calls a minute whatever it is
+doing, and a `list_boards` in a loop costs the same as a `create_card`.
+
+That is a real gap between a frozen document and the code, found while proving
+`-32004`, and it is not fixed here because the fix is transport work, not a
+handler: the bucket has to move into `/mcp` after the JSON-RPC body is parsed,
+where `params.name` says `get_board` (a read) or `create_card` (a write), and
+the response has to carry `x-ratelimit-remaining` for the bucket that was
+actually charged. Doing it in `onRequest` would mean parsing the body twice.
+
+Until then: one bucket, the write one, and §5's read allowance is a promise the
+endpoint does not keep. The next agent that touches `settings/ratelimit.ts`
+should close it, and the test is a key that reads 100 times and writes once.

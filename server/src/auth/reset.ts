@@ -20,6 +20,7 @@ import { recordEvent } from '../lib/events.js';
 import type { Mailer } from '../lib/mail.js';
 import { resetConfirmSchema, resetRequestSchema } from '../contracts/auth.js';
 import { revokeAllSessions } from './sessions.js';
+import { translate, type Locale } from '../i18n/index.js';
 
 export const RESET_TTL_MS = 30 * 60 * 1000;
 const REQUESTS_PER_HOUR = 3;
@@ -84,6 +85,7 @@ export async function requestReset(
   pepper: string,
   mailer: Mailer | null,
   rawInput: unknown,
+  locale: Locale = 'en',
 ): Promise<{ status: 'accepted' }> {
   const parsed = resetRequestSchema.safeParse(rawInput);
   if (!parsed.success) throw fromZod(parsed.error);
@@ -106,13 +108,15 @@ export async function requestReset(
   const issued = await issueToken(db, pepper, user.id);
   await mailer.send({
     to: user.email,
-    subject: 'Reset your Klui password',
+    subject: translate(locale, 'mail.reset.subject'),
+    // The reader's language, not the requester's: `Accept-Language` of the
+    // request that asked for the link is the only signal the server has (K5-07).
     text: [
-      'Someone asked to reset the password for this account.',
+      translate(locale, 'mail.reset.intro'),
       '',
-      `Open this link within 30 minutes: ${resetUrl(env, issued.raw)}`,
+      translate(locale, 'mail.reset.link', { url: resetUrl(env, issued.raw) }),
       '',
-      'If it was not you, ignore this message: the link expires and nothing changes.',
+      translate(locale, 'mail.reset.ignore'),
     ].join('\n'),
   });
   await db.$transaction(async (tx) => {

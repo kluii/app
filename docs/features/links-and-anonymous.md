@@ -39,7 +39,8 @@ A link role is stored on the board (`link_role`), and `link_role: edit` means ev
 
 - `POST /boards/:id/links` → `{id, role, label?, url, token}`. The token is `<22+ base62>`, returned **once**.
 - Stored as `sha256(token)` (with `KLUI_TOKEN_PEPPER`), never in clear, never in a log, never in an event payload.
-- `/l/<token>` resolves the link, sets a scoped cookie (`klui_link_<boardId>`, `httpOnly`, `SameSite=Lax`, `noindex`), and redirects to the board with a `link` actor active. The token disappears from the URL bar; a later request authenticated by the cookie does not carry it.
+- `/l/<token>` resolves the link, sets a signed `klui_link` cookie holding `linkId.boardId` (`httpOnly`, `SameSite=Lax`, 30 days, `noindex`) and `302`s to the board with a `link` actor active. The cookie names a row, not the token: the row is re-read on every request, so revocation is effective immediately. One cookie covers every board the visitor holds a link for; `can()` still scopes each actor to its own board, and a second board answers `404`.
+- A token is only minted when the board's `link_role` is `read` or `edit`. Minting a credential the board would ignore is a `400`, not a dead URL.
 - Revoking sets `revoked_at`; the next request answers `404`. `last_used_at` updates at most once a minute (a write per request is a free amplification vector).
 - Rotation = create a new link + revoke the old one. There is no "same token, new secret".
 - The settings UI shows metadata forever and the token never again: "created 2026-11-26 · last used 3 min ago · revoke".
@@ -51,13 +52,14 @@ Requirements: a display name, 2–32 characters, chosen client-side, stored per 
 - **Session:** a signed cookie `klui_anon` (12 h) containing `{boardId, label, anonId}`. `anonId` is 16 random bytes, stored on the cards the actor creates (`cards.anon_actor_id`). It is the only thing that makes "edit the card I just created" enforceable without an account.
 - **Can:** create a card, edit a card they created in the same session, mark their own card done.
 - **Cannot:** comment, attach (no attachments in 2.0), delete, move a card to another column, change settings, export, or see anything a link `read` holder cannot see.
-- `off`: no write affordance at all. `open`: direct write. `moderated`: writes create `PendingCard` rows, invisible to everyone but owner/admin.
+- `off`: no write affordance at all. `open`: direct write. `moderated`: writes create `PendingCard` rows, invisible to everyone but owner/admin. The bulk write is no exception: up to 200 rows, one transaction, and still nothing public until approval.
+- The name is remembered per board in the visitor's own browser (`localStorage`); the cookie carries it for the session, and nothing else stores it.
 - A name collision between two anons is allowed and expected. Attribution is "someone calling themselves X", and the UI says so on hover.
 
 ## 5. Moderation
 
 - The queue lists pending cards with board, column, title, description, author label, age. Owner/admin can approve (→ real card, anon label preserved, `pending.approved` event with the approver) or reject (`pending.rejected`, nothing created).
-- 7-day expiry, purged by the sweeper; the author is not notified (they have no account).
+- 7-day expiry, purged by the sweeper every five minutes behind a Postgres advisory lock; the author is not notified (they have no account). The sweep records `pending.expired` with `actor_kind: system`, so a deletion nobody asked for is visible in the log.
 - A moderation banner on the board for owner/admin: "3 cards waiting".
 - Approving is the only path that creates a card from a pending row; there is no auto-approve after N minutes.
 
@@ -74,6 +76,8 @@ Requirements: a display name, 2–32 characters, chosen client-side, stored per 
 - `link` boards, `/l/*`, RSS, OG images of link boards: `noindex` meta + `X-Robots-Tag: noindex`.
 - OG cards are generated server-side from the board's real name and counts; they contain no card titles (a preview must not leak content into a chat unfurl beyond what the board itself shows).
 - A bot that fetches `/b/<token>` style URLs must receive a real HTML document with OG tags, because unfurlers do not run JavaScript. That route is served by the server, not the SPA.
+- A URL segment is resolved **exact slug first, then `slug-suffix`**. Splitting four trailing characters first made `board-under-test` resolve as board `board-under` with suffix `test`, which hid a public board whose name ended in a word.
+- The owner profile (`/<username>`) is prerendered inside `#root` for crawlers and rendered by the SPA for humans; `/sitemap.xml` lists public boards and those profiles, `/robots.txt` disallows `/api/`, `/l/` and `/mcp`.
 - Guessed URLs answer the standard 404 page, with the same timing shape as a real 404.
 
 ## 8. Acceptance

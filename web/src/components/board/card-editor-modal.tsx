@@ -10,6 +10,7 @@ import { Dialog } from '../ui/dialog';
 import { Field } from '../ui/field';
 import { Input, Textarea } from '../ui/input';
 import { errorMessage } from './card-display-modal';
+import { TagEditor, draftToTags, tagsToDraft, type TagDraft } from './tag-editor';
 
 /**
  * The editor is a separate modal, reached from Edit (docs/features/
@@ -29,9 +30,10 @@ export function CardEditorModal({
   onSaved: () => void;
 }) {
   const queryClient = useQueryClient();
-  const ids = { title: useId(), description: useId() };
+  const ids = { title: useId(), description: useId(), tags: useId() };
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description ?? '');
+  const [tags, setTags] = useState<TagDraft[]>(tagsToDraft(card.tags));
   const [confirming, setConfirming] = useState(false);
   const [conflict, setConflict] = useState(false);
 
@@ -39,11 +41,15 @@ export function CardEditorModal({
   useEffect(() => {
     setTitle(card.title);
     setDescription(card.description ?? '');
+    setTags(tagsToDraft(card.tags));
     setConfirming(false);
     setConflict(false);
   }, [card.id]);
 
-  const saved = card.title === title.trim() && (card.description ?? '') === description;
+  const saved =
+    card.title === title.trim() &&
+    (card.description ?? '') === description &&
+    JSON.stringify(card.tags) === JSON.stringify(draftToTags(tags));
   const dirty = !saved;
 
   const update = useMutation({
@@ -51,9 +57,23 @@ export function CardEditorModal({
       api.updateCard(card.id, {
         title: title.trim(),
         description: description.trim() === '' ? null : description,
+        tags: draftToTags(tags),
         ...(overwrite ? {} : { expected_updated_at: card.updated_at }),
       }),
     onSuccess: async () => {
+      // "Use on every card with this tag" is the explicit second action: the
+      // board default is written, and this card keeps the same value so nothing
+      // changes under the reader.
+      const wide = tags.filter((tag) => tag.boardWide && tag.color !== null);
+      if (wide.length > 0) {
+        const current = await api.tagColors(boardId);
+        const next = { ...current };
+        for (const tag of wide) next[tag.name] = tag.color ?? '';
+        await api.putTagColors(
+          boardId,
+          Object.fromEntries(Object.entries(next).filter(([, color]) => color !== '')),
+        );
+      }
       await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
       onSaved();
     },
@@ -141,6 +161,12 @@ export function CardEditorModal({
             rows={5}
             onChange={(event) => setDescription(event.target.value)}
           />
+        </Field>
+
+        <Field label={t('board.tags.title')} htmlFor={ids.tags}>
+          <div id={ids.tags}>
+            <TagEditor tags={tags} onChange={setTags} disabled={update.isPending} />
+          </div>
         </Field>
 
         {conflict ? (

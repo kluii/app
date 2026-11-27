@@ -22,7 +22,9 @@ export function CardRow({
   card,
   cards,
   columns,
-  canWrite,
+  canMove,
+  canDelete,
+  canTick,
   lifted,
   onOpen,
   onMove,
@@ -34,7 +36,9 @@ export function CardRow({
   card: Card;
   cards: Card[];
   columns: Column[];
-  canWrite: boolean;
+  canMove: boolean;
+  canDelete: boolean;
+  canTick: boolean;
   lifted: boolean;
   onOpen: () => void;
   onMove: (request: MoveRequest) => void;
@@ -44,7 +48,12 @@ export function CardRow({
   onKeyDown: (card: Card, event: KeyboardEvent<HTMLButtonElement>) => boolean;
 }) {
   const due = card.due_at ? formatDue(card.due_at) : null;
-  const { ref, dragging, consumeDragClick } = useCardDnd({ card, cards, canWrite, onMove });
+  const { ref, dragging, consumeDragClick } = useCardDnd({
+    card,
+    cards,
+    canWrite: canMove,
+    onMove,
+  });
 
   return (
     <li
@@ -117,10 +126,10 @@ export function CardRow({
         data-testid={`card-${card.id}`}
         data-dragging={dragging ? 'true' : undefined}
         aria-label={t('board.card.openNamed', { title: card.title })}
-        aria-describedby={canWrite ? `card-move-hint-${card.id}` : undefined}
+        aria-describedby={canMove ? `card-move-hint-${card.id}` : undefined}
         className="absolute inset-0 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
-        {canWrite ? (
+        {canMove ? (
           <span id={`card-move-hint-${card.id}`} className="sr-only">
             {t('board.drag.hint')}
           </span>
@@ -128,7 +137,7 @@ export function CardRow({
       </button>
 
       <div className="absolute right-1 top-1 z-10 flex items-center gap-0.5">
-        {card.done && canWrite ? (
+        {card.done && canTick ? (
           <Button
             variant="ghost"
             size="icon"
@@ -144,7 +153,8 @@ export function CardRow({
         <CardMenu
           card={card}
           columns={columns}
-          canWrite={canWrite}
+          canMove={canMove}
+          canDelete={canDelete}
           onOpen={onOpen}
           onMove={onMoveTo}
           onDelete={onDelete}

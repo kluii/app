@@ -16,6 +16,8 @@ function card(id: string, position: number, columnId = 'col_todo'): Card {
     description: null,
     assignee: null,
     assignee_label: null,
+    actor_label: null,
+    mine: false,
     due_at: null,
     done: false,
     position: String(position),

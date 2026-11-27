@@ -12,7 +12,7 @@ export function AuthPage({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-95">
-          <div className="flex items-center justify-between">
+          <header className="flex items-center justify-between">
             <img
               src={theme === 'dark' ? lightLogo : darkLogo}
               alt={t('common.app.name')}
@@ -25,8 +25,10 @@ export function AuthPage({ children }: { children: ReactNode }) {
             >
               {theme === 'dark' ? t('theme.light') : t('theme.dark')}
             </button>
-          </div>
-          <div className="mt-10">{children}</div>
+          </header>
+          <main id="main-content" tabIndex={-1} className="mt-10 focus:outline-none">
+            {children}
+          </main>
         </div>
       </div>
       <footer className="px-4 py-3 text-center">

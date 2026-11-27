@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Check } from 'lucide-react';
+import { useRef } from 'react';
 import { ApiError } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import type { BoardState, Caller, Card } from '../../api/types';
 import { t } from '../../i18n';
+import { formatDate } from '../../lib/format';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
+import { CardThread } from './card-thread';
 import { TagChip } from './tag-chip';
 import { useToggleDone } from './use-toggle-done';
 
@@ -28,6 +32,7 @@ export function CardDisplayModal({
   onClose: () => void;
 }) {
   const done = useToggleDone(boardId);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   const assignee = card.assignee?.username ?? card.assignee_label;
   const due = card.due_at ? formatDate(card.due_at) : null;
@@ -36,11 +41,12 @@ export function CardDisplayModal({
     <Dialog
       open
       onClose={onClose}
+      initialFocus={closeRef}
       title={card.title}
       description={due ? t('board.card.dueOn', { date: due }) : undefined}
       footer={
         <>
-          {caller.can_write ? (
+          {caller.can_write && (caller.actor_kind !== 'anon' || card.mine) ? (
             <Button
               variant="ghost"
               loading={done.isPending}
@@ -49,7 +55,9 @@ export function CardDisplayModal({
               {card.done ? t('board.card.reopen') : t('board.card.done')}
             </Button>
           ) : null}
-          <Button variant="ghost" onClick={onClose}>
+          {/* Read first: the panel opens on the way out, never in the comment
+              box, so a keyboard user is not dropped into a composer (K2-15). */}
+          <Button ref={closeRef} variant="ghost" onClick={onClose}>
             {t('common.action.close')}
           </Button>
           {caller.can_write ? (
@@ -67,6 +75,12 @@ export function CardDisplayModal({
               <Check aria-hidden className="h-3 w-3" strokeWidth={2} />
             </span>
             {t('board.card.done')}
+          </p>
+        ) : null}
+
+        {card.actor_label ? (
+          <p className="text-body-sm text-ink-subtle">
+            {t('board.card.by', { label: card.actor_label })}
           </p>
         ) : null}
 
@@ -104,6 +118,8 @@ export function CardDisplayModal({
             {errorMessage(done.error)}
           </p>
         ) : null}
+
+        <CardThread cardId={card.id} caller={caller} />
       </div>
     </Dialog>
   );
@@ -114,14 +130,7 @@ export function errorMessage(error: unknown): string {
     if (error.code === 'conflict') return t('board.card.conflict');
     if (error.code === 'board_closed') return t('board.card.boardClosed');
   }
-  return t('common.error.generic');
-}
-
-/** `12 Mar` in the reader's locale: a board date is a label, never a timestamp. */
-export function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(
-    new Date(value),
-  );
+  return failureMessage(error);
 }
 
 /** The board state a modal needs, or nothing while the first fetch is in flight. */

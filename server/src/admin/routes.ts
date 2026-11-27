@@ -8,8 +8,8 @@ import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../app.js';
 import { AppError, fromZod } from '../lib/errors.js';
 import { requireUser } from '../auth/request.js';
-import { banUserSchema } from '../contracts/admin.js';
-import { banUser, listUsers, unbanUser } from './service.js';
+import { banAddressSchema, banUserSchema } from '../contracts/admin.js';
+import { banAddress, banUser, listBans, listUsers, unbanAddress, unbanUser } from './service.js';
 
 export function registerAdminRoutes(app: FastifyInstance, context: AppContext): void {
   const database = () => {
@@ -26,6 +26,27 @@ export function registerAdminRoutes(app: FastifyInstance, context: AppContext): 
       ...(query.q ? { query: query.q } : {}),
     });
     return page;
+  });
+
+  /** Both kinds of ban in one view, because an operator asks "what is blocked". */
+  app.get('/api/v1/admin/bans', async (request) => {
+    const adminId = requireUser(request);
+    return listBans(database(), adminId);
+  });
+
+  app.post('/api/v1/admin/bans/ip', async (request, reply) => {
+    const adminId = requireUser(request);
+    const parsed = banAddressSchema.safeParse(request.body);
+    if (!parsed.success) throw fromZod(parsed.error);
+    const result = await banAddress(database(), adminId, parsed.data);
+    return reply.code(201).send(result);
+  });
+
+  app.delete('/api/v1/admin/bans/ip/:ip', async (request, reply) => {
+    const adminId = requireUser(request);
+    const { ip } = request.params as { ip: string };
+    await unbanAddress(database(), adminId, ip);
+    return reply.code(204).send();
   });
 
   app.post('/api/v1/admin/users/:id/ban', async (request, reply) => {

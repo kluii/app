@@ -39,9 +39,28 @@ export const tagsSchema = z
     ),
   );
 
-export const createCardSchema = z
+/**
+ * The one item shape, so `POST /cards` and `POST /cards/bulk` cannot drift.
+ *
+ * The refinement is applied with `superRefine` to each derived object rather
+ * than with `omit()` on a refined schema: Zod v4 refuses to `omit()` an object
+ * that carries a refinement, and that refusal was a 500 on every bulk call.
+ */
+function exclusiveAssignee(
+  value: { assignee?: string | undefined; assignee_label?: string | undefined },
+  context: z.RefinementCtx,
+): void {
+  if (value.assignee && value.assignee_label) {
+    context.addIssue({
+      code: 'custom',
+      message: 'assignee and assignee_label are exclusive: a member id, or a display name',
+      path: ['assignee'],
+    });
+  }
+}
+
+export const cardItemSchema = z
   .object({
-    column: idSchema('col'),
     title: cardTitleSchema,
     description: z.string().max(10_000).optional(),
     assignee: z.string().max(64).optional(),
@@ -50,11 +69,29 @@ export const createCardSchema = z
     tags: tagsSchema.optional(),
     done: z.boolean().optional(),
   })
-  .strict()
-  .refine((value) => !(value.assignee && value.assignee_label), {
-    message: 'assignee and assignee_label are exclusive: a member id, or a display name',
-    path: ['assignee'],
-  });
+  .strict();
+
+/**
+ * `cap_token` is a Cap solution, present only on an instance that enables the
+ * captcha and only for an anonymous actor past the threshold (K3-07). It is
+ * accepted on both write shapes and ignored when the gate is off, so a client
+ * that always sends it is never punished.
+ */
+export const capTokenSchema = z.string().trim().min(1).max(4096).optional();
+
+export const createCardSchema = cardItemSchema
+  .extend({ column: idSchema('col'), cap_token: capTokenSchema })
+  .superRefine(exclusiveAssignee);
+
+export const bulkItemSchema = cardItemSchema.superRefine(exclusiveAssignee);
+
+export const bulkCreateSchema = z
+  .object({
+    column: idSchema('col'),
+    items: z.array(bulkItemSchema).min(1).max(200),
+    cap_token: capTokenSchema,
+  })
+  .strict();
 
 export const updateCardSchema = z
   .object({
@@ -71,11 +108,17 @@ export const updateCardSchema = z
 
 const neighbourSchema = idSchema('crd').nullable().optional();
 
+/**
+ * A move is a write like any other: `expected_updated_at` is accepted so two
+ * people dragging the same card cannot silently overwrite each other (D-28).
+ * `index`/`position`/`order` stay rejected — the move takes neighbours.
+ */
 export const moveCardSchema = z
   .object({
     column: idSchema('col'),
     before: neighbourSchema,
     after: neighbourSchema,
+    expected_updated_at: expectedUpdatedAt,
   })
   .strict();
 
@@ -105,6 +148,8 @@ export const deleteColumnSchema = z
   })
   .strict();
 
+export type CardItemInput = z.infer<typeof cardItemSchema>;
 export type CreateCardInput = z.infer<typeof createCardSchema>;
+export type BulkCreateInput = z.infer<typeof bulkCreateSchema>;
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 export type MoveCardInput = z.infer<typeof moveCardSchema>;

@@ -40,7 +40,7 @@ Engine: `@atlaskit/pragmatic-drag-and-drop`. No other drag library in the tree.
 
 ### 1.5 Keyboard
 
-- `Space` lifts the focused card, `Arrow` keys move it (left/right = column, up/down = index), `Space` drops, `Esc` cancels and restores the original position.
+- `Space` lifts the focused card, `Arrow` keys move it (left/right = column, up/down = index), `Space` drops, `Esc` cancels and restores the original position. `Enter` opens the card; it never lifts one, so the read panel stays reachable from the keyboard.
 - A live region announces: "Card Wire the digest, moved to Doing, position 2 of 5." Announce on drop, not on every arrow.
 - Focus returns to the card after the drop, not to the column.
 - Dragging with the keyboard uses the same `{column, before, after}` request as the pointer.

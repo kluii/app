@@ -72,7 +72,7 @@ See `docs/permissions.md`. The security-relevant invariants:
 
 ## 7. Abuse
 
-- Token buckets per IP / session / agent key, plus per-board anonymous writes (30/hour default). `429` with `Retry-After`; the client shows the wait.
+- Token buckets per session, per credential and per IP: session writes 120/min and reads 600/min per user, login 5/15 min per account and 20/hour per IP, signup 5/hour per IP, anonymous joins 20/hour per IP, anonymous writes 30/hour per board and 10/hour per IP (agent-key buckets arrive with K4-01). `429` with `Retry-After`; the client shows the wait. Every bucket is in memory per process, so a restart forgives, and all of them are named with their env var in `docs/deployment.md`.
 - Proxy trust: `X-Forwarded-For` is read only when `KLUI_TRUSTED_PROXY_HOPS > 0`, and only the Nth-from-right entry is used. Default 0. A wrong value either bans everyone or bans nobody — both are incidents.
 - Bans: application table with `(subject, subject_kind, reason, expires_at)`, admin view, enforced before authorization (a ban leaks nothing). Never fail2ban inside the container: it manipulates host firewall state and cannot see container traffic. Edge banning (CrowdSec/Traefik) is documented as the host-side option.
 - Captcha: Cap, self-hosted, **off by default**, enabled per instance, triggered only past a threshold on anonymous writes and (optionally) signup. A captcha is a bot filter, not a security control; it replaces none of the limits above.
@@ -127,7 +127,7 @@ Cache-Control: no-store on HTML and credentialed JSON
 - Fail-closed boot test: production without `KLUI_SESSION_SECRET` must exit non-zero.
 - Authz matrix test.
 - XSS corpus test on the markdown renderer and OG escaping.
-- A test asserting `KLUI_ANALYTICS_URL` unset produces no outbound request.
+- A test asserting `KLUI_ANALYTICS_URL` unset produces no outbound request (`server/test/analytics.test.ts`: no tag, no absolute script URL, `fetch` never called).
 - A test asserting `/metrics` is `404` by default.
 
 ## 12. Disclosure

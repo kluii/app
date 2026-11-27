@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createRoute } from '@tanstack/react-router';
 import { BoardView } from '../components/board/board-view';
-import { authedRoute } from './authed';
+import { boardAccessRoute } from './board-access';
 
 export const boardRoute = createRoute({
-  getParentRoute: () => authedRoute,
+  getParentRoute: () => boardAccessRoute,
   path: '/boards/$boardId',
   component: BoardPage,
 });

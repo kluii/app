@@ -12,6 +12,7 @@ export type EventTypeName =
   | 'board.created'
   | 'board.updated'
   | 'board.closed'
+  | 'board.deleted'
   | 'member.added'
   | 'member.updated'
   | 'member.removed'
@@ -26,6 +27,7 @@ export type EventTypeName =
   | 'card.deleted'
   | 'comment.created'
   | 'comment.updated'
+  | 'comment.deleted'
   | 'link.created'
   | 'link.revoked'
   | 'pending.created'
@@ -33,6 +35,7 @@ export type EventTypeName =
   | 'pending.rejected'
   | 'pending.expired'
   | 'agent_key.created'
+  | 'digest.updated'
   | 'agent_key.revoked'
   | 'import.completed'
   | 'security.login'
@@ -44,9 +47,11 @@ export type EventTypeName =
   | 'security.session_revoked'
   | 'security.user_banned'
   | 'security.user_unbanned'
+  | 'security.ip_banned'
+  | 'security.ip_unbanned'
   | 'security.profile_updated';
 
-type Tx = Prisma.TransactionClient;
+export type Tx = Prisma.TransactionClient;
 
 export function toEnumName(type: EventTypeName): string {
   return type.replaceAll('.', '_');
@@ -108,6 +113,32 @@ export async function recordEvent(
       actor_anon_id: fields.actor_anon_id,
       payload: input.payload as Prisma.InputJsonValue,
       idempotency_key: input.idempotencyKey ?? null,
+    },
+  });
+  return id;
+}
+
+/**
+ * A background job is an actor too (`actor_kind: system`). The sweeper deletes
+ * rows nobody asked it to delete; the log must say so, and say it was not a
+ * person (D-23).
+ */
+export async function recordSystemEvent(
+  tx: Tx,
+  input: { boardId: string; type: EventTypeName; payload: Record<string, unknown> },
+): Promise<string> {
+  const id = newId('evt');
+  await tx.event.create({
+    data: {
+      id,
+      board_id: input.boardId,
+      type: toEnumName(input.type) as never,
+      actor_kind: 'system',
+      actor_user_id: null,
+      actor_label: null,
+      actor_anon_id: null,
+      payload: input.payload as Prisma.InputJsonValue,
+      idempotency_key: null,
     },
   });
   return id;

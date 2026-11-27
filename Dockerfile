@@ -1,7 +1,10 @@
 # syntax=docker/dockerfile:1
 # One image: build the SPA and the API, then run `prisma migrate deploy` and the server.
 
-FROM node:26-alpine AS build
+# The two Node stages are architecture-independent: TypeScript and the SPA do
+# not care, and `prisma generate` must not run under emulation (see the schema's
+# binaryTargets comment). Only the runtime stage is built per architecture.
+FROM --platform=$BUILDPLATFORM node:26-alpine AS build
 WORKDIR /app
 ENV npm_config_update_notifier=false
 
@@ -14,7 +17,41 @@ RUN npm ci --ignore-scripts
 
 COPY . .
 RUN npm run build
-RUN npm prune --omit=dev
+
+# The runtime dependency tree, and only that: the server workspace's production
+# dependencies minus what an image that runs `node server/dist/server.js` never
+# loads. `npm prune --omit=dev` on the full install was not enough — it kept the
+# web workspace's production dependencies (lucide-react 48 MB, react-dom,
+# @tanstack, @atlaskit) beside a SPA that is already built, plus the
+# peer-installed typescript (23 MB) that no runtime file imports.
+FROM --platform=$BUILDPLATFORM node:26-alpine AS deps
+WORKDIR /app
+ENV npm_config_update_notifier=false
+
+COPY package.json package-lock.json ./
+COPY server/package.json server/package.json
+COPY web/package.json web/package.json
+# Both architectures' engines, fetched for the build host: `migrate deploy` needs a
+# schema engine at boot, and the client needs a query engine, so each image must
+# carry its own. PRISMA_CLI_BINARY_TARGETS is the CLI's own switch for this.
+ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x,linux-musl-arm64-openssl-3.0.x
+RUN npm ci --omit=dev --workspace @klui/server --ignore-scripts --no-audit --no-fund
+
+# The generated client is the runtime artefact: it carries the engine this image
+# loads (libquery_engine-linux-musl-openssl-3.0.x.so.node), so generation happens
+# here, on the same base image the runtime uses.
+COPY server/prisma ./server/prisma
+RUN cd server && node ../node_modules/prisma/build/index.js generate
+
+# typescript is a peerOptional of @prisma/client and prisma, not a dependency of
+# the server: no file imports it at runtime.
+RUN rm -rf node_modules/typescript
+# The Prisma CLI keeps both of its engines: `migrate deploy` refuses to run
+# without the query engine beside the schema engine, and it answers "Can't write
+# to /app/node_modules/@prisma/engines" rather than a migration error when one is
+# missing. The engine the server itself loads is the generated one in
+# `.prisma/client`; it carries both architectures' engines because the same tree
+# is copied into the amd64 and the arm64 image.
 
 FROM node:26-alpine AS runtime
 WORKDIR /app
@@ -25,7 +62,7 @@ ENV NODE_ENV=production \
 
 RUN apk add --no-cache openssl
 
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/server/package.json ./server/package.json
 COPY --from=build /app/server/dist ./server/dist

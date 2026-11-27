@@ -6,10 +6,20 @@
 import type { Prisma } from '@prisma/client';
 import type { Db } from '../db.js';
 import { AppError } from '../lib/errors.js';
+import { newId } from '../lib/ids.js';
 import { RANK_STEP, planRank, renumberPositions } from '../lib/ranks.js';
 import { recordEvent } from '../lib/events.js';
+import { conflictIfStale } from '../lib/concurrency.js';
+import { commitEvent, type Hub } from '../realtime/events.js';
 import type { CardDto, ColumnDto, TagDto } from '../contracts/dto.js';
 import type { Actor } from '../lib/authz.js';
+import { assertAllowed, loadBoardFor } from '../boards/service.js';
+import type {
+  BulkCreateInput,
+  CreateCardInput,
+  MoveCardInput,
+  UpdateCardInput,
+} from '../contracts/cards.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -32,6 +42,7 @@ export function toCardDto(
   card: Prisma.CardGetPayload<{ include: { tags: true } }>,
   assignee: { id: string; username: string } | null,
   boardTagColors: Map<string, string>,
+  viewer?: Actor | null,
 ): CardDto {
   const tags: TagDto[] = card.tags
     .slice()
@@ -44,6 +55,8 @@ export function toCardDto(
     description: card.description,
     assignee,
     assignee_label: card.assignee_label,
+    actor_label: card.actor_label,
+    mine: viewer?.kind === 'anon' && card.anon_actor_id === viewer.anonId,
     due_at: card.due_at ? card.due_at.toISOString() : null,
     done: card.done,
     position: card.position.toString(),
@@ -66,6 +79,16 @@ export async function columnPositions(db: Db | Tx, columnId: string): Promise<nu
     select: { position: true },
   });
   return rows.map((row) => Number(row.position));
+}
+
+/**
+ * Serialises appends in one column (K2-05). Two creators in READ COMMITTED read
+ * the same `max(position)` and receive the same rank, so the row lock — not the
+ * transaction boundary — is what orders them. The lock is the column row, so a
+ * create in another column never waits.
+ */
+export async function lockColumnForAppend(tx: Tx, columnId: string): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM columns WHERE id = ${columnId} FOR UPDATE`;
 }
 
 export async function nextAppendPosition(db: Db | Tx, columnId: string): Promise<number> {
@@ -221,4 +244,496 @@ export async function createTagRows(
 
 export function positionString(value: number): string {
   return value.toFixed(10).replace(/\.?0+$/, '');
+}
+
+/**
+ * A moderated write: no card, no event, one row per item the owner can approve
+ * or reject (docs/features/links-and-anonymous.md §5). Seven days, then the
+ * sweeper drops it (K3-04).
+ *
+ * One row per item in **one** transaction, and one function for the single and
+ * the bulk door: a moderated board that queued one card through `POST /cards`
+ * and wrote 200 live ones through `POST /cards/bulk` protected the door nobody
+ * used. The row carries what the queue can replay — title, description, due
+ * date, tags — like the single path always did.
+ */
+export async function createPendingCards(
+  db: Db,
+  input: {
+    boardId: string;
+    columnId: string;
+    label: string;
+    anonId: string;
+    items: { title: string; description: string | null; dueAt: Date | null; tags: unknown }[];
+  },
+): Promise<{ id: string; title: string }[]> {
+  if (input.items.length === 0) return [];
+  await requireColumnInBoard(db, input.boardId, input.columnId);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  return db.$transaction(
+    input.items.map((item) =>
+      db.pendingCard.create({
+        data: {
+          id: newId('pnd'),
+          board_id: input.boardId,
+          column_id: input.columnId,
+          title: item.title,
+          description: item.description,
+          tags: item.tags === undefined ? undefined : (item.tags as Prisma.InputJsonValue),
+          due_at: item.dueAt,
+          actor_label: input.label,
+          anon_actor_id: input.anonId,
+          expires_at: expiresAt,
+        },
+        select: { id: true, title: true },
+      }),
+    ),
+  );
+}
+
+/** The single-write shape of the same queue: one row, same transaction rules. */
+export async function createPendingCard(
+  db: Db,
+  input: {
+    boardId: string;
+    columnId: string;
+    title: string;
+    description: string | null;
+    dueAt: Date | null;
+    tags: unknown;
+    label: string;
+    anonId: string;
+  },
+): Promise<{ id: string; title: string }> {
+  const [row] = await createPendingCards(db, {
+    boardId: input.boardId,
+    columnId: input.columnId,
+    label: input.label,
+    anonId: input.anonId,
+    items: [
+      {
+        title: input.title,
+        description: input.description,
+        dueAt: input.dueAt,
+        tags: input.tags,
+      },
+    ],
+  });
+  if (!row) {
+    throw new AppError('internal', { message: 'the queue accepted nothing', hint: null });
+  }
+  return row;
+}
+
+/**
+ * The card writes and reads, extracted from the routes so `/mcp` and REST run
+ * the same function: one `can()` call, one transaction, one event, one DTO.
+ *
+ * What stays in the route is what only a browser-facing actor can reach — the
+ * anonymous-write budget, the moderated pending queue and the field
+ * restrictions on a visitor's own card. An MCP credential is never anonymous,
+ * so those branches are policy for a route, not a second write path.
+ */
+export type CardWrite = { db: Db; actor: Actor; hub?: Hub };
+
+/**
+ * `assignee` is the username string an agent read off a board; a display name
+ * for a non-member is stored as `assignee_label` and never becomes a user.
+ */
+export async function resolveAssignee(
+  db: Db,
+  boardId: string,
+  reference: string,
+): Promise<{ id: string; username: string } | null> {
+  const byUsername = await db.boardMember.findFirst({
+    where: { board_id: boardId, user: { username: reference.toLowerCase() } },
+    include: { user: { select: { id: true, username: true } } },
+  });
+  if (byUsername) return byUsername.user;
+  const byId = await db.boardMember.findFirst({
+    where: { board_id: boardId, user_id: reference },
+    include: { user: { select: { id: true, username: true } } },
+  });
+  return byId ? byId.user : null;
+}
+
+async function requireColumnInBoard(db: Db, boardId: string, columnId: string): Promise<void> {
+  // The column must belong to *this* board: `card.create` on board A is not
+  // permission to write into a column of board B (PROMPT.md §3.3).
+  const column = await db.column.findFirst({ where: { id: columnId, board_id: boardId } });
+  if (!column) throw new AppError('column_not_found');
+}
+
+export async function createCard(
+  context: CardWrite,
+  boardId: string,
+  input: CreateCardInput,
+): Promise<CardDto> {
+  const { db, actor } = context;
+  const loaded = await loadBoardFor(db, actor, boardId, 'card.create');
+  assertAllowed(loaded.decision);
+  await requireColumnInBoard(db, boardId, input.column);
+  const assignee =
+    input.assignee !== undefined ? await resolveAssignee(db, boardId, input.assignee) : null;
+
+  const card = await db.$transaction(async (tx) => {
+    // Inside the transaction and behind the column lock: two creators must not
+    // read the same max(position).
+    await lockColumnForAppend(tx, input.column);
+    const position = await nextAppendPosition(tx, input.column);
+    const created = await tx.card.create({
+      data: {
+        id: newId('crd'),
+        board_id: boardId,
+        column_id: input.column,
+        title: input.title,
+        description: input.description ?? null,
+        assignee_id: assignee?.id ?? null,
+        assignee_label: assignee ? null : (input.assignee_label ?? null),
+        due_at: input.due_at ? new Date(input.due_at) : null,
+        done: input.done ?? false,
+        position,
+        anon_actor_id: actor.kind === 'anon' ? actor.anonId : null,
+        actor_label: actor.kind === 'anon' ? actor.label : null,
+      },
+      include: { tags: true },
+    });
+    if (input.tags) await createTagRows(tx, created.id, input.tags);
+    await recordEvent(tx, {
+      boardId,
+      actor,
+      type: 'card.created',
+      payload: {
+        board_id: boardId,
+        card_id: created.id,
+        column_id: created.column_id,
+        title: created.title,
+      },
+    });
+    return created;
+  });
+
+  const tags = await db.cardTag.findMany({ where: { card_id: card.id } });
+  const tagColors = await boardTagColors(db, boardId);
+  commitEvent(context.hub, {
+    boardId,
+    type: 'card.created',
+    entity: 'card',
+    action: 'created',
+    payload: { card_id: card.id, column_id: card.column_id },
+    actorLabel: actor.kind,
+  });
+  return toCardDto({ ...card, tags }, assignee, tagColors, actor);
+}
+
+export async function bulkCreateCards(
+  context: CardWrite,
+  boardId: string,
+  input: BulkCreateInput,
+): Promise<{ created: (CardDto | null)[] }> {
+  const { db, actor } = context;
+  const loaded = await loadBoardFor(db, actor, boardId, 'card.create');
+  assertAllowed(loaded.decision);
+  await requireColumnInBoard(db, boardId, input.column);
+
+  const assignees = new Map<string, { id: string; username: string } | null>();
+  for (const item of input.items) {
+    if (item.assignee !== undefined && !assignees.has(item.assignee)) {
+      assignees.set(item.assignee, await resolveAssignee(db, boardId, item.assignee));
+    }
+  }
+
+  const createdIds = await db.$transaction(async (tx) => {
+    const ids: string[] = [];
+    await lockColumnForAppend(tx, input.column);
+    const base = await nextAppendPosition(tx, input.column);
+    for (const [index, item] of input.items.entries()) {
+      const assignee = item.assignee === undefined ? null : (assignees.get(item.assignee) ?? null);
+      const card = await tx.card.create({
+        data: {
+          id: newId('crd'),
+          board_id: boardId,
+          column_id: input.column,
+          title: item.title,
+          description: item.description ?? null,
+          assignee_id: assignee?.id ?? null,
+          assignee_label: assignee ? null : (item.assignee_label ?? null),
+          due_at: item.due_at ? new Date(item.due_at) : null,
+          done: item.done ?? false,
+          position: base + index * RANK_STEP,
+          anon_actor_id: actor.kind === 'anon' ? actor.anonId : null,
+        },
+        include: { tags: true },
+      });
+      if (item.tags) await createTagRows(tx, card.id, item.tags);
+      await recordEvent(tx, {
+        boardId,
+        actor,
+        type: 'card.created',
+        payload: {
+          board_id: boardId,
+          card_id: card.id,
+          column_id: card.column_id,
+          title: card.title,
+        },
+      });
+      ids.push(card.id);
+    }
+    return ids;
+  });
+
+  const [rows, tagColors] = await Promise.all([
+    db.card.findMany({ where: { id: { in: createdIds } }, include: { tags: true } }),
+    boardTagColors(db, boardId),
+  ]);
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  commitEvent(context.hub, {
+    boardId,
+    type: 'card.created',
+    entity: 'card',
+    action: 'created',
+    payload: { card_ids: createdIds, column_id: input.column },
+    actorLabel: actor.kind,
+  });
+  return {
+    created: input.items.map((item, index) => {
+      const row = byId.get(createdIds[index] ?? '');
+      const assignee = item.assignee === undefined ? null : (assignees.get(item.assignee) ?? null);
+      return row ? toCardDto(row, assignee, tagColors, actor) : null;
+    }),
+  };
+}
+
+export async function readCard(
+  db: Db,
+  actor: Actor,
+  cardId: string,
+): Promise<CardDto & { comments_count: number }> {
+  const card = await db.card.findUnique({ where: { id: cardId }, include: { tags: true } });
+  if (!card) throw new AppError('card_not_found');
+  const loaded = await loadBoardFor(db, actor, card.board_id, 'board.read');
+  assertAllowed(loaded.decision);
+  const [tagColors, assignee, commentsCount] = await Promise.all([
+    boardTagColors(db, card.board_id),
+    card.assignee_id
+      ? db.user.findUnique({
+          where: { id: card.assignee_id },
+          select: { id: true, username: true },
+        })
+      : Promise.resolve(null),
+    db.comment.count({ where: { card_id: card.id } }),
+  ]);
+  return { ...toCardDto(card, assignee, tagColors, actor), comments_count: commentsCount };
+}
+
+export async function updateCard(
+  context: CardWrite,
+  cardId: string,
+  input: UpdateCardInput,
+): Promise<CardDto> {
+  const { db, actor } = context;
+  const card = await db.card.findUnique({ where: { id: cardId }, include: { tags: true } });
+  if (!card) throw new AppError('card_not_found');
+
+  const action = input.done === true ? 'card.complete' : 'card.update';
+  const loaded = await loadBoardFor(db, actor, card.board_id, action, {
+    isOwnCard: actor.kind === 'anon' && card.anon_actor_id === actor.anonId,
+  });
+  assertAllowed(loaded.decision);
+  conflictIfStale(card.updated_at, input.expected_updated_at, toCardDto(card, null, new Map()));
+
+  const changes: Record<string, [unknown, unknown]> = {};
+  const data: Record<string, unknown> = {};
+  if (input.title !== undefined && input.title !== card.title) {
+    changes.title = [card.title, input.title];
+    data.title = input.title;
+  }
+  if (input.description !== undefined && input.description !== card.description) {
+    changes.description = [card.description, input.description];
+    data.description = input.description;
+  }
+  if (input.due_at !== undefined) {
+    const next = input.due_at === null ? null : new Date(input.due_at);
+    if (next?.getTime() !== card.due_at?.getTime()) {
+      changes.due_at = [card.due_at?.toISOString() ?? null, next?.toISOString() ?? null];
+      data.due_at = next;
+    }
+  }
+  if (input.done !== undefined && input.done !== card.done) {
+    changes.done = [card.done, input.done];
+    data.done = input.done;
+  }
+  if (input.assignee !== undefined) {
+    const resolved =
+      input.assignee === null ? null : await resolveAssignee(db, card.board_id, input.assignee);
+    data.assignee_id = resolved?.id ?? null;
+    data.assignee_label = resolved ? null : input.assignee;
+    if ((resolved?.id ?? null) !== card.assignee_id) {
+      changes.assignee = [card.assignee_id, resolved?.id ?? input.assignee];
+    }
+  } else if (input.assignee_label !== undefined) {
+    data.assignee_label = input.assignee_label;
+    data.assignee_id = null;
+    if (input.assignee_label !== card.assignee_label) {
+      changes.assignee_label = [card.assignee_label, input.assignee_label];
+    }
+  }
+
+  const updated = await db.$transaction(async (tx) => {
+    if (input.tags !== undefined) {
+      await tx.cardTag.deleteMany({ where: { card_id: cardId } });
+      await createTagRows(tx, cardId, input.tags);
+      changes.tags = [card.tags.map((tag) => tag.name), input.tags.map((tag) => tag.name)];
+    }
+    const row =
+      Object.keys(data).length > 0
+        ? await tx.card.update({ where: { id: cardId }, data, include: { tags: true } })
+        : await tx.card.findUniqueOrThrow({ where: { id: cardId }, include: { tags: true } });
+
+    if (changes.done) {
+      await recordEvent(tx, {
+        boardId: card.board_id,
+        actor,
+        type: input.done ? 'card.completed' : 'card.reopened',
+        // The title rides along: a reader of the log (the digest, an export)
+        // must not need a join to say what was completed.
+        payload: {
+          board_id: card.board_id,
+          card_id: card.id,
+          column_id: card.column_id,
+          title: card.title,
+        },
+      });
+    }
+    const rest = Object.fromEntries(Object.entries(changes).filter(([key]) => key !== 'done'));
+    if (Object.keys(rest).length > 0) {
+      await recordEvent(tx, {
+        boardId: card.board_id,
+        actor,
+        type: 'card.updated',
+        payload: {
+          board_id: card.board_id,
+          card_id: card.id,
+          column_id: card.column_id,
+          title: row.title,
+          changes: rest,
+        },
+      });
+    }
+    return row;
+  });
+
+  const tagColors = await boardTagColors(db, card.board_id);
+  const assignee = updated.assignee_id
+    ? await db.user.findUnique({
+        where: { id: updated.assignee_id },
+        select: { id: true, username: true },
+      })
+    : null;
+  commitEvent(context.hub, {
+    boardId: card.board_id,
+    type: 'card.updated',
+    entity: 'card',
+    action: 'updated',
+    payload: { card_id: card.id },
+    actorLabel: actor.kind,
+  });
+  return toCardDto(updated, assignee, tagColors, actor);
+}
+
+export async function moveCard(
+  context: CardWrite,
+  cardId: string,
+  input: MoveCardInput,
+): Promise<{ card: CardDto; column_id: string; position: string }> {
+  const { db, actor } = context;
+  const card = await db.card.findUnique({ where: { id: cardId }, include: { tags: true } });
+  if (!card) throw new AppError('card_not_found');
+  const loaded = await loadBoardFor(db, actor, card.board_id, 'card.move');
+  assertAllowed(loaded.decision);
+
+  const column = await db.column.findFirst({
+    where: { id: input.column, board_id: card.board_id },
+  });
+  if (!column) throw new AppError('column_not_found');
+
+  // Before the transaction: a stale move must not take the lock or the row.
+  conflictIfStale(card.updated_at, input.expected_updated_at, toCardDto(card, null, new Map()));
+
+  const moved = await db.$transaction(async (tx) => {
+    const plan = await planMove(tx, {
+      cardId,
+      columnId: column.id,
+      before: input.before ?? null,
+      after: input.after ?? null,
+    });
+    const updated = await tx.card.update({
+      where: { id: cardId },
+      data: { column_id: column.id, position: plan.position },
+      include: { tags: true },
+    });
+    await recordEvent(tx, {
+      boardId: card.board_id,
+      actor,
+      type: 'card.moved',
+      payload: {
+        board_id: card.board_id,
+        card_id: cardId,
+        title: card.title,
+        from_column: card.column_id,
+        to_column: column.id,
+        // Ids are for machines; the digest prints a column name.
+        to_column_name: column.name,
+        before: plan.before,
+        after: plan.after,
+      },
+    });
+    return updated;
+  });
+
+  const tagColors = await boardTagColors(db, card.board_id);
+  commitEvent(context.hub, {
+    boardId: card.board_id,
+    type: 'card.moved',
+    entity: 'card',
+    action: 'moved',
+    payload: { card_id: cardId, column_id: column.id },
+    actorLabel: actor.kind,
+  });
+  return {
+    card: toCardDto(moved, null, tagColors),
+    column_id: column.id,
+    position: moved.position.toString(),
+  };
+}
+
+export async function deleteCard(context: CardWrite, cardId: string): Promise<void> {
+  const { db, actor } = context;
+  const card = await db.card.findUnique({ where: { id: cardId } });
+  if (!card) throw new AppError('card_not_found');
+  const loaded = await loadBoardFor(db, actor, card.board_id, 'card.delete');
+  assertAllowed(loaded.decision);
+
+  await db.$transaction(async (tx) => {
+    await tx.card.delete({ where: { id: cardId } });
+    await recordEvent(tx, {
+      boardId: card.board_id,
+      actor,
+      type: 'card.deleted',
+      payload: {
+        board_id: card.board_id,
+        card_id: card.id,
+        column_id: card.column_id,
+        title: card.title,
+      },
+    });
+  });
+  commitEvent(context.hub, {
+    boardId: card.board_id,
+    type: 'card.deleted',
+    entity: 'card',
+    action: 'deleted',
+    payload: { card_id: cardId },
+    actorLabel: actor.kind,
+  });
 }

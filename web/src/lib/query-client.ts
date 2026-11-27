@@ -20,5 +20,12 @@ export const queryKeys = {
   me: ['me'] as const,
   boards: ['boards'] as const,
   board: (id: string) => ['board', id] as const,
-  activity: (id: string) => ['activity', id] as const,
+  activity: (id: string, actorKind?: string) => ['activity', id, actorKind ?? 'all'] as const,
+  comments: (cardId: string) => ['comments', cardId] as const,
+  summary: (boardId: string) => ['summary', boardId] as const,
+  profile: (username: string) => ['profile', username.toLowerCase()] as const,
+  pending: (boardId: string) => ['pending', boardId] as const,
+  members: (boardId: string) => ['members', boardId] as const,
+  links: (boardId: string) => ['links', boardId] as const,
+  agentKeys: ['agent-keys'] as const,
 };

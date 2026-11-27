@@ -1,10 +1,13 @@
-# The gate, on every push to every branch. A workflow that exists but never ran
-# is not CI (docs/testing.md §11), so the run URL is recorded in docs/verify/.
+# The gate, on every push to every branch, and on a release tag — a tag push
+# matches no branch, so without `tags` the `release` job below could never run.
+# A workflow that exists but never ran is not CI (docs/testing.md §11), so the run
+# URL is recorded in docs/verify/.
 name: ci
 
 on:
   push:
     branches: ['**']
+    tags: ['v*']
   pull_request:
 
 concurrency:
@@ -77,3 +80,164 @@ jobs:
             npm-debug.log*
           retention-days: 7
           if-no-files-found: ignore
+
+  # The gate used to stop at `npm run build`, so a server bug that only the
+  # browser journeys reach (and only a real container exposes) shipped green
+  # six times. Both jobs below are required.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: klui
+          POSTGRES_PASSWORD: klui
+          POSTGRES_DB: klui_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U klui -d klui_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate the Prisma client
+        run: npm run db:generate --workspace server
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      # test:e2e builds the server and the SPA, resets the `e2e` schema, then
+      # runs the journeys against the built server on port 8123 (D-52).
+      - name: Browser journeys
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose file for the run
+        run: |
+          cat > .env <<'ENV'
+          KLUI_PUBLIC_URL=http://127.0.0.1:8080
+          KLUI_PORT=8080
+          POSTGRES_PASSWORD=ci-only-not-a-secret
+          ENV
+
+      - name: Build the image
+        run: docker compose build
+
+      - name: Boot it
+        run: docker compose up -d --wait --wait-timeout 180
+
+      # The image carried 404 MB of node_modules: the web workspace's production
+      # dependencies beside a built SPA, and a peer-installed typescript. The
+      # ceiling is a regression guard, not a target: 251 MB of it is the node
+      # base, 176 MB is the Prisma toolchain `migrate deploy` runs, and 98 MB is
+      # the second architecture's engines (see the schema's binaryTargets). The
+      # measured size is 757 MB and docs/deployment.md §8 records the arithmetic.
+      - name: Print the image size, and fail if it regrows
+        run: |
+          size=$(docker image inspect --format '{{.Size}}' "klui:$(node -p "require('./package.json').version")")
+          printf 'image %s bytes (%s MB)\n' "$size" "$((size / 1000000))"
+          test "$size" -lt 800000000
+
+      - name: Assert the instance is healthy
+        run: |
+          for attempt in $(seq 1 60); do
+            body=$(curl -fsS http://127.0.0.1:8080/healthz || true)
+            if printf '%s' "$body" | grep -q '"db":"up"'; then
+              printf '%s\n' "$body"
+              printf '%s' "$body" | grep -q '"status":"ok"'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'healthz never reported db:up' >&2
+          docker compose logs --no-color >&2
+          exit 1
+
+      - name: Show the logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  # The release: a tag is what publishes, and only after the three gates above
+  # have passed on that commit. Two architectures, the version as the tag and
+  # `latest`, pushed to GHCR with the workflow's own token.
+  #
+  # This job cannot tag itself: `git tag v2.0.0 && git push origin v2.0.0` is the
+  # owner's action (docs/deployment.md §11). What it guarantees is that the image
+  # and the version in package.json are the same number, or nothing is published.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [gate, e2e, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The tag and the package version must agree
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag=${GITHUB_REF_NAME#v}
+          printf 'tag %s, package %s\n' "$tag" "$version"
+          test "$tag" = "$version"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      # No `--platform` in the Dockerfile, so buildx runs each stage under
+      # emulation for the target arch: `prisma generate` therefore produces the
+      # arm64 engine for the arm64 image, which a BUILDPLATFORM build would not.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

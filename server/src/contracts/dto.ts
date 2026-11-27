@@ -34,6 +34,10 @@ export type CardDto = {
   description: string | null;
   assignee: { id: string; username: string } | null;
   assignee_label: string | null;
+  /** The display name an anonymous actor chose; null for every other actor. */
+  actor_label: string | null;
+  /** True when the caller is the anonymous actor who created this card. */
+  mine: boolean;
   due_at: string | null;
   done: boolean;
   position: string;
@@ -53,9 +57,21 @@ export type CallerDto = {
   actor_kind: 'user' | 'agent' | 'link' | 'anon';
   role: MemberRoleDto | null;
   label: string;
+  /** One flag per affordance, decided by `can()`: the UI never guesses. */
+  can_delete_card: boolean;
+  can_move_card: boolean;
+  can_comment: boolean;
+  can_manage_columns: boolean;
+  can_manage_members: boolean;
   can_write: boolean;
   can_manage: boolean;
   can_moderate: boolean;
+  /** `board.export`: any member, never a link or anonymous visitor. */
+  can_export: boolean;
+  /** `board.import`: owner or admin. */
+  can_import: boolean;
+  /** `board.close`: owner or admin, and false once the board is closed. */
+  can_close: boolean;
 };
 
 export type BoardStateDto = {

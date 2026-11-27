@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api, ApiError } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import { Chip } from '../ui/chip';
 import { Button } from '../ui/button';
 import { Field } from '../ui/field';
@@ -35,7 +36,7 @@ export function SecuritySettings() {
       setEnrollment(result);
       setError(null);
     },
-    onError: () => setError(t('common.error.generic')),
+    onError: (cause) => setError(failureMessage(cause)),
   });
 
   const confirm = useMutation({
@@ -214,5 +215,5 @@ function messageFor(error: unknown): string {
   if (error instanceof ApiError && error.code === 'invalid_code') {
     return t('auth.signIn.error.invalidCode');
   }
-  return t('common.error.generic');
+  return failureMessage(error);
 }

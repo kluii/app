@@ -63,7 +63,7 @@ function StyleguidePage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-content flex-col gap-8 px-6 py-8">
+    <main id="main-content" className="mx-auto flex w-full max-w-content flex-col gap-8 px-6 py-8">
       <header className="flex flex-col gap-2">
         <h1 className="text-h1">{t('styleguide.title')}</h1>
         <p className="max-w-140 text-body-sm text-ink-muted">{t('styleguide.intro')}</p>
@@ -286,6 +286,6 @@ function StyleguidePage() {
       >
         <p className="text-body-sm text-ink-muted">{t('styleguide.intro')}</p>
       </Dialog>
-    </div>
+    </main>
   );
 }

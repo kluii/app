@@ -341,3 +341,23 @@
     }
   }
 }
+
+/*
+ * Print: a summary on white paper, black ink, no dark theme
+ * (docs/features/close-out.md §4). Re-pointing the tokens keeps every component
+ * inside the page on the same palette.
+ */
+@media print {
+  :root,
+  [data-theme="light"],
+  [data-theme="dark"] {
+    --canvas: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #ffffff;
+    --surface-muted: #f3f4f6;
+    --ink: #000000;
+    --ink-muted: #1f2937;
+    --ink-subtle: #374151;
+    --border: #d1d5db;
+  }
+}

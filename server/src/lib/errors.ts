@@ -5,6 +5,7 @@
  * {"error":{"code","message","hint"}} — `hint` is null, never absent.
  */
 import type { ZodError } from 'zod';
+import { translate, type Locale } from '../i18n/index.js';
 
 export type ErrorCode =
   | 'validation_failed'
@@ -16,6 +17,7 @@ export type ErrorCode =
   | 'banned'
   | 'board_closed'
   | 'conflict'
+  | 'already_closed'
   | 'not_found'
   | 'board_not_found'
   | 'card_not_found'
@@ -29,7 +31,11 @@ export type ErrorCode =
   | 'registration_closed'
   | 'email_not_configured'
   | 'rate_limited'
+  | 'too_many_attempts'
+  | 'captcha_required'
+  | 'captcha_failed'
   | 'payload_too_large'
+  | 'unsupported_schema'
   | 'unsupported_media_type'
   | 'unknown_field'
   | 'internal'
@@ -73,9 +79,14 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   agent_key_not_found: 404,
   column_not_empty: 409,
   conflict: 409,
+  already_closed: 409,
   payload_too_large: 413,
+  unsupported_schema: 400,
   unsupported_media_type: 415,
   rate_limited: 429,
+  too_many_attempts: 429,
+  captcha_required: 400,
+  captcha_failed: 400,
   internal: 500,
   service_unavailable: 503,
   email_not_configured: 503,
@@ -87,6 +98,14 @@ export class AppError extends Error {
   readonly code: ErrorCode;
   readonly status: number;
   readonly hint: string | null;
+  /** A catalogue key for the hint, translated at the wire (K5-07). */
+  readonly hintKey: string | null;
+  /**
+   * Set only when the call site wrote the sentence itself. Everything else is
+   * translated from `error.<code>` at the wire, so the same failure speaks the
+   * reader's language while `Error.message` and the logs stay English.
+   */
+  readonly explicitMessage: string | null;
   readonly details: ValidationDetail[] | undefined;
   readonly current: unknown;
 
@@ -95,6 +114,7 @@ export class AppError extends Error {
     options: {
       message?: string;
       hint?: string | null;
+      hintKey?: string;
       status?: number;
       details?: ValidationDetail[];
       current?: unknown;
@@ -105,6 +125,8 @@ export class AppError extends Error {
     this.code = code;
     this.status = options.status ?? STATUS_BY_CODE[code];
     this.hint = options.hint ?? null;
+    this.hintKey = options.hintKey ?? null;
+    this.explicitMessage = options.message ?? null;
     this.details = options.details;
     this.current = options.current;
   }
@@ -128,16 +150,28 @@ export function defaultMessage(code: ErrorCode): string {
       return 'You do not have permission to do that.';
     case 'csrf_failed':
       return 'The request could not be verified.';
+    case 'already_closed':
+      return 'This board is already closed.';
     case 'conflict':
       return 'This item changed while you were editing.';
     case 'validation_failed':
       return 'The request body is invalid.';
     case 'rate_limited':
       return 'Too many requests.';
+    case 'too_many_attempts':
+      return 'Too many attempts.';
+    case 'captcha_required':
+      return 'This instance asks for a captcha token past a few anonymous writes.';
+    case 'captcha_failed':
+      return 'The captcha token was not accepted.';
     case 'column_not_empty':
       return 'The column still holds cards.';
     case 'board_closed':
       return 'This board is closed.';
+    case 'payload_too_large':
+      return 'The payload is too large.';
+    case 'unsupported_schema':
+      return 'The file is not a supported export.';
     case 'internal':
       return 'Something went wrong on our side.';
     default:
@@ -152,9 +186,10 @@ export function fromZod(error: ZodError): AppError {
     code: issue.code,
     message: issue.message,
   }));
+  // No literal: the message and the hint are keys, so this one call site speaks
+  // every catalogued language without passing a locale through thirty callers.
   return new AppError('validation_failed', {
-    message: defaultMessage('validation_failed'),
-    hint: 'Fix the fields listed in details.',
+    hintKey: 'error.validation.hint',
     details,
   });
 }
@@ -162,13 +197,19 @@ export function fromZod(error: ZodError): AppError {
 export function toWire(
   error: AppError,
   requestId: string,
+  locale: Locale = 'en',
 ): { status: number; body: WireErrorBody } {
+  const translated =
+    error.explicitMessage ??
+    translate(locale, `error.${error.code}`, {}, defaultMessage(error.code));
   const body: WireErrorBody = {
     error: {
       code: error.code,
-      message:
-        error.code === 'internal' ? `${error.message} (request ${requestId})` : error.message,
-      hint: error.hint,
+      message: error.code === 'internal' ? `${translated} (request ${requestId})` : translated,
+      hint:
+        error.hintKey === null
+          ? error.hint
+          : translate(locale, error.hintKey, {}, error.hint ?? undefined),
     },
   };
   if (error.details) {

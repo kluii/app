@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
 import { cn } from '../../lib/cn';
 
 /**
@@ -15,6 +15,7 @@ export function Dialog({
   children,
   className,
   footer,
+  initialFocus,
 }: {
   open: boolean;
   onClose: () => void;
@@ -23,16 +24,33 @@ export function Dialog({
   children: ReactNode;
   className?: string;
   footer?: ReactNode;
+  /**
+   * Where focus lands when the dialog opens. `showModal()` picks the first
+   * focusable in DOM order, which is wrong for a panel whose first control is a
+   * text box (K2-15): the caller names the element instead.
+   */
+  initialFocus?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+    if (!dialog || !open) return undefined;
+    // The platform restores focus to the element that opened the dialog, but
+    // only while the element is still in the document. A dialog conditional on
+    // state is removed by React before that can happen, so keep the opener and
+    // put focus back ourselves (K2-15).
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!dialog.open) {
+      dialog.showModal();
+      initialFocus?.current?.focus();
+    }
+    return () => {
+      if (dialog.open) dialog.close();
+      if (opener?.isConnected === true) opener.focus();
+    };
+  }, [open, initialFocus]);
 
   return (
     <dialog

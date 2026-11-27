@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
+import { failureMessage } from '../../lib/api-error';
 import type { BoardState, Caller, Card, Column } from '../../api/types';
 import { t } from '../../i18n';
 import { applyCardFrame, cardIdOf, envelopeOf, dropCard, isCardEvent } from '../../data/boards';
@@ -13,11 +14,16 @@ import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Input } from '../ui/input';
 import { ActivityDialog } from './activity-dialog';
+import { BoardDataDialog } from './board-data-dialog';
+import { CloseBoardDialog } from './close-board-dialog';
 import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from './board-filters';
 import { CardCreateModal } from './card-create-modal';
 import { CardDisplayModal, cardFromState } from './card-display-modal';
 import { CardEditorModal } from './card-editor-modal';
 import { CardRow } from './card-row';
+import { MembersButton } from './members-dialog';
+import { ShareButton } from './share-dialog';
+import { ModerationButton } from './moderation-dialog';
 import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
 import { useKeyboardDrag } from './use-keyboard-drag';
 import { useToggleDone } from './use-toggle-done';
@@ -36,6 +42,8 @@ type Composer =
 export function BoardView({ boardId }: { boardId: string }) {
   const [composer, setComposer] = useState<Composer>({ kind: 'closed' });
   const [activityOpen, setActivityOpen] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [announcement, setAnnouncement] = useState('');
   const queryClient = useQueryClient();
@@ -171,9 +179,12 @@ export function BoardView({ boardId }: { boardId: string }) {
   if (state.isError) {
     const status = state.error instanceof ApiError ? state.error.status : 0;
     if (status === 404 || status === 403) return <Unreadable />;
+    // No credential at all: a board URL is not a way in without one — unless
+    // the board accepts a display name (K3-03).
+    if (status === 401) return <AnonymousEntry boardId={boardId} />;
     return (
       <div className="px-6 py-8">
-        <p className="text-body-sm text-ink-muted">{t('common.error.generic')}</p>
+        <p className="text-body-sm text-ink-muted">{failureMessage(state.error)}</p>
         <Button className="mt-3" size="sm" variant="ghost" onClick={() => void state.refetch()}>
           {t('common.action.retry')}
         </Button>
@@ -189,6 +200,8 @@ export function BoardView({ boardId }: { boardId: string }) {
       onOpenCard={(card) => setComposer({ kind: 'read', cardId: card.id })}
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
+      onOpenData={() => setDataOpen(true)}
+      onOpenClose={() => setCloseOpen(true)}
       live={live}
       onMove={requestMove}
       onMoveTo={(cardId, columnId) =>
@@ -224,12 +237,130 @@ export function BoardView({ boardId }: { boardId: string }) {
           onClose={() => setComposer({ kind: 'closed' })}
         />
       ) : null}
+      <BoardDataDialog
+        boardId={boardId}
+        canImport={state.data.caller.can_import}
+        open={dataOpen}
+        onClose={() => setDataOpen(false)}
+      />
+      <CloseBoardDialog
+        boardId={boardId}
+        boardName={state.data.board.name}
+        open={closeOpen}
+        onClose={() => setCloseOpen(false)}
+        onClosed={() => {
+          setCloseOpen(false);
+          void queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+        }}
+      />
       <ActivityDialog
         boardId={boardId}
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
+        onOpenCard={(cardId) => {
+          setActivityOpen(false);
+          setComposer({ kind: 'read', cardId });
+        }}
       />
     </BoardFrame>
+  );
+}
+
+/**
+ * The name gate. A stranger on a board that accepts anonymous writes names
+ * themselves, and the name is remembered per board in this browser only
+ * (docs/features/links-and-anonymous.md §4).
+ */
+function AnonymousEntry({ boardId }: { boardId: string }) {
+  const queryClient = useQueryClient();
+  const info = useQuery({
+    queryKey: ['board-public', boardId],
+    queryFn: () => api.boardPublic(boardId),
+    retry: false,
+  });
+  const storageKey = `klui-anon-${boardId}`;
+  const [label, setLabel] = useState(() => {
+    try {
+      return window.localStorage.getItem(storageKey) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [error, setError] = useState<string | null>(null);
+  const join = useMutation({
+    mutationFn: () => api.joinBoard(boardId, label.trim()),
+    onSuccess: async () => {
+      try {
+        window.localStorage.setItem(storageKey, label.trim());
+      } catch {
+        // A private window refuses storage; the session still works.
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+    },
+    onError: (failure) => {
+      setError(failureMessage(failure));
+    },
+  });
+
+  if (info.isPending) {
+    return <p className="px-6 py-8 text-body-sm text-ink-subtle">{t('common.label.loading')}</p>;
+  }
+  if (info.isError || !info.data.accepts_anon) return <NoCredential />;
+
+  return (
+    <div className="mx-auto flex min-h-96 w-full max-w-96 flex-col justify-center gap-3 px-6 py-8">
+      <h1 className="text-h2">{info.data.name}</h1>
+      <p className="text-body-sm text-ink-muted">{t('board.anon.body')}</p>
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (label.trim().length < 2) {
+            setError(t('board.anon.hint'));
+            return;
+          }
+          setError(null);
+          join.mutate();
+        }}
+      >
+        <label htmlFor="anon-label" className="text-label text-ink">
+          {t('board.anon.label')}
+        </label>
+        <Input
+          id="anon-label"
+          value={label}
+          maxLength={32}
+          autoComplete="nickname"
+          onChange={(event) => setLabel(event.target.value)}
+        />
+        <p className="text-body-sm text-ink-subtle">{t('board.anon.hint')}</p>
+        {error ? (
+          <p role="alert" className="text-body-sm text-danger">
+            {error}
+          </p>
+        ) : null}
+        <Button
+          type="submit"
+          variant="primary"
+          loading={join.isPending}
+          className="mt-1 self-start"
+        >
+          {t('board.anon.submit')}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function NoCredential() {
+  return (
+    <div className="mx-auto flex min-h-96 max-w-96 flex-col items-center justify-center gap-2 px-6 text-center">
+      <h1 className="text-h2">{t('board.error.title')}</h1>
+      <p className="text-body-sm text-ink-muted">{t('board.error.needCredential')}</p>
+      <Link to="/login" className="mt-2 text-body-sm text-ink underline-offset-4 hover:underline">
+        {t('common.action.signIn')}
+      </Link>
+    </div>
   );
 }
 
@@ -252,6 +383,8 @@ function BoardFrame({
   onOpenCard,
   onAddCard,
   onOpenActivity,
+  onOpenData,
+  onOpenClose,
   live,
   onMove,
   onMoveTo,
@@ -267,6 +400,8 @@ function BoardFrame({
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
+  onOpenData: () => void;
+  onOpenClose: () => void;
   live: LiveStatus;
   onMove: (request: MoveRequest) => void;
   onMoveTo: (cardId: string, columnId: string) => void;
@@ -291,10 +426,17 @@ function BoardFrame({
           <span className="font-mono text-mono-sm text-ink-subtle">
             {board.owner.username}/{board.slug}
           </span>
-          <Chip>{callerLabel(caller)}</Chip>
+          <span data-testid="caller-chip">
+            <Chip>{callerLabel(caller)}</Chip>
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Chip>{t(`board.visibility.${board.visibility}`)}</Chip>
+          {board.closed_at === null ? null : (
+            <span data-testid="board-closed-chip">
+              <Chip>{t('board.closed.chip')}</Chip>
+            </span>
+          )}
           {live === 'closed' ? (
             <span className="font-mono text-mono-sm text-ink-subtle" data-testid="board-live">
               {t('common.label.reconnecting')}
@@ -307,9 +449,45 @@ function BoardFrame({
             members={members}
             shown={visible.length}
           />
+          <ShareButton boardState={boardState} />
+          <MembersButton boardState={boardState} />
+          {caller.can_moderate ? (
+            <ModerationButton boardId={board.id} count={boardState.pending_count} />
+          ) : null}
           <Button size="sm" variant="secondary" onClick={onOpenActivity}>
             {t('board.activity.title')}
           </Button>
+          {caller.can_export ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onOpenData}
+              data-testid="open-board-data"
+            >
+              {t('board.data.open')}
+            </Button>
+          ) : null}
+          {board.closed_at === null ? (
+            caller.can_close && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={onOpenClose}
+                data-testid="open-close-board"
+              >
+                {t('board.close.open')}
+              </Button>
+            )
+          ) : (
+            <Link
+              className="inline-flex h-8 items-center rounded-sm border border-border bg-surface-2 px-3 text-body-sm text-ink hover:bg-surface-muted"
+              to="/boards/$boardId/summary"
+              params={{ boardId: board.id }}
+              data-testid="open-board-summary"
+            >
+              {t('board.summary.open')}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -317,11 +495,15 @@ function BoardFrame({
 
       {columns.length === 0 ? (
         <div className="px-4 py-6">
-          <ColumnRail boardId={board.id} canWrite={caller.can_write} className="border-none p-0" />
+          <ColumnRail
+            boardId={board.id}
+            canWrite={caller.can_manage_columns}
+            className="border-none p-0"
+          />
         </div>
       ) : (
-        <div className="flex-1 overflow-x-auto">
-          <div className="flex items-start gap-4 px-4 py-4">
+        <div className="flex-1 overflow-x-auto" data-testid="board-scroll">
+          <div className="board-rail flex items-start gap-4 px-4 py-4">
             {columns.map((column) => (
               <ColumnSection
                 key={column.id}
@@ -340,7 +522,7 @@ function BoardFrame({
                 keyboard={keyboard}
               />
             ))}
-            {caller.can_write ? <AddColumn boardId={board.id} /> : null}
+            {caller.can_manage_columns ? <AddColumn boardId={board.id} /> : null}
           </div>
         </div>
       )}
@@ -367,7 +549,9 @@ function ColumnRail({
     <div className={className}>
       <div className="flex flex-col items-center gap-2 rounded-md border border-border px-6 py-10 text-center">
         <h2 className="text-h2">{t('board.empty.noColumns')}</h2>
-        <p className="max-w-72 text-body-sm text-ink-muted">{t('board.empty.noColumnsBody')}</p>
+        <p className="max-w-72 text-body-sm text-ink-muted">
+          {canWrite ? t('board.empty.noColumnsBody') : t('board.empty.noColumnsBodyReader')}
+        </p>
         {canWrite ? <AddColumn boardId={boardId} /> : null}
       </div>
     </div>
@@ -406,14 +590,14 @@ function ColumnSection({
   const droppable = useColumnDroppable({
     columnId: column.id,
     cards: allCards,
-    canWrite: caller.can_write,
+    canWrite: caller.can_move_card,
     onMove,
   });
 
   return (
     <section
       ref={droppable.ref}
-      className="flex w-column shrink-0 flex-col gap-2 rounded-md bg-column p-2"
+      className="board-column flex w-column shrink-0 flex-col gap-2 rounded-md bg-column p-2"
       data-testid={`column-${column.id}`}
     >
       <header className="flex items-center justify-between px-1 py-1">
@@ -423,7 +607,11 @@ function ColumnSection({
 
       {cards.length === 0 ? (
         <p className="px-1 pb-1 text-body-sm text-ink-subtle">
-          {filtering ? t('board.column.emptyFiltered') : t('board.column.empty')}
+          {filtering
+            ? t('board.column.emptyFiltered')
+            : caller.can_write
+              ? t('board.column.empty')
+              : t('board.column.emptyReader')}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -433,7 +621,9 @@ function ColumnSection({
               card={card}
               cards={allCards}
               columns={columns}
-              canWrite={caller.can_write}
+              canMove={caller.can_move_card}
+              canDelete={caller.can_delete_card}
+              canTick={caller.can_write && (caller.actor_kind !== 'anon' || card.mine)}
               lifted={keyboard.drag?.cardId === card.id}
               onOpen={() => onOpenCard(card)}
               onMove={onMove}

@@ -27,6 +27,8 @@ type Card = {
   position: string;
   done: boolean;
   updated_at: string;
+  assignee_label: string | null;
+  tags: { name: string; color: string | null }[];
 };
 
 async function boardWithColumns(c: TestClient): Promise<{ board: Board; columns: Column[] }> {
@@ -312,6 +314,250 @@ describe('cards and moves', () => {
   });
 });
 
+describe('a private board share policy', () => {
+  const patchBoard = (c: TestClient, boardId: string, body: unknown) =>
+    c.request('PATCH', `/api/v1/boards/${boardId}`, body);
+
+  it('refuses a link role or anonymous writes on a private board, and leaves the row alone', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+
+    // The refinement only fired when `visibility` was in the body, so a bare
+    // `link_role` patch walked straight through it.
+    const linkRole = await patchBoard(c, board.id, { link_role: 'edit' });
+    expect(linkRole.statusCode).toBe(400);
+    expect((linkRole.json() as { error: { code: string } }).error.code).toBe('validation_failed');
+
+    const anon = await patchBoard(c, board.id, { anon_write: 'open' });
+    expect(anon.statusCode).toBe(400);
+
+    const row = await harness.db.board.findUniqueOrThrow({ where: { id: board.id } });
+    expect({ link_role: row.link_role, anon_write: row.anon_write }).toEqual({
+      link_role: 'none',
+      anon_write: 'off',
+    });
+  });
+
+  it('accepts the same fields when the board is link or public in the same request', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+
+    const link = await patchBoard(c, board.id, { visibility: 'link', link_role: 'edit' });
+    expect(link.statusCode).toBe(200);
+    expect((link.json() as { link_role: string }).link_role).toBe('edit');
+
+    const back = await patchBoard(c, board.id, { visibility: 'private', link_role: 'edit' });
+    expect(back.statusCode).toBe(400);
+
+    const kept = await harness.db.board.findUniqueOrThrow({ where: { id: board.id } });
+    expect(kept.link_role).toBe('edit');
+    expect(kept.visibility).toBe('link');
+  });
+
+  it('is backed by a CHECK constraint, so a direct insert cannot break it either', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+
+    await expect(
+      harness.db.$executeRawUnsafe(`UPDATE boards SET link_role = 'edit' WHERE id = '${board.id}'`),
+    ).rejects.toThrow(/boards_private_has_no_share_policy/);
+  });
+});
+
+describe('the public board URL', () => {
+  const publicUrl = (username: string, slug: string) => `/api/v1/users/${username}/boards/${slug}`;
+
+  it('gives an anonymous caller the same 404 for a private board as for one that never existed', async () => {
+    const owner = harness.client();
+    const { board } = await boardWithColumns(owner);
+    const anonymous = harness.client();
+
+    const real = await anonymous.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    const ghost = await anonymous.request(
+      'GET',
+      publicUrl(`owner-${owner.suffix}`, 'never-existed'),
+    );
+    expect(real.statusCode).toBe(404);
+    expect(ghost.statusCode).toBe(404);
+    // Byte-identical: the body must not tell an enumerator which board exists.
+    expect(real.json()).toEqual(ghost.json());
+    expect(real.body).toBe(ghost.body);
+  });
+
+  it('redirects a member to the human URL, never to an API path', async () => {
+    const owner = harness.client();
+    const { board } = await boardWithColumns(owner);
+
+    const member = harness.client();
+    const user = await member.signup(`viewer-${member.suffix}`);
+    await harness.db.boardMember.create({
+      data: {
+        id: `bmb_${member.suffix}xxxxxxxxxxxxxx`,
+        board_id: board.id,
+        user_id: user.id,
+        role: 'viewer',
+      },
+    });
+
+    const response = await member.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    expect(response.statusCode).toBe(301);
+    expect(response.headers.location).toBe(`/owner-${owner.suffix}/${board.slug}`);
+  });
+
+  it('requires the suffix on a link board, and redirects to the suffixed human URL', async () => {
+    const owner = harness.client();
+    const { board } = await boardWithColumns(owner);
+    const patched = await owner.request('PATCH', `/api/v1/boards/${board.id}`, {
+      visibility: 'link',
+      link_role: 'read',
+    });
+    expect(patched.statusCode).toBe(200);
+    const linkBoard = patched.json() as { slug: string; link_suffix: string | null };
+    expect(linkBoard.link_suffix).toHaveLength(4);
+
+    // The bare slug is not a URL for a link board, for anyone.
+    const bare = await owner.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    expect(bare.statusCode).toBe(404);
+
+    const suffixed = await owner.request(
+      'GET',
+      publicUrl(`owner-${owner.suffix}`, `${board.slug}-${linkBoard.link_suffix ?? ''}`),
+    );
+    expect(suffixed.statusCode).toBe(301);
+    expect(suffixed.headers.location).toBe(
+      `/owner-${owner.suffix}/${board.slug}-${linkBoard.link_suffix ?? ''}`,
+    );
+  });
+
+  it('redirects a renamed slug only when the board is readable', async () => {
+    const owner = harness.client();
+    const { board } = await boardWithColumns(owner);
+    const renamed = await owner.request('PATCH', `/api/v1/boards/${board.id}`, {
+      slug: `${board.slug}-renamed`,
+    });
+    expect(renamed.statusCode).toBe(200);
+
+    const anonymous = harness.client();
+    // A private board that was renamed leaks neither the new slug nor a 301.
+    const hidden = await anonymous.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    expect(hidden.statusCode).toBe(404);
+
+    const readable = await owner.request('GET', publicUrl(`owner-${owner.suffix}`, board.slug));
+    expect(readable.statusCode).toBe(301);
+    expect(readable.headers.location).toBe(`/owner-${owner.suffix}/${board.slug}-renamed`);
+  });
+});
+
+describe('bulk create', () => {
+  const bulk = (c: TestClient, boardId: string, body: unknown) =>
+    c.request('POST', `/api/v1/boards/${boardId}/cards/bulk`, body);
+
+  it('creates the batch with increasing positions, one event each, and its tags', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const todo = columns[0];
+    if (!todo) return;
+
+    const response = await bulk(c, board.id, {
+      column: todo.id,
+      items: [
+        { title: 'First', tags: ['api'] },
+        { title: 'Second', description: 'with a description' },
+        { title: 'Third', done: true },
+      ],
+    });
+    expect(response.statusCode).toBe(201);
+    const created = (response.json() as { created: Card[] }).created;
+    expect(created.map((card) => card.title)).toEqual(['First', 'Second', 'Third']);
+
+    // One RANK_STEP apart, in the order the batch arrived.
+    const positions = created.map((card) => Number(card.position));
+    expect(positions).toEqual([
+      positions[0],
+      (positions[0] ?? 0) + 1024,
+      (positions[0] ?? 0) + 2048,
+    ]);
+
+    const events = await harness.db.event.findMany({
+      where: { board_id: board.id, type: 'card_created' },
+    });
+    expect(events).toHaveLength(3);
+
+    const tags = await harness.db.cardTag.findMany({
+      where: { card_id: created[0]?.id ?? '' },
+    });
+    expect(tags.map((tag) => tag.name)).toEqual(['api']);
+  });
+
+  it('refuses a column that belongs to another board, and writes nothing', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+    const other = harness.client();
+    const foreign = await boardWithColumns(other);
+    const foreignColumn = foreign.columns[0];
+    if (!foreignColumn) return;
+
+    const response = await bulk(c, board.id, {
+      column: foreignColumn.id,
+      items: [{ title: 'Smuggled' }],
+    });
+    // 404, not 400: `column_not_found` is a not-found in the error catalogue
+    // (server/src/lib/errors.ts) and docs/api.md §1 maps not-found to 404. The
+    // single-card path answers the same, and the code is what a client branches on.
+    expect(response.statusCode).toBe(404);
+    expect((response.json() as { error: { code: string } }).error.code).toBe('column_not_found');
+
+    const smuggled = await harness.db.card.count({ where: { board_id: board.id } });
+    const untouched = await harness.db.card.count({ where: { board_id: foreign.board.id } });
+    expect({ smuggled, untouched }).toEqual({ smuggled: 0, untouched: 0 });
+  });
+
+  it('is all-or-nothing when one item is invalid', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const todo = columns[0];
+    if (!todo) return;
+
+    const response = await bulk(c, board.id, {
+      column: todo.id,
+      items: [{ title: 'Fine' }, { title: '' }, { title: 'Also fine' }],
+    });
+    expect(response.statusCode).toBe(400);
+    const count = await harness.db.card.count({ where: { board_id: board.id } });
+    expect(count).toBe(0);
+  });
+
+  it('returns the same DTO shape as the single create', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const todo = columns[0];
+    if (!todo) return;
+
+    const viaSingle = await c.request('POST', `/api/v1/boards/${board.id}/cards`, {
+      column: todo.id,
+      title: 'Single',
+      assignee_label: 'visitor',
+      tags: ['api'],
+    });
+    expect(viaSingle.statusCode).toBe(201);
+
+    const response = await bulk(c, board.id, {
+      column: todo.id,
+      items: [{ title: 'Bulk', assignee_label: 'visitor', tags: ['api'] }],
+    });
+    expect(response.statusCode).toBe(201);
+    const bulkCard = (response.json() as { created: Card[] }).created[0];
+    const singleCard = viaSingle.json() as Card;
+    expect(bulkCard).toBeDefined();
+    if (!bulkCard) return;
+
+    // Same keys, same nullability: a bulk card is not a second shape.
+    expect(Object.keys(bulkCard).sort()).toEqual(Object.keys(singleCard).sort());
+    expect(bulkCard.assignee_label).toBe('visitor');
+    expect(bulkCard.tags.map((tag) => tag.name)).toEqual(['api']);
+  });
+});
+
 describe('the done flag', () => {
   it('toggles done in place, keeps the column, and refuses a stale write', async () => {
     const c = harness.client();
@@ -425,5 +671,51 @@ describe('rank planning', () => {
       position: 1024,
     });
     expect(planRank({ before: 1024, after: 1024.5, min: 1024, max: 4096 }).kind).toBe('renumber');
+  });
+});
+
+describe('deleting a board', () => {
+  it('records what was deleted, in an event that outlives the board', async () => {
+    const c = harness.client();
+    const { board, columns } = await boardWithColumns(c);
+    const first = columns[0];
+    expect(first).toBeDefined();
+    await addCard(c, board.id, first?.id ?? '', 'one');
+    await addCard(c, board.id, first?.id ?? '', 'two');
+
+    const removed = await c.request('DELETE', `/api/v1/boards/${board.id}`, { confirm: true });
+    expect(removed.statusCode).toBe(204);
+
+    // The board-scoped row is written in the same transaction, so a crash
+    // between the two inserts cannot leave a deletion unrecorded — but it dies
+    // with the cascade. The instance row is the durable one.
+    const surviving = await harness.db.event.findMany({
+      where: { board_id: null, type: 'board_deleted' },
+      orderBy: { created_at: 'desc' },
+    });
+    const record = surviving.find(
+      (row) => (row.payload as { board_id?: string }).board_id === board.id,
+    );
+    expect(record, 'an instance-scoped board.deleted event').toBeDefined();
+    expect(record?.actor_kind).toBe('user');
+    // A user actor is named by id; the readable name is in the payload.
+    expect(record?.actor_user_id).not.toBeNull();
+    expect(record?.payload).toMatchObject({
+      board_id: board.id,
+      name: 'Retro S2',
+      owner: `owner-${c.suffix}`,
+      counts: { columns: 3, cards: 2, comments: 0 },
+    });
+  });
+
+  it('still answers 404 for a board that is gone, with no trace left behind', async () => {
+    const c = harness.client();
+    const { board } = await boardWithColumns(c);
+    expect(
+      (await c.request('DELETE', `/api/v1/boards/${board.id}`, { confirm: true })).statusCode,
+    ).toBe(204);
+    const again = await c.request('GET', `/api/v1/boards/${board.id}`);
+    expect(again.statusCode).toBe(404);
+    expect(await harness.db.event.count({ where: { board_id: board.id } })).toBe(0);
   });
 });

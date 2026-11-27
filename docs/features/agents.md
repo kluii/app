@@ -66,7 +66,7 @@ Pass expected_updated_at on updates you did not just make. Prefer bulk_create_ca
 looping create_card. Never invent a board id. If a tool returns -32004, wait retry_after_s.
 ```
 
-"Test connection" performs a real `initialize` + `whoami` and prints what it reached: the board name, the role, the key name. A green check that did not call the server is worse than no button.
+"Test connection" calls the instance's own `/mcp` with the pasted key — `initialize`, then `tools/call whoami`, then `list_boards` for a board-scoped key — and prints what it reached: the board name, the role, the key name. An endpoint that is down, or that answers `-32603` for that key, is a refusal, not a tick. The only in-process path is an instance with no `KLUI_PUBLIC_URL`, and the answer says `via:"inline"` so the panel can say it did not prove the endpoint. Testing a stored key without pasting it answers `key_required`: a hash cannot authenticate.
 
 ## 5. Parity and the app
 
