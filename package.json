@@ -1,0 +1,47 @@
+{
+  "name": "klui",
+  "version": "2.0.1",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c gray,white \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev --workspace server",
+    "dev:web": "npm run dev --workspace web",
+    "build": "npm run build --workspace server && npm run build --workspace web",
+    "start": "node server/dist/server.js",
+    "typecheck": "npm run typecheck --workspace server && npm run typecheck --workspace web",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspace server && npm run test --workspace web",
+    "test:e2e": "npm run build && node scripts/e2e-db.mjs && playwright test",
+    "db:migrate": "npm run db:migrate --workspace server",
+    "db:generate": "npm run db:generate --workspace server"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.1",
+    "@eslint/js": "10.0.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@playwright/test": "1.65.1",
+    "concurrently": "10.0.7",
+    "eslint": "10.15.0",
+    "globals": "17.14.0",
+    "prettier": "3.10.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.74.0"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "prisma@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true
+  }
+}

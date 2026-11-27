@@ -126,21 +126,15 @@ npm run test:perf                            # slow, opt-in
 
 `test:e2e` starts the server itself, waits for `/healthz` to report `db:"up"`, and kills it on exit — including on failure. A leftover process on 8123 means the next run tests a stale build.
 
-## 13. Verification protocol
+## 13. Reporting a change
 
-Every wave ends with `docs/verify/k<wave>.md`:
+Every change ends with the gate, run by the author, and its literal output:
 
-```md
-## K2-04 — pragmatic drag and drop
-
-### Exit: a card dropped into the middle of a populated column lands between the two cards
-
-$ npx playwright test e2e/board-drag.spec.ts --reporter=line
-Running 1 test using 1 worker
-  ✓  1 e2e/board-drag.spec.ts:12:1 › drop between two cards, reload, order persists (4.2s)
-1 passed (4.6s)
-
-Verdict: PASS
+```bash
+npm run format:check && npm run typecheck && npm run lint && npm run build && npm test
+npm run test:e2e                             # when a screen changed
 ```
 
-Rules: the command, the real trimmed output, the verdict. No invented numbers. A red gate that is not fixed is reported as red and the wave stops. A deviation from the plan is written here with its reason — silent deviation is the one unrecoverable failure.
+A behaviour change, a migration or an environment variable also lands in `CHANGELOG.md` in the same branch: that file is the record of what shipped, and it is what a self-hoster reads before upgrading.
+
+Rules: the command, the real trimmed output, the verdict. No invented numbers. A red gate that is not fixed is reported as red. A deviation from the brief is written down with its reason — silent deviation is the one unrecoverable failure.

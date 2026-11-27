@@ -25,7 +25,7 @@ One Node process serves everything:
 
 - No worker process in 2.0. Background work (lifecycle sweeper, pending expiry, digest, event retention) runs in-process on an interval, guarded by a Postgres advisory lock so two instances against one database cannot both run it.
 - Graceful shutdown: stop accepting, drain in-flight requests, close the SSE hub (send `event: close`), disconnect Prisma, exit. A 15 s hard timeout then `process.exit(1)`.
-- The SPA is served by `@fastify/static` from `web/dist` with a fallback to `index.html`. **The asset list is snapshotted at boot** — restart after every web build (trap 7 in `PROMPT.md`).
+- The SPA is served by `@fastify/static` from `web/dist` with a fallback to `index.html`. **The asset list is snapshotted at boot** — restart after every web build, or a rebuilt bundle is served from a stale manifest.
 - `index.html` is sent with `Cache-Control: no-store`; hashed assets are immutable.
 - `server.ts` boots in this order: env validation → secrets resolution (fail closed) → Prisma connect → plugin registration → sweeper start → listen. A failure at any step exits non-zero with one actionable message.
 
@@ -52,6 +52,9 @@ server/src/
   digest/          builder (deterministic), delivery (webhook, mail, rss), scheduler
   settings/        instance settings, branding, accent validation
   realtime/        hub.ts (subscribers, ring buffer), events.ts (envelope)
+  public/          server-rendered profile and board <head>, robots.txt, sitemap.xml
+  moderation/      the pending queue: list, approve, reject, expiry sweep
+  links/ anon/     write-link tokens and the anonymous-name gate (K3)
   lib/             errors, ids, ranks, secrets, rate-limit, logger, reserved, authz
   contracts/       Zod schemas shared by REST and MCP
 ```
@@ -117,7 +120,7 @@ Required by the decisions register; each one is an ADR item, not an improvisatio
 ### 3.4 Events
 
 - One helper, `recordEvent(tx, {boardId, actor, type, payload})`, called inside the same transaction as the mutation it describes. A mutation without an event is a defect; an event without a mutation is a lie.
-- Closed enum of types: `board.created`, `board.updated`, `board.closed`, `member.added`, `member.updated`, `member.removed`, `column.created`, `column.updated`, `column.deleted`, `card.created`, `card.updated`, `card.moved`, `card.completed`, `card.reopened`, `card.deleted`, `comment.created`, `comment.updated`, `link.created`, `link.revoked`, `pending.approved`, `pending.rejected`, `agent_key.created`, `agent_key.revoked`, `import.completed`.
+- Closed enum of types: `board.created`, `board.updated`, `board.closed`, `board.deleted`, `member.added`, `member.updated`, `member.removed`, `column.created`, `column.updated`, `column.deleted`, `card.created`, `card.updated`, `card.moved`, `card.completed`, `card.reopened`, `card.deleted`, `comment.created`, `comment.updated`, `link.created`, `link.revoked`, `pending.approved`, `pending.rejected`, `agent_key.created`, `agent_key.revoked`, `import.completed`.
 - `payload` shapes are documented in `docs/api.md` §Events and reused verbatim by the digest, the activity feed and the close-out summary. Adding a key is backward compatible; renaming one is a migration.
 - Activity, digest and close-out **read events only**. They may join cards/columns for labels, but they may not reconstruct "what happened" from current state.
 
@@ -218,7 +221,7 @@ Indexes required from day one: `events(board_id, created_at, id)`, `cards(board_
 | SSE disconnected | Board stays usable; a subtle `--ink-subtle` line says "Reconnecting"; polling fallback every 15 s until connected. |
 | SMTP missing | Email features answer `503 email_not_configured` at the API boundary and the UI hides the email channel with an explanation. Never a silent no-op. |
 | OIDC provider down | Local login still works; the provider button shows the real error after the redirect. Break-glass admin is the documented escape. |
-| Static bundle stale | Server restart required after build (trap in `PROMPT.md`); `/healthz` version identifies the running build. |
+| Static bundle stale | Server restart required after build (§2: the asset list is snapshotted at boot); `/healthz` version identifies the running build. |
 | Rate limit hit | `429` + `Retry-After`; the client shows a neutral toast with the wait time. |
 | Migration fails at boot | Container exits non-zero; compose surfaces the log; the previous image can be restored without data loss because migrations are additive (see `docs/deployment.md` §Rollback). |
 

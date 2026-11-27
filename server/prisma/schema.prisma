@@ -1,0 +1,606 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
+generator client {
+  provider = "prisma-client-js"
+  // Two architectures, one build host. `prisma generate` cannot run under QEMU
+  // arm64 — its schema parser (get-dmmf wasm) misreads the file there and reports
+  // every line as invalid, measured — so the image generates on the build platform
+  // and carries both engines. `native` keeps a local `npm run build` working.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum Visibility {
+  private
+  link
+  public
+}
+
+enum LinkRole {
+  read
+  edit
+  none
+}
+
+enum AnonWrite {
+  off
+  open
+  moderated
+}
+
+enum MemberRole {
+  owner
+  admin
+  editor
+  viewer
+}
+
+enum LinkTokenRole {
+  read
+  edit
+}
+
+enum ActorKind {
+  user
+  link
+  anon
+  agent
+  system
+}
+
+enum AgentKeyScope {
+  board
+  user
+}
+
+enum BanSubjectKind {
+  ip
+  user
+}
+
+/// Who wrote a comment. A user account can go away; the type is what the export
+/// carries so a v1 file round-trips its `author_type` verbatim.
+enum CommentAuthorType {
+  user
+  agent
+  anon
+}
+
+enum JobStatus {
+  pending
+  running
+  done
+  failed
+}
+
+enum TotpPolicy {
+  available
+  required
+  disabled
+}
+
+/// The closed event catalogue (docs/api.md §8, docs/architecture.md §3.4).
+/// Adding a value is additive; renaming one is a migration.
+enum EventType {
+  board_created
+  board_updated
+  board_closed
+  board_deleted
+  member_added
+  member_updated
+  member_removed
+  column_created
+  column_updated
+  column_deleted
+  card_created
+  card_updated
+  card_moved
+  card_completed
+  card_reopened
+  card_deleted
+  comment_created
+  comment_updated
+  comment_deleted
+  link_created
+  link_revoked
+  pending_created
+  pending_approved
+  pending_rejected
+  pending_expired
+  agent_key_created
+  agent_key_revoked
+  import_completed
+  security_login
+  security_login_failed
+  security_password_changed
+  security_password_reset
+  security_totp_enabled
+  security_totp_disabled
+  security_session_revoked
+  security_oidc_linked
+  security_oidc_unlinked
+  security_user_banned
+  security_user_unbanned
+  security_ip_banned
+  security_ip_unbanned
+  security_profile_updated
+  digest_updated
+}
+
+// ── Identity ─────────────────────────────────────────────────────────────────
+
+/// `email` and `username` are stored lowercased; uniqueness is therefore
+/// case-insensitive by construction (docs/architecture.md §3.1).
+model User {
+  id                String    @id
+  email             String    @unique
+  username          String    @unique
+  display_name      String?
+  password_hash     String
+  locale            String    @default("en")
+  is_instance_admin Boolean   @default(false)
+  email_verified_at DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+
+  sessions        Session[]
+  recovery_codes  RecoveryCode[]
+  password_resets PasswordResetToken[]
+  totp_secret     TotpSecret?
+  oauth_accounts  OAuthAccount[]
+  digest_pref       DigestPref?
+  notification_pref NotificationPref?
+  notifications     Notification[]
+
+  boards_owned Board[]               @relation("BoardOwner")
+  memberships  BoardMember[]
+  comments     Comment[]
+  agent_keys   AgentKey[]
+  events       Event[]
+  reservations UsernameReservation[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String    @id
+  token_hash   String    @unique
+  user_id      String
+  ip           String?
+  user_agent   String?
+  created_at   DateTime  @default(now())
+  last_seen_at DateTime  @default(now())
+  expires_at   DateTime
+  revoked_at   DateTime?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("sessions")
+}
+
+model TotpSecret {
+  user_id      String    @id
+  secret_enc   String
+  confirmed_at DateTime?
+  last_step    Int?
+  created_at   DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("totp_secrets")
+}
+
+/// A reset token is 32 random bytes, stored as sha256 with the pepper, valid
+/// 30 minutes, single use, and retired by the next request (docs/features/auth.md §6).
+model PasswordResetToken {
+  id         String    @id
+  user_id    String
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("password_reset_tokens")
+}
+
+model RecoveryCode {
+  id         String    @id
+  user_id    String
+  code_hash  String
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("recovery_codes")
+}
+
+model OAuthAccount {
+  id                  String   @id
+  user_id             String
+  provider            String
+  provider_account_id String
+  created_at          DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([provider, provider_account_id])
+  @@index([user_id])
+  @@map("oauth_accounts")
+}
+
+/// Admin-configured OIDC provider, off by default; secret is AES-256-GCM sealed (K5-09).
+model OidcProvider {
+  id                String   @id
+  slug              String   @unique
+  name              String
+  issuer_url        String
+  client_id         String
+  client_secret_enc String
+  scopes            String   @default("openid profile email")
+  enabled           Boolean  @default(false)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now()) @updatedAt
+
+  @@map("oidc_providers")
+}
+
+/// Singleton row, id = 1. Branding, registration, TOTP policy, captcha.
+model InstanceSettings {
+  id                Int        @id @default(1)
+  instance_name     String     @default("Klui")
+  tab_title         String?
+  logo_url          String?
+  favicon_url       String?
+  accent_color      String?
+  registration_open Boolean    @default(true)
+  totp_policy       TotpPolicy @default(available)
+  captcha_enabled   Boolean    @default(false)
+  analytics_url     String?
+  metrics_enabled   Boolean    @default(false)
+  created_at        DateTime   @default(now())
+  updated_at        DateTime   @default(now()) @updatedAt
+
+  @@map("instance_settings")
+}
+
+/// A username renamed away stays reserved for 90 days and 301s to its owner (D-13).
+model UsernameReservation {
+  username            String   @id
+  user_id             String
+  redirect_to_user_id String
+  reserved_until      DateTime
+  created_at          DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("username_reservations")
+}
+
+/// Same rule for board slugs: unique per owner.
+model BoardSlugReservation {
+  id             String   @id
+  board_id       String
+  slug           String
+  redirect_slug  String
+  reserved_until DateTime
+  created_at     DateTime @default(now())
+
+  board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@unique([board_id, slug])
+  @@map("board_slug_reservations")
+}
+
+// ── Boards ───────────────────────────────────────────────────────────────────
+
+/// No archive and no expiry (D-53): a board ends by `closed_at` or by deletion.
+model Board {
+  id            String     @id
+  owner_id      String
+  name          String
+  slug          String
+  visibility    Visibility @default(private)
+  link_role     LinkRole   @default(none)
+  anon_write    AnonWrite  @default(off)
+  link_suffix   String?
+  closed_at     DateTime?
+  close_summary Json?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @default(now()) @updatedAt
+
+  owner         User                   @relation("BoardOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  members       BoardMember[]
+  links         BoardLink[]
+  tag_colors    BoardTagColor[]
+  columns       Column[]
+  cards         Card[]
+  comments      Comment[]
+  events        Event[]
+  pending_cards PendingCard[]
+  jobs          Job[]
+  agent_keys    AgentKey[]
+  slug_history  BoardSlugReservation[]
+
+  @@unique([owner_id, slug])
+  @@index([owner_id])
+  @@map("boards")
+}
+
+model BoardMember {
+  id         String     @id
+  board_id   String
+  user_id    String
+  role       MemberRole
+  created_at DateTime   @default(now())
+  updated_at DateTime   @default(now()) @updatedAt
+
+  board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([board_id, user_id])
+  @@index([user_id])
+  @@map("board_members")
+}
+
+/// A write credential: `token_hash = sha256(raw)`, raw returned once (D-12).
+model BoardLink {
+  id           String        @id
+  board_id     String
+  token_hash   String        @unique
+  role         LinkTokenRole
+  label        String?
+  created_at   DateTime      @default(now())
+  last_used_at DateTime?
+  revoked_at   DateTime?
+
+  board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@index([board_id])
+  @@map("board_links")
+}
+
+/// The board-level default colour for a tag (D-21). Card-level override wins.
+model BoardTagColor {
+  id       String @id
+  board_id String
+  tag      String
+  color    String
+
+  board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@unique([board_id, tag])
+  @@map("board_tag_colors")
+}
+
+// ── Content ──────────────────────────────────────────────────────────────────
+
+model Column {
+  id         String   @id
+  board_id   String
+  name       String
+  position   Decimal  @db.Decimal(30, 10)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  board Board  @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@index([board_id, position])
+  @@map("columns")
+}
+
+model Card {
+  id             String    @id
+  board_id       String
+  column_id      String
+  title          String
+  description    String?
+  assignee_id    String?
+  assignee_label String?
+  due_at         DateTime?
+  done           Boolean   @default(false)
+  position       Decimal   @db.Decimal(30, 10)
+  anon_actor_id  String?
+  /// The display name an anonymous actor chose; null for an account or a link.
+  actor_label    String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @default(now()) @updatedAt
+
+  board    Board     @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  column   Column    @relation(fields: [column_id], references: [id], onDelete: Cascade)
+  tags     CardTag[]
+  comments Comment[]
+
+  @@index([board_id, column_id, position])
+  @@index([anon_actor_id])
+  @@map("cards")
+}
+
+model CardTag {
+  card_id String
+  name    String
+  color   String?
+
+  card Card @relation(fields: [card_id], references: [id], onDelete: Cascade)
+
+  @@id([card_id, name])
+  @@map("card_tags")
+}
+
+model Comment {
+  id           String            @id
+  board_id     String
+  card_id      String
+  author_id    String?
+  author_type  CommentAuthorType @default(user)
+  author_label String?
+  body         String
+  edited_at    DateTime?
+  created_at   DateTime          @default(now())
+  updated_at   DateTime          @default(now()) @updatedAt
+
+  board  Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  card   Card  @relation(fields: [card_id], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [author_id], references: [id], onDelete: SetNull)
+
+  @@index([card_id, created_at])
+  @@map("comments")
+}
+
+/// Append-only. Written by exactly one helper, in the mutation's transaction.
+model Event {
+  id              String    @id
+  board_id        String?
+  type            EventType
+  actor_kind      ActorKind
+  actor_user_id   String?
+  actor_label     String?
+  actor_anon_id   String?
+  payload         Json
+  idempotency_key String?
+  created_at      DateTime  @default(now())
+
+  board Board? @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  actor User?  @relation(fields: [actor_user_id], references: [id], onDelete: SetNull)
+
+  @@unique([board_id, idempotency_key])
+  @@index([board_id, created_at, id])
+  @@index([type])
+  @@map("events")
+}
+
+model PendingCard {
+  id            String    @id
+  board_id      String
+  column_id     String
+  title         String
+  description   String?
+  tags          Json?
+  due_at        DateTime?
+  actor_label   String
+  anon_actor_id String
+  expires_at    DateTime
+  created_at    DateTime  @default(now())
+
+  board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@index([board_id, created_at])
+  @@index([expires_at])
+  @@map("pending_cards")
+}
+
+// ── Agents and operations ────────────────────────────────────────────────────
+
+/// `kb_` + base62, stored sha256, shown once, scoped to one board or one user (D-33).
+model AgentKey {
+  id           String        @id
+  user_id      String
+  board_id     String?
+  name         String
+  key_hash     String        @unique
+  scope        AgentKeyScope
+  expires_at   DateTime
+  revoked_at   DateTime?
+  last_used_at DateTime?
+  created_at   DateTime      @default(now())
+
+  user  User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  board Board? @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("agent_keys")
+}
+
+model DigestPref {
+  user_id          String    @id
+  enabled          Boolean   @default(false)
+  hour             Int       @default(8)
+  timezone         String    @default("UTC")
+  webhook_url      String?
+  email            String?
+  rss_token_hash   String?
+  /// The one-click unsubscribe token, hashed at rest like every credential.
+  unsubscribe_hash String?
+  last_sent_at     DateTime?
+  /// What the last send actually carried, for the RSS feed and the settings page.
+  last_digest      Json?
+  /// Consecutive delivery failures; a channel is disabled at ten (digest.md §3).
+  failures         Int       @default(0)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @default(now()) @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("digest_prefs")
+}
+
+/// Deduplicated by (user_id, kind, event_id): one event never notifies twice (D-37).
+model Notification {
+  id         String    @id
+  user_id    String
+  kind       String
+  event_id   String?
+  payload    Json
+  read_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, kind, event_id])
+  @@index([user_id, created_at])
+  @@map("notifications")
+}
+
+/// Per-account mute list and optional Discord/Slack webhook for notifications (K5-04).
+model NotificationPref {
+  user_id     String   @id
+  muted_kinds Json     @default("[]")
+  webhook_url String?
+  failures    Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("notification_prefs")
+}
+
+model Ban {
+  id           String         @id
+  subject      String
+  subject_kind BanSubjectKind
+  reason       String?
+  expires_at   DateTime?
+  created_at   DateTime       @default(now())
+
+  @@index([subject, subject_kind])
+  @@map("bans")
+}
+
+model Job {
+  id          String    @id
+  board_id    String
+  kind        String
+  status      JobStatus @default(pending)
+  source_hash String?
+  result      Json?
+  error       String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now()) @updatedAt
+
+  board Board @relation(fields: [board_id], references: [id], onDelete: Cascade)
+
+  @@unique([board_id, kind, source_hash])
+  @@map("jobs")
+}

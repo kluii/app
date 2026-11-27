@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Klui</title>
+    <script>
+      /* The only inline script (DESIGN.md §15): apply the theme before React mounts,
+         or a light-theme user sees a dark flash on every load. The server computes
+         its CSP hash at boot in server/src/settings/static.ts. */
+      (function () {
+        try {
+          var stored = localStorage.getItem('klui-theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (error) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

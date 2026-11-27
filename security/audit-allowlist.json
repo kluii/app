@@ -1,0 +1,17 @@
+{
+  "$comment": "Runtime dependency advisories accepted with a reason and an expiry (docs/security.md §11). An entry that no longer matches an advisory fails the gate, so the list cannot rot.",
+  "allowlist": [
+    {
+      "module": "deepmerge-ts",
+      "advisory": "GHSA-ggr8-5vv4-36mx",
+      "reason": "Reached only through the Prisma CLI's config loader, which runs `migrate deploy` at container start and then exits. No user input is merged. Leaving Prisma 6 requires moving the datasource URL into prisma.config.ts and adopting a driver adapter (its own ADR).",
+      "expires": "2027-03-01"
+    },
+    {
+      "module": "effect",
+      "advisory": "GHSA-7589-6fvf-x4pw",
+      "reason": "Bundled by @prisma/config for schema parsing in the CLI, same boot-only path as above. The advisory is a ReDoS in a template-literal compiler fed by the local schema file, not by a request.",
+      "expires": "2027-03-01"
+    }
+  ]
+}

@@ -87,11 +87,18 @@ Names are a contract: compose files, docs and the site depend on them.
 | `KLUI_REGISTRATION_OPEN` | `true` | Admin can override at runtime in settings |
 | `KLUI_TOTP_POLICY` | `available` | `available` / `required` / `disabled` |
 | `KLUI_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` / `_FROM` | unset | Unset → email features fail closed with `503` |
-| `KLUI_ANALYTICS_URL` | unset | Unset → no script tag, no outbound request (asserted by test) |
+| `KLUI_ANALYTICS_URL` | unset | Unset → no script tag, no outbound request (asserted by `server/test/analytics.test.ts`). Set → one deferred tag before `</head>`, and its origin is added to the CSP `script-src` and `connect-src`; without that the policy would block the tag and the feature would only look shipped |
 | `KLUI_METRICS_ENABLED` | `false` | When true, bind to loopback or require a token |
 | `KLUI_METRICS_TOKEN` | unset | Bearer token for `/metrics` |
-| `KLUI_CAPTCHA_ENABLED` | `false` | Cap, self-hosted |
-| `KLUI_CAPTCHA_URL` | unset | Cap instance URL |
+| `KLUI_CAPTCHA_ENABLED` | `false` | Cap, self-hosted, anonymous writes only, past the threshold |
+| `KLUI_CAPTCHA_URL` | unset | Cap instance URL; required when the captcha is enabled, or boot fails |
+| `KLUI_CAPTCHA_SECRET` | unset | Sent as `Authorization: Bearer` to `{URL}/siteverify` |
+| `KLUI_CAPTCHA_THRESHOLD` | `3` | Anonymous writes from one address before a token is demanded |
+| `KLUI_ANON_WRITES_PER_BOARD` | `30` | Per board per hour |
+| `KLUI_ANON_WRITES_PER_IP` | `10` | Per address per hour |
+| `KLUI_ANON_JOINS_PER_IP` | `20` | Display-name joins per address per hour |
+| `KLUI_AGENT_WRITES` | `60` | Agent-key writes per key per minute |
+| `KLUI_AGENT_READS` | `600` | Agent-key reads per key per minute |
 | `KLUI_OIDC_DISCORD_CLIENT_ID` / `_SECRET` | unset | Provider flags default off |
 | `KLUI_OIDC_GITHUB_CLIENT_ID` / `_SECRET` | unset | |
 | `KLUI_OIDC_GENERIC_{NAME}_ISSUER` / `_CLIENT_ID` / `_SECRET` | unset | `{NAME}` uppercased, e.g. `KLUI_OIDC_GENERIC_AUTHENTIK_ISSUER` |
@@ -169,7 +176,9 @@ docker compose up -d
 
 ## 7. Health and observability
 
-- `GET /healthz` → `{"status":"ok","version":"2.0.0","db":"up"}`. `503` with `db:"down"` when the database is unreachable. No auth, no detail beyond that.
+- `GET /healthz` → `{"status":"ok","version":"<package version>","db":"up"}`. `503` with `db:"down"` when the database is unreachable. No auth, no detail beyond that.
+- One `warn` is logged per process the first time `X-Forwarded-For` arrives while `KLUI_TRUSTED_PROXY_HOPS=0`, naming the variable and this section. The header is client-written, so it is not trusted and the default is not changed: the line exists because this section is the fix.
+- The version in that body is the `package.json` of the running build, the tag `compose.yaml` builds (`klui:${KLUI_VERSION:-<that version>}`) and the three `package.json` files are held together by `server/test/version.test.ts`: bump one alone and the suite fails.
 - The version comes from `package.json`. A version bump is the only honest deploy proof; a container that still reports the old version did not deploy.
 - `/metrics` is off by default. When enabled, expose it on loopback and scrape it from the host, or protect it with `KLUI_METRICS_TOKEN`.
 - Logs are JSON, one line per request, with the request id. No bodies, no tokens, no emails. `docker compose logs -f app | jq` is the intended workflow.
@@ -183,6 +192,8 @@ docker compose up -d
 | Demo / public board with anonymous writes | 2 vCPU | 1 GB | 5 GB + data |
 
 Postgres is the memory consumer; give it 1 GB and a `shared_buffers` of 256 MB for anything beyond a personal instance. The app itself is comfortable in 256 MB.
+
+**Image size, measured.** `docker images` reports 757 MB for `klui:2.0.0` (2026-11-27), down from 793 MB and up from the 659 MB single-architecture build, because the image now carries both `linux/amd64` and `linux/arm64` Prisma engines — 98 MB of it — and `prisma generate` cannot run under QEMU arm64 (its schema parser misreads the file there), so the client is generated once on the build platform with `binaryTargets` covering both. The runtime stage copies the server's production `node_modules` and nothing else: the peak was web's dependencies beside an already-built SPA (`lucide-react` 48 MB, `react-dom`, `@tanstack`) plus a peer-installed `typescript` (23 MB), which no runtime file imports. What remains is mostly not ours to cut: the `node:26-alpine` base is 251 MB by itself, and the Prisma toolchain — CLI 67, client 74, engines 36, `effect` 33 — is 176 MB of it, because the container runs `prisma migrate deploy` at boot. A 300 MB image would need migrations in a separate container and a hand-pruned vendor tree; this document does not claim one. The `docker` job fails above 800 MB, so the 404 MB regression cannot return quietly.
 
 ## 9. Hosted instance (same image)
 
@@ -206,8 +217,12 @@ The cloud instance runs the same image and the same compose file with different 
 
 1. Version bumped in `server/package.json` and `web/package.json`.
 2. CHANGELOG entry with migrations, env changes and rollback notes.
-3. Full gate green, recorded in `docs/verify/k5.md`.
-4. Image published for `linux/amd64` and `linux/arm64`, tagged `2.0.0` and `latest`.
+3. Full gate green, with its output pasted in the release's `CHANGELOG.md` entry.
+4. Tag pushed: `git tag -a v2.0.0 -m "Klui 2.0.0" && git push origin v2.0.0`. The
+   `release` job in `.github/workflows/ci.yml` runs only for a `v*` tag, refuses
+   when the tag and `package.json` disagree, and publishes
+   `ghcr.io/<owner>/klui:2.0.0` and `:latest` for `linux/amd64` and `linux/arm64`.
+   It cannot run before `gate`, `e2e` and `docker` pass on that commit.
 5. Pre-upgrade dump taken and its restore tested on a scratch database.
 6. Row counts recorded before, compared after.
 7. `/healthz` reports the new version.

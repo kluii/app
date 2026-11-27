@@ -1,0 +1,496 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+/*
+ * The only file in the repository allowed to contain a colour literal
+ * (DESIGN.md §15). Every value below is measured in
+ * web/test/contrast.test.ts against the surfaces it actually sits on.
+ *
+ * The palette is the landing page's: warm graphite, warm paper, one serif.
+ */
+
+/* ── The three families ────────────────────────────────────────────────────
+ * Self-hosted latin subsets, because the CSP is `font-src 'self'`
+ * (server/src/settings/static.ts). Inter and JetBrains Mono are variable, and
+ * so is Newsreader, which is why one file covers every weight below.
+ */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../assets/fonts/inter-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../assets/fonts/newsreader-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+}
+
+:root {
+  color-scheme: dark;
+
+  /* surfaces: a step, not a shadow (§5) */
+  --canvas: #121110;
+  --column: #171514;
+  --card: #201e1c;
+  --surface: #1a1817;
+  --surface-2: #242220;
+  --surface-muted: #2a2724;
+
+  /* seams */
+  --border: #302d29;
+  --border-strong: #46413a;
+  /* #6e675c measured 2.83:1 against --surface-2, under the 3:1 the control
+     boundary owes its surface; raised by two steps of lightness (3.25:1). */
+  --control-border: #767065;
+
+  /* ink */
+  --ink: #f4f1eb;
+  --ink-muted: #ada79e;
+  --ink-subtle: #948e85;
+
+  /* the accent is the ink */
+  --primary: #f5f2ec;
+  --primary-hover: #fffdf8;
+  --primary-foreground: #14120f;
+
+  /* the inverted plate: a menu header, a printed rule */
+  --plate: #e9e5dd;
+  --plate-ink: #14120f;
+
+  --danger: #e8836f;
+  --focus: #f5f2ec;
+  --selection: #2e2b27;
+  --insert-line: #f5f2ec;
+
+  /* tag tints (D-21): capped so any hue keeps the label readable */
+  --tag-tint: 18%;
+  --tag-slate: #94a3b8;
+  --tag-gray: #a1a1aa;
+  --tag-red: #f87171;
+  --tag-orange: #fb923c;
+  --tag-amber: #fbbf24;
+  --tag-lime: #a3e635;
+  --tag-green: #4ade80;
+  --tag-teal: #2dd4bf;
+  --tag-sky: #38bdf8;
+  --tag-blue: #60a5fa;
+  --tag-violet: #a78bfa;
+  --tag-pink: #f472b6;
+
+  /* geometry (DESIGN.md §4): the off-scale sizes the app needs */
+  --size-column: 288px;
+  --size-card: 272px;
+  --size-dialog: 560px;
+  --size-dialog-wide: 640px;
+  --size-content: 1440px;
+
+  /* one shadow, overlays only */
+  --shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --scrim: rgba(0, 0, 0, 0.64);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --canvas: #f7f5f0;
+  --column: #ebe7de;
+  --card: #ffffff;
+  --surface: #fcfbf7;
+  --surface-2: #f3efe7;
+  --surface-muted: #e8e3d8;
+
+  --border: #d9d3c6;
+  --border-strong: #b5ae9e;
+  --control-border: #7a7365;
+
+  --ink: #14120f;
+  --ink-muted: #5b564d;
+  --ink-subtle: #635e54;
+
+  --primary: #14120f;
+  --primary-hover: #000000;
+  --primary-foreground: #fffdf8;
+
+  --plate: #14120f;
+  --plate-ink: #f7f5f0;
+
+  --danger: #a33a22;
+  --focus: #14120f;
+  --selection: #e4dfd3;
+  --insert-line: #14120f;
+
+  --tag-tint: 12%;
+  --tag-slate: #64748b;
+  --tag-gray: #71717a;
+  --tag-red: #dc2626;
+  --tag-orange: #ea580c;
+  --tag-amber: #d97706;
+  --tag-lime: #65a30d;
+  --tag-green: #16a34a;
+  --tag-teal: #0d9488;
+  --tag-sky: #0284c7;
+  --tag-blue: #2563eb;
+  --tag-violet: #7c3aed;
+  --tag-pink: #db2777;
+
+  --shadow-overlay: 0 10px 30px rgba(20, 18, 15, 0.12);
+  --scrim: rgba(20, 18, 15, 0.32);
+}
+
+/* ── Tailwind mapping ──────────────────────────────────────────────────────
+ * Utilities read these names: bg-canvas, text-ink-muted, border-border,
+ * rounded-sm, w-column. A component that needs a new value adds a token here,
+ * never an arbitrary value at the call site (DESIGN.md §15).
+ */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-column: var(--column);
+  --color-card: var(--card);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-muted: var(--surface-muted);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-control-border: var(--control-border);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-plate: var(--plate);
+  --color-plate-ink: var(--plate-ink);
+
+  --color-danger: var(--danger);
+  --color-focus: var(--focus);
+  --color-selection: var(--selection);
+  --color-insert-line: var(--insert-line);
+
+  /* 8 px for surfaces and inputs, a pill for controls; the 4 px step is gone. */
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-full: 9999px;
+
+  --width-column: var(--size-column);
+  --width-card: var(--size-card);
+  --width-dialog: var(--size-dialog);
+  --width-dialog-wide: var(--size-dialog-wide);
+  --width-content: var(--size-content);
+
+  --font-display: Newsreader, Georgia, serif;
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --container-content: var(--size-content);
+
+  /* Type scale (§3): text-display … text-mono-sm. Family is a utility
+     (`font-display`), because a Tailwind text token cannot carry one. */
+  --text-display: 44px;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.025em;
+  --text-display--font-weight: 400;
+
+  --text-h1: 32px;
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 400;
+
+  --text-h2: 24px;
+  --text-h2--line-height: 1.2;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 400;
+
+  --text-h3: 18px;
+  --text-h3--line-height: 1.3;
+  --text-h3--letter-spacing: 0.01em;
+  --text-h3--font-weight: 500;
+
+  --text-body: 15px;
+  --text-body--line-height: 1.6;
+  --text-body--letter-spacing: 0.01em;
+  --text-body--font-weight: 400;
+
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 1.5;
+  --text-body-sm--letter-spacing: 0.02em;
+  --text-body-sm--font-weight: 400;
+
+  --text-label: 12px;
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: 0.05em;
+  --text-label--font-weight: 500;
+
+  --text-mono: 12px;
+  --text-mono--line-height: 1.5;
+  --text-mono--letter-spacing: 0;
+  --text-mono--font-weight: 400;
+
+  --text-mono-sm: 11px;
+  --text-mono-sm--line-height: 1.4;
+  --text-mono-sm--letter-spacing: 0.02em;
+  --text-mono-sm--font-weight: 400;
+
+  /* a column header is small caps with air, not a title */
+  --tracking-caps: 0.08em;
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────────
+ * Three values, no more: a hover, a drop, and the curve both use.
+ */
+:root {
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+@layer base {
+  :root {
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    color: var(--ink);
+    background-color: var(--canvas);
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  ::selection {
+    background-color: var(--selection);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ── Component-level rules that cannot be expressed as utilities ────────────
+ * A tint mix and a scrim are not Tailwind values; they live here, next to the
+ * tokens they are built from, rather than as an arbitrary value at a call site.
+ */
+@layer components {
+  /* D-21: any hue stays readable because the tint is capped and the label is ink. */
+  .tag-chip {
+    --tag-bg: color-mix(in srgb, var(--tag) var(--tag-tint), var(--card));
+    --tag-line: color-mix(in srgb, var(--tag) 45%, var(--border));
+    background-color: var(--tag-bg);
+    border: 1px solid var(--tag-line);
+    color: var(--ink);
+  }
+
+  .tag-chip__bar {
+    background-color: var(--tag);
+  }
+
+  .dialog-panel {
+    width: var(--size-dialog);
+    max-width: calc(100vw - 2rem);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .dialog-panel::backdrop {
+    background-color: var(--scrim);
+  }
+
+  /* Ten frames stacked in one cell; each is visible for 80 of 800 ms. */
+  .spinner {
+    position: relative;
+    width: 1ch;
+    height: 1.4em;
+  }
+
+  .spinner > span {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    animation: spinner-frame 800ms steps(1, end) infinite;
+  }
+
+  .spinner > span:nth-child(1) {
+    animation-delay: 0ms;
+  }
+
+  .spinner > span:nth-child(2) {
+    animation-delay: 80ms;
+  }
+
+  .spinner > span:nth-child(3) {
+    animation-delay: 160ms;
+  }
+
+  .spinner > span:nth-child(4) {
+    animation-delay: 240ms;
+  }
+
+  .spinner > span:nth-child(5) {
+    animation-delay: 320ms;
+  }
+
+  .spinner > span:nth-child(6) {
+    animation-delay: 400ms;
+  }
+
+  .spinner > span:nth-child(7) {
+    animation-delay: 480ms;
+  }
+
+  .spinner > span:nth-child(8) {
+    animation-delay: 560ms;
+  }
+
+  .spinner > span:nth-child(9) {
+    animation-delay: 640ms;
+  }
+
+  .spinner > span:nth-child(10) {
+    animation-delay: 720ms;
+  }
+
+  @keyframes spinner-frame {
+    0% {
+      opacity: 1;
+    }
+
+    10% {
+      opacity: 0;
+    }
+
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spinner > span {
+      animation: none;
+      opacity: 0;
+    }
+
+    .spinner > span:nth-child(1) {
+      opacity: 1;
+    }
+  }
+}
+
+/* ── Drag and drop ────────────────────────────────────────────────────────
+ * Four pieces: the source card fades, the target column steps up, a 2 px rule
+ * shows the slot, and the card that landed settles once. Under reduced motion
+ * the rule still appears — a position is information — and nothing moves.
+ */
+.insert-line {
+  height: 2px;
+  margin: 2px 0;
+  border-radius: var(--radius-sm);
+  background-color: var(--insert-line);
+}
+
+[data-dragging="true"] {
+  opacity: 0.35;
+  outline: 1px dashed var(--border-strong);
+  outline-offset: -1px;
+  /* the source card keeps its place: the native preview is already following
+     the pointer, and a transform here reads as a double image */
+}
+
+[data-drop-active="true"] {
+  background-color: var(--surface-2);
+  outline: 1px solid var(--border-strong);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-dragging="true"],
+  [data-drop-active="true"] {
+    transition:
+      opacity var(--dur-fast) var(--ease),
+      background-color var(--dur-fast) var(--ease);
+  }
+
+  .insert-line {
+    animation: insert-line-in var(--dur-fast) var(--ease);
+    transition: opacity var(--dur-fast) var(--ease);
+  }
+
+  .insert-line[data-leaving="true"] {
+    opacity: 0;
+  }
+
+  [data-settling="true"] {
+    animation: card-settle var(--dur-base) var(--ease);
+  }
+
+  body.is-dragging {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  @keyframes insert-line-in {
+    from {
+      transform: scaleX(0.4);
+    }
+
+    to {
+      transform: none;
+    }
+  }
+
+  @keyframes card-settle {
+    from {
+      transform: translateY(-6px) scale(0.985);
+      opacity: 0.6;
+    }
+
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+}
+
+/*
+ * Print: a summary on white paper, black ink, no dark theme
+ * (docs/features/close-out.md §4). Re-pointing the tokens keeps every component
+ * inside the page on the same palette.
+ */
+@media print {
+  :root,
+  [data-theme="light"],
+  [data-theme="dark"] {
+    --canvas: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #ffffff;
+    --surface-muted: #f3f4f6;
+    --ink: #000000;
+    --ink-muted: #1f2937;
+    --ink-subtle: #374151;
+    --border: #d1d5db;
+  }
+}

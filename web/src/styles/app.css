@@ -1,0 +1,72 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
+@import "tailwindcss";
+@import "./tokens.css";
+
+/*
+ * A summary is something people print and paste into a report
+ * (docs/features/close-out.md §4): one page for a board under 50 cards, no app
+ * chrome. The print palette itself lives in tokens.css, which is the only file
+ * allowed to name a colour.
+ */
+@media print {
+  header[data-app-chrome="true"] {
+    display: none;
+  }
+
+  .summary-page {
+    max-width: none;
+    padding: 0;
+    break-inside: avoid;
+  }
+
+  .summary-page a {
+    display: none;
+  }
+}
+
+/*
+ * 390 px (K2-13). The rail scrolls sideways and snaps; a column stops at the top
+ * of the viewport with its header pinned, because a list you can only scroll
+ * blindly is worse than a shorter list. Colours stay in tokens.css.
+ */
+@media (max-width: 640px) {
+  .board-rail {
+    scroll-snap-type: x proximity;
+    padding-inline: 0.75rem;
+  }
+
+  .board-column {
+    scroll-snap-align: start;
+    max-height: calc(100dvh - 11rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .board-column > header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--column);
+  }
+
+  /* A modal on a phone is a sheet: it comes from the bottom, full width, and
+     scrolls inside itself instead of the page behind it. */
+  dialog.dialog-panel {
+    width: 100%;
+    max-width: 100%;
+    max-height: 90dvh;
+    margin: auto 0 0;
+    overflow-y: auto;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 0;
+  }
+}
+
+/* A finger needs 40 px; a mouse does not, and 40 px rows on a desktop list are
+   wasted space (DESIGN.md §9). */
+@media (pointer: coarse) {
+  .board-column button,
+  .board-rail button {
+    min-height: 40px;
+  }
+}
