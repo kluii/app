@@ -1,4 +1,7 @@
 {
+  "account.language": "Language",
+  "account.settings": "Account settings",
+  "account.theme": "Theme",
   "auth.reset.confirm": "Set the password",
   "auth.reset.confirmBody": "The link works once and expires after 30 minutes.",
   "auth.reset.confirmTitle": "Choose a new password",

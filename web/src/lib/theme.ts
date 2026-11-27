@@ -20,17 +20,21 @@ export function applyTheme(theme: Theme): void {
   }
 }
 
-export function useTheme(): { theme: Theme; toggle: () => void } {
-  const [theme, setTheme] = useState<Theme>(currentTheme);
+export function useTheme(): { theme: Theme; toggle: () => void; setTheme: (next: Theme) => void } {
+  const [theme, setThemeState] = useState<Theme>(currentTheme);
   useEffect(() => {
-    setTheme(currentTheme());
+    setThemeState(currentTheme());
   }, []);
   return {
     theme,
+    setTheme: (next: Theme) => {
+      applyTheme(next);
+      setThemeState(next);
+    },
     toggle: () => {
       const next: Theme = theme === 'dark' ? 'light' : 'dark';
       applyTheme(next);
-      setTheme(next);
+      setThemeState(next);
     },
   };
 }

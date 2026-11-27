@@ -1,4 +1,7 @@
 {
+  "account.language": "Langue",
+  "account.settings": "Paramètres du compte",
+  "account.theme": "Thème",
   "auth.reset.confirm": "Définir le mot de passe",
   "auth.reset.confirmBody": "Le lien ne sert qu’une fois et expire après 30 minutes.",
   "auth.reset.confirmTitle": "Choisir un nouveau mot de passe",

@@ -1,38 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Link, Outlet, useNavigate } from '@tanstack/react-router';
+import { Link, Outlet } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { LogOut, Moon, Sun } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { queryKeys } from '../../lib/query-client';
-import { useTheme } from '../../lib/theme';
+import { currentTheme } from '../../lib/theme';
 import { t } from '../../i18n';
-import { Button } from '../ui/button';
 import whiteLogo from '../../assets/klui-logo-white.png';
 import blackLogo from '../../assets/klui-logo-black.png';
+import { AccountMenu } from './account-menu';
 
 /**
  * 56 px bar, canvas ground, hairline bottom, no shadow (DESIGN.md §4).
  * The footer is mandatory on every page (AGENTS.md §8).
  */
 export function AppShell({ children, actions }: { children?: ReactNode; actions?: ReactNode }) {
-  const { theme, toggle } = useTheme();
-  const navigate = useNavigate();
+  const [theme] = useState(currentTheme);
   const me = useQuery({
     queryKey: queryKeys.me,
     queryFn: api.me,
     retry: false,
     staleTime: 30_000,
   });
-
-  useEffect(() => {
-    document.documentElement.lang = 'en';
-  }, []);
-
-  const signOut = async () => {
-    await api.logout();
-    await navigate({ to: '/login' });
-  };
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
@@ -63,35 +52,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
           {actions}
         </div>
         <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggle}
-            aria-label={t('theme.toggle')}
-            title={theme === 'dark' ? t('theme.light') : t('theme.dark')}
-          >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          </Button>
-          {me.data ? (
-            <>
-              <Link
-                to="/settings"
-                className="rounded-sm px-2 text-label text-ink-muted underline-offset-4 hover:text-ink hover:underline"
-              >
-                {t('nav.account')}
-              </Link>
-              <span className="font-mono text-mono-sm text-ink-muted">{me.data.username}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => void signOut()}
-                aria-label={t('common.action.signOut')}
-                title={t('common.action.signOut')}
-              >
-                <LogOut size={16} />
-              </Button>
-            </>
-          ) : null}
+          {me.data ? <AccountMenu me={me.data} /> : null}
         </div>
       </header>
 
