@@ -17,10 +17,13 @@ import { Dialog } from '../ui/dialog';
 
 export function BoardDataDialog({
   boardId,
+  canImport,
   open,
   onClose,
 }: {
   boardId: string;
+  /** Export is a read; import writes a board, so it is offered only to a manager (K3-08). */
+  canImport: boolean;
   open: boolean;
   onClose: () => void;
 }) {
@@ -89,50 +92,52 @@ export function BoardDataDialog({
         <p className="text-body-sm text-ink-subtle">{t('board.data.exportHint')}</p>
       </section>
 
-      <section className="mt-5 flex flex-col gap-2 border-t border-border pt-4">
-        <h3 className="text-h3">{t('board.data.import')}</h3>
-        <p className="text-body-sm text-ink-subtle">{t('board.data.importHint')}</p>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          className="text-body-sm text-ink-muted file:mr-3 file:h-8 file:rounded-sm file:border file:border-border file:bg-surface-2 file:px-3 file:text-body-sm file:text-ink"
-          onChange={(event) => {
-            setFile(event.target.files?.[0] ?? null);
-            setResult(null);
-            setError(null);
-          }}
-          data-testid="import-file"
-        />
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="primary"
-            disabled={file === null}
-            loading={importFile.isPending}
-            onClick={() => {
-              if (file !== null) importFile.mutate(file);
+      {canImport ? (
+        <section className="mt-5 flex flex-col gap-2 border-t border-border pt-4">
+          <h3 className="text-h3">{t('board.data.import')}</h3>
+          <p className="text-body-sm text-ink-subtle">{t('board.data.importHint')}</p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="text-body-sm text-ink-muted file:mr-3 file:h-8 file:rounded-sm file:border file:border-border file:bg-surface-2 file:px-3 file:text-body-sm file:text-ink"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              setResult(null);
+              setError(null);
             }}
-            data-testid="import-submit"
-          >
-            {t('board.data.importSubmit')}
-          </Button>
-        </div>
-        {result !== null ? (
-          <p className="text-body-sm text-ink-muted" role="status" data-testid="import-result">
-            {t('board.data.imported', {
-              cards: result.cards,
-              comments: result.comments,
-              columns: result.columns,
-            })}
-          </p>
-        ) : null}
-        {error !== null ? (
-          <p className="text-body-sm text-danger" role="alert" data-testid="import-error">
-            {error}
-          </p>
-        ) : null}
-      </section>
+            data-testid="import-file"
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={file === null}
+              loading={importFile.isPending}
+              onClick={() => {
+                if (file !== null) importFile.mutate(file);
+              }}
+              data-testid="import-submit"
+            >
+              {t('board.data.importSubmit')}
+            </Button>
+          </div>
+          {result !== null ? (
+            <p className="text-body-sm text-ink-muted" role="status" data-testid="import-result">
+              {t('board.data.imported', {
+                cards: result.cards,
+                comments: result.comments,
+                columns: result.columns,
+              })}
+            </p>
+          ) : null}
+          {error !== null ? (
+            <p className="text-body-sm text-danger" role="alert" data-testid="import-error">
+              {error}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
     </Dialog>
   );
 }

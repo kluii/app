@@ -227,9 +227,16 @@ describe('using a link', () => {
 
     const state = await visitor.request('GET', `/api/v1/boards/${board.id}/state`);
     expect(state.statusCode).toBe(200);
-    expect((JSON.parse(state.body) as { caller: { can_write: boolean } }).caller.can_write).toBe(
-      false,
-    );
+    const caller = (
+      JSON.parse(state.body) as {
+        caller: { can_write: boolean; can_export: boolean; can_import: boolean };
+      }
+    ).caller;
+    expect(caller.can_write).toBe(false);
+    // Export carries the member list and the whole log; import writes the board.
+    // A link is a visitor, so neither is theirs (K3-08).
+    expect(caller.can_export).toBe(false);
+    expect(caller.can_import).toBe(false);
 
     const columns = (JSON.parse(state.body) as { columns: { id: string }[] }).columns;
     const created = await visitor.request('POST', `/api/v1/boards/${board.id}/cards`, {

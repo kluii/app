@@ -80,6 +80,8 @@ describe('a board state under a frame', () => {
       can_manage_columns: true,
       can_manage_members: true,
       can_moderate: true,
+      can_export: true,
+      can_import: true,
       can_close: true,
     },
     pending_count: 0,

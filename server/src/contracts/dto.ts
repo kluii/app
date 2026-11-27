@@ -66,6 +66,10 @@ export type CallerDto = {
   can_write: boolean;
   can_manage: boolean;
   can_moderate: boolean;
+  /** `board.export`: any member, never a link or anonymous visitor. */
+  can_export: boolean;
+  /** `board.import`: owner or admin. */
+  can_import: boolean;
   /** `board.close`: owner or admin, and false once the board is closed. */
   can_close: boolean;
 };

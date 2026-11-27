@@ -3,6 +3,9 @@ import { createHmac } from 'node:crypto';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+// Re-runnable without a schema reset: a fixed username is a 409 on the second
+// run against the same e2e database, which reads as a product failure.
+const RUN = Date.now().toString(36);
 
 function decodeBase32(input: string): Buffer {
   let bits = 0;
@@ -77,7 +80,7 @@ test('a password login stops at the second factor and continues with the code', 
   request,
   browser,
 }) => {
-  const username = 'factor-user';
+  const username = `factor-user-${RUN}`;
   const { secret } = await signUpWithTotp(request, username);
 
   const context = await browser.newContext();
@@ -99,8 +102,8 @@ test('a password login stops at the second factor and continues with the code', 
 test('the account page reveals the secret and the recovery codes once', async ({ page }) => {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByRole('link', { name: 'No account yet? Create one' }).click();
-  await page.getByLabel('Email').fill('panel@klui.test');
-  await page.getByLabel('Username').fill('panel-user');
+  await page.getByLabel('Email').fill(`panel-${RUN}@klui.test`);
+  await page.getByLabel('Username').fill(`panel-user-${RUN}`);
   await page.getByLabel('Password').fill('a-long-passphrase-9');
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();

@@ -83,7 +83,10 @@ The anonymous buckets are keyed on `request.ip`, which only honours `X-Forwarded
             "created_at":"…","updated_at":"…"}],
   "members":[{"user_id":"usr_…","username":"will","role":"owner"}],
   "caller":{"actor_kind":"user","role":"owner","label":"will",
-            "can_write":true,"can_manage":true,"can_moderate":false},
+            "can_write":true,"can_manage":true,"can_moderate":false,
+            "can_delete_card":true,"can_move_card":true,"can_comment":true,
+            "can_manage_columns":true,"can_manage_members":true,
+            "can_export":true,"can_import":true,"can_close":true},
   "pending_count":0 }
 
 // Event

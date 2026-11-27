@@ -101,6 +101,8 @@ export type Caller = {
   can_manage_columns: boolean;
   can_manage_members: boolean;
   can_moderate: boolean;
+  can_export: boolean;
+  can_import: boolean;
   can_close: boolean;
 };
 

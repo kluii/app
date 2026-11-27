@@ -236,7 +236,12 @@ export function BoardView({ boardId }: { boardId: string }) {
           onClose={() => setComposer({ kind: 'closed' })}
         />
       ) : null}
-      <BoardDataDialog boardId={boardId} open={dataOpen} onClose={() => setDataOpen(false)} />
+      <BoardDataDialog
+        boardId={boardId}
+        canImport={state.data.caller.can_import}
+        open={dataOpen}
+        onClose={() => setDataOpen(false)}
+      />
       <CloseBoardDialog
         boardId={boardId}
         boardName={state.data.board.name}
@@ -420,7 +425,9 @@ function BoardFrame({
           <span className="font-mono text-mono-sm text-ink-subtle">
             {board.owner.username}/{board.slug}
           </span>
-          <Chip>{callerLabel(caller)}</Chip>
+          <span data-testid="caller-chip">
+            <Chip>{callerLabel(caller)}</Chip>
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Chip>{t(`board.visibility.${board.visibility}`)}</Chip>
@@ -449,9 +456,16 @@ function BoardFrame({
           <Button size="sm" variant="secondary" onClick={onOpenActivity}>
             {t('board.activity.title')}
           </Button>
-          <Button size="sm" variant="secondary" onClick={onOpenData} data-testid="open-board-data">
-            {t('board.data.open')}
-          </Button>
+          {caller.can_export ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onOpenData}
+              data-testid="open-board-data"
+            >
+              {t('board.data.open')}
+            </Button>
+          ) : null}
           {board.closed_at === null ? (
             caller.can_close && (
               <Button
@@ -534,7 +548,9 @@ function ColumnRail({
     <div className={className}>
       <div className="flex flex-col items-center gap-2 rounded-md border border-border px-6 py-10 text-center">
         <h2 className="text-h2">{t('board.empty.noColumns')}</h2>
-        <p className="max-w-72 text-body-sm text-ink-muted">{t('board.empty.noColumnsBody')}</p>
+        <p className="max-w-72 text-body-sm text-ink-muted">
+          {canWrite ? t('board.empty.noColumnsBody') : t('board.empty.noColumnsBodyReader')}
+        </p>
         {canWrite ? <AddColumn boardId={boardId} /> : null}
       </div>
     </div>
@@ -590,7 +606,11 @@ function ColumnSection({
 
       {cards.length === 0 ? (
         <p className="px-1 pb-1 text-body-sm text-ink-subtle">
-          {filtering ? t('board.column.emptyFiltered') : t('board.column.empty')}
+          {filtering
+            ? t('board.column.emptyFiltered')
+            : caller.can_write
+              ? t('board.column.empty')
+              : t('board.column.emptyReader')}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">

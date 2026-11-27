@@ -339,6 +339,8 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
       can_manage_members: can(actor, 'member.invite', policy, loaded.membership).allow,
       can_manage: can(actor, 'board.update', policy, loaded.membership).allow,
       can_moderate: can(actor, 'moderation.decide', policy, loaded.membership).allow,
+      can_export: can(actor, 'board.export', policy, loaded.membership).allow,
+      can_import: can(actor, 'board.import', policy, loaded.membership).allow,
       can_close: can(actor, 'board.close', policy, loaded.membership).allow,
     };
 

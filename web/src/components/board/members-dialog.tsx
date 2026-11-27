@@ -18,6 +18,9 @@ const MANAGEABLE: MemberRole[] = ['admin', 'editor', 'viewer'];
 
 export function MembersButton({ boardState }: { boardState: BoardState }) {
   const [open, setOpen] = useState(false);
+  // Reading the roster is cheap, but every control in it needs `member.manage`:
+  // a visitor who cannot invite anyone gets no button (K3-08).
+  if (!boardState.caller.can_manage) return null;
   return (
     <>
       <Button

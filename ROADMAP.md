@@ -238,7 +238,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Per-IP, per-session, per-key token buckets; per-board hourly cap for anonymous writes; `KLUI_TRUSTED_PROXY_HOPS` parsing; bans table with TTL and admin view; Cap captcha behind a threshold, off by default.
   **Exit:** the anon cap answers `429` with `Retry-After`; a spoofed `X-Forwarded-For` from an untrusted hop is ignored (test with two hop configurations); a ban blocks the next request without a deploy.
 
-- [ ] **K3-08 — Shared-board affordances** `S` · dep: K3-03
+- [x] **K3-08 — Shared-board affordances** `S` · dep: K3-03
   Link-mode chip ("You can edit" / "Read-only link"), empty states keyed to the visitor's real powers, no dead controls, moderation banner for owners.
   **Exit:** a read-only visitor sees no edit affordance at all (not a disabled one); the owner sees the pending count in the header.
 
