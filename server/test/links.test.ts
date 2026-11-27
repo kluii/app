@@ -215,9 +215,9 @@ describe('using a link', () => {
     });
     expect(created.statusCode).toBe(403);
     expect((JSON.parse(created.body) as { error: { code: string } }).error.code).toBe('forbidden');
-    expect(await harness.db.card.count({ where: { board_id: board.id, title: 'From a link' } })).toBe(
-      0,
-    );
+    expect(
+      await harness.db.card.count({ where: { board_id: board.id, title: 'From a link' } }),
+    ).toBe(0);
   });
 
   it('gives a read link the board and no write', async () => {
