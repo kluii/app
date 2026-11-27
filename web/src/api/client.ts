@@ -186,6 +186,11 @@ export const api = {
     request<CommentDto>('PATCH', `/comments/${commentId}`, { body }),
   deleteComment: (commentId: string) => request<void>('DELETE', `/comments/${commentId}`),
 
+  tagColors: (boardId: string) =>
+    request<Record<string, string>>('GET', `/boards/${boardId}/tag-colors`),
+  putTagColors: (boardId: string, colors: Record<string, string>) =>
+    request<Record<string, string>>('PUT', `/boards/${boardId}/tag-colors`, colors),
+
   closeBoard: (boardId: string, note: string | null) =>
     request<BoardSummary>('POST', `/boards/${boardId}/close`, {
       confirm: true,
