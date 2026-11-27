@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Link, Outlet } from '@tanstack/react-router';
+import { Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
+import { cn } from '../../lib/cn';
 import { queryKeys } from '../../lib/query-client';
 import { currentTheme } from '../../lib/theme';
 import { t } from '../../i18n';
@@ -16,6 +17,11 @@ import { AccountMenu } from './account-menu';
  */
 export function AppShell({ children, actions }: { children?: ReactNode; actions?: ReactNode }) {
   const [theme] = useState(currentTheme);
+  // A board is a fixed frame: its rail scrolls, the page does not. Every other
+  // screen is a document and keeps scrolling normally.
+  const onBoard = useRouterState({
+    select: (state) => /^\/boards\/[^/]+$/.test(state.location.pathname),
+  });
   const me = useQuery({
     queryKey: queryKeys.me,
     queryFn: api.me,
@@ -24,7 +30,12 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
   });
 
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas text-ink">
+    <div
+      className={cn(
+        'flex flex-col bg-canvas text-ink',
+        onBoard ? 'h-dvh overflow-hidden' : 'min-h-dvh',
+      )}
+    >
       {/* The first Tab stop is a way past the header, every page (K2-15). */}
       <a
         href="#main-content"
@@ -56,7 +67,14 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
         </div>
       </header>
 
-      <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className={cn(
+          'min-h-0 flex-1 focus:outline-none',
+          onBoard ? 'overflow-hidden' : 'overflow-y-auto',
+        )}
+      >
         {children ?? <Outlet />}
       </main>
 

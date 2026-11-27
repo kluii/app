@@ -526,7 +526,10 @@ function BoardFrame({
           />
         </div>
       ) : (
-        <div className="flex-1 overflow-x-auto" data-testid="board-scroll">
+        <div
+          className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
+          data-testid="board-scroll"
+        >
           <div className="board-rail flex items-start gap-4 px-4 py-4">
             {columns.map((column) => (
               <ColumnSection
