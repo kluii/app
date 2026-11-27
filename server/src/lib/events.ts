@@ -114,3 +114,29 @@ export async function recordEvent(
   });
   return id;
 }
+
+/**
+ * A background job is an actor too (`actor_kind: system`). The sweeper deletes
+ * rows nobody asked it to delete; the log must say so, and say it was not a
+ * person (D-23).
+ */
+export async function recordSystemEvent(
+  tx: Tx,
+  input: { boardId: string; type: EventTypeName; payload: Record<string, unknown> },
+): Promise<string> {
+  const id = newId('evt');
+  await tx.event.create({
+    data: {
+      id,
+      board_id: input.boardId,
+      type: toEnumName(input.type) as never,
+      actor_kind: 'system',
+      actor_user_id: null,
+      actor_label: null,
+      actor_anon_id: null,
+      payload: input.payload as Prisma.InputJsonValue,
+      idempotency_key: null,
+    },
+  });
+  return id;
+}

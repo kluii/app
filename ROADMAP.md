@@ -222,7 +222,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Display-name gate (2–32 chars, client-only, per board), signed anon cookie (12 h), `actor_label` on events and cards, limits from `docs/permissions.md`, `anon_write` off/open/moderated.
   **Exit:** an anon can create a card and mark it done; cannot comment, delete, or move; a second anon cannot edit the first one's card; `private` forces anon off.
 
-- [ ] **K3-04 — Moderation queue** `L` · dep: K3-03
+- [x] **K3-04 — Moderation queue** `L` · dep: K3-03
   `pending_cards` with approve/reject, owner/admin only, 7-day expiry job, queue UI with count badge.
   **Exit:** a moderated write creates no card and no public event; approving creates the card with the anon label preserved; an expired pending card is purged by the sweeper and the test proves it.
 

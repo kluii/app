@@ -8,6 +8,7 @@ import type {
   EventDto,
   Me,
   Page,
+  PendingCard,
   PublicBoard,
   Visibility,
 } from './types';
@@ -180,6 +181,12 @@ export const api = {
   createBoard: (input: { name: string; template?: 'classic' | 'blank' }) =>
     request<Board>('POST', '/boards', input),
   boardState: (boardId: string) => request<BoardState>('GET', `/boards/${boardId}/state`),
+  pending: (boardId: string) =>
+    request<{ items: PendingCard[] }>('GET', `/boards/${boardId}/pending`),
+  approvePending: (boardId: string, pendingId: string) =>
+    request<{ card_id: string }>('POST', `/boards/${boardId}/pending/${pendingId}/approve`, {}),
+  rejectPending: (boardId: string, pendingId: string) =>
+    request<void>('POST', `/boards/${boardId}/pending/${pendingId}/reject`, {}),
   boardPublic: (boardId: string) =>
     request<{
       id: string;

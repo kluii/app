@@ -34,6 +34,7 @@ import { registerExportRoutes } from './export/routes.js';
 import { registerImportRoutes } from './import/routes.js';
 import { registerLinkRoutes } from './links/routes.js';
 import { registerAnonRoutes } from './anon/routes.js';
+import { registerModerationRoutes } from './moderation/routes.js';
 import { renderHtmlPage, robotsTxt, sitemapXml } from './public/pages.js';
 import type { Mailer } from './lib/mail.js';
 
@@ -162,6 +163,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerBoardRoutes(scoped, { ...context, hub });
     registerLinkRoutes(scoped, { ...context, hub });
     registerAnonRoutes(scoped, { ...context, hub });
+    registerModerationRoutes(scoped, { ...context, hub });
     registerColumnRoutes(scoped, { ...context, hub });
     registerCardRoutes(scoped, { ...context, hub });
     registerCommentRoutes(scoped, { ...context, hub });

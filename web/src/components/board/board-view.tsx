@@ -20,6 +20,7 @@ import { CardCreateModal } from './card-create-modal';
 import { CardDisplayModal, cardFromState } from './card-display-modal';
 import { CardEditorModal } from './card-editor-modal';
 import { CardRow } from './card-row';
+import { ModerationButton } from './moderation-dialog';
 import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
 import { useKeyboardDrag } from './use-keyboard-drag';
 import { useToggleDone } from './use-toggle-done';
@@ -438,6 +439,9 @@ function BoardFrame({
             members={members}
             shown={visible.length}
           />
+          {caller.can_moderate ? (
+            <ModerationButton boardId={board.id} count={boardState.pending_count} />
+          ) : null}
           <Button size="sm" variant="secondary" onClick={onOpenActivity}>
             {t('board.activity.title')}
           </Button>

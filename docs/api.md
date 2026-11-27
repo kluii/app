@@ -157,6 +157,9 @@ next request is `401` and the next login answers `403 banned`.
 | `PATCH` | `/boards/:id/members/:userId` | `{role, expected_updated_at?}`. Cannot demote the last owner. |
 | `DELETE` | `/boards/:id/members/:userId` | `204`. Cannot remove the owner; an admin cannot remove another admin. |
 | `POST` | `/boards/:id/transfer` | `{user_id, confirm:true}`. Owner only; one transaction. |
+| `GET` | `/boards/:id/pending` | `{items:[{id, column_id, title, description, tags, due_at, actor_label, created_at, expires_at}]}`. Owner/admin only (`moderation.list`). |
+| `POST` | `/boards/:id/pending/:pendingId/approve` | `{confirm?:true}` not required. `201 {card_id}`: the card is created in the pending row's column, keeps `actor_label`, and the queue row is deleted in the same transaction. `404` if it is gone. |
+| `POST` | `/boards/:id/pending/:pendingId/reject` | `204`, nothing created. Both verbs are `moderation.decide`. |
 | `GET` | `/boards/:id/tag-colors` | `{ "api": "#8B5CF6", "web": "#2563EB" }` — the board-level defaults. |
 | `PUT` | `/boards/:id/tag-colors` | Replaces the map. Keys are normalised tag names; values are `#RRGGBB`. Owner/admin only (it is a board setting; an editor can still colour a tag on a card, which is a card write). |
 
@@ -266,8 +269,9 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 | `card.deleted` | `{board_id, card_id, column_id, title}` |
 | `comment.created` / `comment.updated` / `comment.deleted` | `{board_id, card_id, comment_id, body_excerpt}` — `deleted` keeps the excerpt so the digest can say what was removed |
 | `link.created` / `link.revoked` | `{board_id, link_id, role}` |
-| `pending.created` | `{board_id, pending_id, title}` |
-| `pending.approved` / `pending.rejected` | `{board_id, pending_id, card_id?}` |
+| `pending.created` | `{board_id, pending_id, title}` — written **only** when a write is moderated; a moderated write itself writes nothing |
+| `pending.approved` / `pending.rejected` | `{board_id, pending_id, card_id?, title, actor_label, approved_by}` — one event per decision, actor is the approver |
+| `pending.expired` | `{board_id, pending_id, title}` — written by the sweeper with `actor_kind: system` |
 | `agent_key.created` / `agent_key.revoked` | `{key_id, name, scope, board_id?}` |
 | `import.completed` | `{board_id, format, columns, cards, comments}` |
 

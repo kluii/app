@@ -65,6 +65,18 @@ export type Card = {
   updated_at: string;
 };
 
+/** A moderated write, before anyone approved it (K3-04). */
+export type PendingCard = {
+  id: string;
+  column_id: string;
+  title: string;
+  description: string | null;
+  due_at: string | null;
+  actor_label: string;
+  created_at: string;
+  expires_at: string;
+};
+
 export type Member = { user_id: string; username: string; role: MemberRole; joined_at?: string };
 
 export type Caller = {

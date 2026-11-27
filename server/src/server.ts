@@ -80,6 +80,20 @@ const app = buildApp({ env, db, secrets, mail });
 await app.listen({ port: env.KLUI_PORT, host: '0.0.0.0' });
 app.log.info({ port: env.KLUI_PORT, env: env.KLUI_ENV }, 'klui listening');
 
+// Background work: one interval, one advisory lock inside the job, `unref()` so
+// the process can still exit (docs/architecture.md §1). The first run is a boot
+// minute after listen, not before: a slow sweep must not delay the port.
+const { sweepExpiredPendingCards } = await import('./moderation/service.js');
+const sweeper = setInterval(
+  () => {
+    void sweepExpiredPendingCards(db).catch((error: unknown) => {
+      app.log.error({ err: error }, 'pending sweeper failed');
+    });
+  },
+  5 * 60 * 1000,
+);
+sweeper.unref();
+
 let shuttingDown = false;
 const shutdown = async (signal: string): Promise<void> => {
   if (shuttingDown) return;
@@ -91,6 +105,7 @@ const shutdown = async (signal: string): Promise<void> => {
   }, SHUTDOWN_TIMEOUT_MS);
   timer.unref();
   try {
+    clearInterval(sweeper);
     await app.close();
     await db.$disconnect();
     clearTimeout(timer);

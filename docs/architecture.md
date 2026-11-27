@@ -53,6 +53,8 @@ server/src/
   settings/        instance settings, branding, accent validation
   realtime/        hub.ts (subscribers, ring buffer), events.ts (envelope)
   public/          server-rendered profile and board <head>, robots.txt, sitemap.xml
+  moderation/      the pending queue: list, approve, reject, expiry sweep
+  links/ anon/     write-link tokens and the anonymous-name gate (K3)
   lib/             errors, ids, ranks, secrets, rate-limit, logger, reserved, authz
   contracts/       Zod schemas shared by REST and MCP
 ```

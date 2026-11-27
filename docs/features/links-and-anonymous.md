@@ -59,7 +59,7 @@ Requirements: a display name, 2–32 characters, chosen client-side, stored per 
 ## 5. Moderation
 
 - The queue lists pending cards with board, column, title, description, author label, age. Owner/admin can approve (→ real card, anon label preserved, `pending.approved` event with the approver) or reject (`pending.rejected`, nothing created).
-- 7-day expiry, purged by the sweeper; the author is not notified (they have no account).
+- 7-day expiry, purged by the sweeper every five minutes behind a Postgres advisory lock; the author is not notified (they have no account). The sweep records `pending.expired` with `actor_kind: system`, so a deletion nobody asked for is visible in the log.
 - A moderation banner on the board for owner/admin: "3 cards waiting".
 - Approving is the only path that creates a card from a pending row; there is no auto-approve after N minutes.
 

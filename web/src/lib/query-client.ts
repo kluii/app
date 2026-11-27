@@ -24,4 +24,5 @@ export const queryKeys = {
   comments: (cardId: string) => ['comments', cardId] as const,
   summary: (boardId: string) => ['summary', boardId] as const,
   profile: (username: string) => ['profile', username.toLowerCase()] as const,
+  pending: (boardId: string) => ['pending', boardId] as const,
 };
