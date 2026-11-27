@@ -154,8 +154,9 @@ model User {
   password_resets PasswordResetToken[]
   totp_secret     TotpSecret?
   oauth_accounts  OAuthAccount[]
-  digest_pref     DigestPref?
-  notifications   Notification[]
+  digest_pref       DigestPref?
+  notification_pref NotificationPref?
+  notifications     Notification[]
 
   boards_owned Board[]               @relation("BoardOwner")
   memberships  BoardMember[]
@@ -542,6 +543,20 @@ model Notification {
   @@unique([user_id, kind, event_id])
   @@index([user_id, created_at])
   @@map("notifications")
+}
+
+/// Per-account mute list and optional Discord/Slack webhook for notifications (K5-04).
+model NotificationPref {
+  user_id     String   @id
+  muted_kinds Json     @default("[]")
+  webhook_url String?
+  failures    Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("notification_prefs")
 }
 
 model Ban {

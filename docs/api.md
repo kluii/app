@@ -259,6 +259,11 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 | `POST` | `/me/digest/test` | Builds the digest from the account's real events and cards, then delivers it to the configured channel: `{sent:true, sections, bytes}`. An empty digest sends nothing and answers `{sent:false, reason:"empty"}`; no channel configured is `400`; an email-only account with SMTP unset is `503 email_not_configured`. |
 | `GET` | `/me/digest/rss/:token` | `application/rss+xml`, `X-Robots-Tag: noindex`. One item: the last digest actually delivered, so nothing is invented for a reader. `404` before the first send, after `rss:"disable"`, and for a token a rotation replaced. No session: the token is the credential. |
 | `GET` | `/me/digest/unsubscribe/:token` | `text/html`, `X-Robots-Tag: noindex`, sets `enabled:false` and deletes nothing. No session and no CSRF: the point of the link is that it works from a mail client after the session is gone. `404` for an unknown token. |
+| `GET` | `/me/notifications` | `{items:[{id, kind, event_id, payload, read_at, created_at}], unread_count}`. Account-scoped, newest first, polled by the header bell every 15 s. |
+| `POST` | `/me/notifications/:id/read` | `204`; marks one notification read. `404` if not owned by the caller. |
+| `POST` | `/me/notifications/read-all` | `204`; marks every unread notification for the caller as read. |
+| `GET` | `/me/notifications/prefs` | `{muted_kinds, webhook_url, failures}`. Per-type mute list and optional Discord/Slack webhook. |
+| `PATCH` | `/me/notifications/prefs` | `{muted_kinds?, webhook_url?}` (`webhook_url` must be `https://` or `null`). Resets failure count when changing webhook. |
 | `GET` | `/healthz` | `{"status":"ok","version":"<package version>","db":"up"}`; `503` with `db:"down"` otherwise. No auth. |
 | `GET` | `/metrics` | Off by default (`404`). When enabled: loopback or `Authorization: Bearer $KLUI_METRICS_TOKEN`. |
 | `POST` | `/mcp` | See `docs/mcp.md`. |

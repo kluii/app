@@ -46,6 +46,7 @@ import { registerModerationRoutes } from './moderation/routes.js';
 import { registerMemberRoutes } from './boards/members-routes.js';
 import { registerAgentKeyRoutes } from './agents/routes.js';
 import { registerDigestRoutes } from './digest/routes.js';
+import { registerNotificationRoutes } from './notifications/routes.js';
 import { registerMcpRoutes } from './mcp/routes.js';
 import { llmsTxt } from './public/llms.js';
 import { registerAnalytics } from './public/analytics.js';
@@ -194,6 +195,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerMemberRoutes(scoped, { ...context, hub });
     registerAgentKeyRoutes(scoped, { ...context, hub });
     registerDigestRoutes(scoped, { ...context, hub });
+    registerNotificationRoutes(scoped, { ...context, hub });
     registerMcpRoutes(scoped, { ...context, hub });
     registerLinkRoutes(scoped, { ...context, hub });
     registerAnonRoutes(scoped, { ...context, hub });

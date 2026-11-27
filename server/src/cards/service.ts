@@ -14,6 +14,7 @@ import { commitEvent, type Hub } from '../realtime/events.js';
 import type { CardDto, ColumnDto, TagDto } from '../contracts/dto.js';
 import type { Actor } from '../lib/authz.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
+import { notify } from '../notifications/service.js';
 import type {
   BulkCreateInput,
   CreateCardInput,
@@ -423,6 +424,14 @@ export async function createCard(
     payload: { card_id: card.id, column_id: card.column_id },
     actorLabel: actor.kind,
   });
+  if (assignee && (actor.kind !== 'user' || actor.userId !== assignee.id)) {
+    await notify(db, {
+      userId: assignee.id,
+      kind: 'assignment',
+      eventId: `assign:${card.id}:${assignee.id}`,
+      payload: { board_id: boardId, card_id: card.id, title: card.title },
+    }).catch(() => undefined);
+  }
   return toCardDto({ ...card, tags }, assignee, tagColors, actor);
 }
 
@@ -638,6 +647,18 @@ export async function updateCard(
     payload: { card_id: card.id },
     actorLabel: actor.kind,
   });
+  if (
+    updated.assignee_id &&
+    updated.assignee_id !== card.assignee_id &&
+    (actor.kind !== 'user' || actor.userId !== updated.assignee_id)
+  ) {
+    await notify(db, {
+      userId: updated.assignee_id,
+      kind: 'assignment',
+      eventId: `assign:${card.id}:${updated.assignee_id}:${updated.updated_at.toISOString()}`,
+      payload: { board_id: card.board_id, card_id: card.id, title: updated.title },
+    }).catch(() => undefined);
+  }
   return toCardDto(updated, assignee, tagColors, actor);
 }
 

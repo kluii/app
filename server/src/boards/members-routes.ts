@@ -16,6 +16,7 @@ import { newId } from '../lib/ids.js';
 import { recordEvent } from '../lib/events.js';
 import { commitEvent } from '../realtime/events.js';
 import { assertAllowed, loadBoardFor, toBoardDto } from './service.js';
+import { notify } from '../notifications/service.js';
 
 const roleSchema = z.enum(['admin', 'editor', 'viewer']);
 const inviteSchema = z.object({ username: z.string().trim().min(1), role: roleSchema }).strict();
@@ -85,6 +86,14 @@ export function registerMemberRoutes(app: FastifyInstance, context: AppContext):
       payload: { board_id: id, user_id: user.id },
       actorLabel: actor.kind,
     });
+    if (actor.kind !== 'user' || actor.userId !== user.id) {
+      await notify(db, {
+        userId: user.id,
+        kind: 'invitation',
+        eventId: `invite:${id}:${memberId}`,
+        payload: { board_id: id, board_name: loaded.board.name, role: parsed.data.role },
+      }).catch(() => undefined);
+    }
     return reply.code(201).send({ ...user, user_id: user.id, role: parsed.data.role });
   });
 

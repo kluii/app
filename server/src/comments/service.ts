@@ -15,6 +15,7 @@ import { newId } from '../lib/ids.js';
 import { recordEvent } from '../lib/events.js';
 import { commitEvent, type Hub } from '../realtime/events.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
+import { extractMentions, notify } from '../notifications/service.js';
 
 /** The page cap docs/api.md §5 documents for a thread. */
 const MAX_PAGE = 100;
@@ -185,5 +186,26 @@ export async function createComment(
     payload: { comment: toCommentDto(comment) },
     actorLabel: actor.kind,
   });
+  const mentions = extractMentions(comment.body);
+  if (mentions.length > 0) {
+    const members = await db.boardMember.findMany({
+      where: { board_id: card.board_id, user: { username: { in: mentions } } },
+      select: { user_id: true },
+    });
+    for (const member of members) {
+      if (member.user_id === authorId) continue;
+      await notify(db, {
+        userId: member.user_id,
+        kind: 'mention',
+        eventId: `mention:${comment.id}:${member.user_id}`,
+        payload: {
+          board_id: card.board_id,
+          card_id: card.id,
+          comment_id: comment.id,
+          body_excerpt: bodyExcerpt(comment.body),
+        },
+      }).catch(() => undefined);
+    }
+  }
   return toCommentDto(comment);
 }

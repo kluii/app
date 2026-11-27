@@ -22,6 +22,7 @@ import { AppError, fromZod } from '../lib/errors.js';
 import { newId } from '../lib/ids.js';
 import { recordEvent } from '../lib/events.js';
 import { commitEvent } from '../realtime/events.js';
+import { notify } from '../notifications/service.js';
 import { buildSummary, summaryToMarkdown, type CloseSummary } from './summary.js';
 
 const closeSchema = z
@@ -141,6 +142,20 @@ export function registerCloseoutRoutes(app: FastifyInstance, context: AppContext
       payload: { board_id: id, summary_id: summaryId },
       actorLabel: actor.kind,
     });
+    const membersToNotify = await db.boardMember.findMany({
+      where: { board_id: id },
+      select: { user_id: true },
+    });
+    const closerId = actor.kind === 'user' || actor.kind === 'agent' ? actor.userId : null;
+    for (const member of membersToNotify) {
+      if (member.user_id === closerId) continue;
+      await notify(db, {
+        userId: member.user_id,
+        kind: 'board_closed',
+        eventId: `closed:${id}:${summaryId}:${member.user_id}`,
+        payload: { board_id: id, board_name: loaded.board.name, summary_id: summaryId },
+      }).catch(() => undefined);
+    }
     return reply.code(200).send(summary);
   });
 

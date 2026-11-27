@@ -85,10 +85,14 @@ app.log.info({ port: env.KLUI_PORT, env: env.KLUI_ENV }, 'klui listening');
 // minute after listen, not before: a slow sweep must not delay the port.
 const { sweepExpiredPendingCards } = await import('./moderation/service.js');
 const { runDueDigests } = await import('./digest/service.js');
+const { notifyDueSoon } = await import('./notifications/service.js');
 const sweeper = setInterval(
   () => {
     void sweepExpiredPendingCards(db).catch((error: unknown) => {
       app.log.error({ err: error }, 'pending sweeper failed');
+    });
+    void notifyDueSoon(db).catch((error: unknown) => {
+      app.log.error({ err: error }, 'due-soon notification sweeper failed');
     });
     // K5-05: the digest runs on the same five-minute beat. It sends only when an
     // account's local hour has come and it has not had a run today, so a quiet
