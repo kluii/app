@@ -30,6 +30,7 @@ import { registerBoardRoutes } from './boards/routes.js';
 import { registerColumnRoutes } from './columns/routes.js';
 import { registerCardRoutes } from './cards/routes.js';
 import { registerActivityRoutes } from './activity/routes.js';
+import { registerSearchRoutes } from './search/routes.js';
 import { registerCommentRoutes } from './comments/routes.js';
 import { registerCloseoutRoutes } from './closeout/routes.js';
 import { registerResetRoutes } from './auth/reset-routes.js';
@@ -170,6 +171,7 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.register(async (scoped) => {
     registerAuthRoutes(scoped, { ...context, hub });
     registerBoardRoutes(scoped, { ...context, hub });
+    registerSearchRoutes(scoped, { ...context, hub });
     registerMemberRoutes(scoped, { ...context, hub });
     registerAgentKeyRoutes(scoped, { ...context, hub });
     registerMcpRoutes(scoped, { ...context, hub });
