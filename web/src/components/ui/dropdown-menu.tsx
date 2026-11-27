@@ -158,6 +158,7 @@ export function DropdownItem({
   tone = 'normal',
   trailing,
   icon,
+  testId,
 }: {
   onSelect: () => void;
   children: ReactNode;
@@ -165,6 +166,7 @@ export function DropdownItem({
   /** A count, a shortcut: right-aligned, mono, never part of the label. */
   trailing?: ReactNode;
   icon?: ReactNode;
+  testId?: string;
 }) {
   return (
     <li role="none">
@@ -172,6 +174,7 @@ export function DropdownItem({
         type="button"
         role="menuitem"
         onClick={onSelect}
+        data-testid={testId}
         className={cn(ITEM, tone === 'danger' ? 'text-danger' : 'text-ink')}
       >
         {icon}

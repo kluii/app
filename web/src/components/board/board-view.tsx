@@ -1,29 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Copy, Plus, Settings2 } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
 import { failureMessage } from '../../lib/api-error';
-import type { BoardState, Caller, Card, Column } from '../../api/types';
+import type { Board, BoardState, Caller, Card, Column } from '../../api/types';
 import { t } from '../../i18n';
 import { applyCardFrame, cardIdOf, envelopeOf, dropCard, isCardEvent } from '../../data/boards';
 import { connectBoardStream, type LiveStatus } from '../../data/live';
 import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
+import { DropdownItem, DropdownMenu, DropdownSeparator } from '../ui/dropdown-menu';
 import { Input } from '../ui/input';
+import { useToast } from '../ui/toast';
 import { ActivityDialog } from './activity-dialog';
 import { BoardDataDialog } from './board-data-dialog';
-import { CloseBoardDialog } from './close-board-dialog';
+import { DeleteBoardDialog } from './delete-board-dialog';
 import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from './board-filters';
 import { CardCreateModal } from './card-create-modal';
 import { CardDisplayModal, cardFromState } from './card-display-modal';
 import { CardEditorModal } from './card-editor-modal';
 import { CardRow } from './card-row';
-import { MembersButton } from './members-dialog';
-import { ShareButton } from './share-dialog';
-import { ModerationButton } from './moderation-dialog';
+import { MembersDialog } from './members-dialog';
+import { ShareDialog } from './share-dialog';
+import { ModerationDialog } from './moderation-dialog';
 import { useColumnDroppable, type MoveRequest } from './use-card-dnd';
 import { useKeyboardDrag } from './use-keyboard-drag';
 import { useToggleDone } from './use-toggle-done';
@@ -43,7 +45,10 @@ export function BoardView({ boardId }: { boardId: string }) {
   const [composer, setComposer] = useState<Composer>({ kind: 'closed' });
   const [activityOpen, setActivityOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
-  const [closeOpen, setCloseOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [moderationOpen, setModerationOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [announcement, setAnnouncement] = useState('');
   const queryClient = useQueryClient();
@@ -201,7 +206,10 @@ export function BoardView({ boardId }: { boardId: string }) {
       onAddCard={(columnId) => setComposer({ kind: 'create', columnId })}
       onOpenActivity={() => setActivityOpen(true)}
       onOpenData={() => setDataOpen(true)}
-      onOpenClose={() => setCloseOpen(true)}
+      onOpenMembers={() => setMembersOpen(true)}
+      onOpenShare={() => setShareOpen(true)}
+      onOpenModeration={() => setModerationOpen(true)}
+      onOpenDelete={() => setDeleteOpen(true)}
       live={live}
       onMove={requestMove}
       onMoveTo={(cardId, columnId) =>
@@ -243,16 +251,29 @@ export function BoardView({ boardId }: { boardId: string }) {
         open={dataOpen}
         onClose={() => setDataOpen(false)}
       />
-      <CloseBoardDialog
+      {/* Delete replaces Close in the board chrome; the close-out feature itself
+          still exists on /boards/:id/summary and is not deleted. */}
+      <DeleteBoardDialog
         boardId={boardId}
         boardName={state.data.board.name}
-        open={closeOpen}
-        onClose={() => setCloseOpen(false)}
-        onClosed={() => {
-          setCloseOpen(false);
-          void queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
-        }}
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
       />
+      <MembersDialog
+        boardState={state.data}
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
+      />
+      <ModerationDialog
+        boardId={boardId}
+        open={moderationOpen}
+        onClose={() => setModerationOpen(false)}
+      />
+      {/* Mounted only while open: the created token lives in the panel's state,
+          so closing it is what makes it unrecoverable (K3-06). */}
+      {shareOpen ? (
+        <ShareDialog boardState={state.data} open onClose={() => setShareOpen(false)} />
+      ) : null}
       <ActivityDialog
         boardId={boardId}
         open={activityOpen}
@@ -384,7 +405,10 @@ function BoardFrame({
   onAddCard,
   onOpenActivity,
   onOpenData,
-  onOpenClose,
+  onOpenMembers,
+  onOpenShare,
+  onOpenModeration,
+  onOpenDelete,
   live,
   onMove,
   onMoveTo,
@@ -401,7 +425,10 @@ function BoardFrame({
   onAddCard: (columnId: string) => void;
   onOpenActivity: () => void;
   onOpenData: () => void;
-  onOpenClose: () => void;
+  onOpenMembers: () => void;
+  onOpenShare: () => void;
+  onOpenModeration: () => void;
+  onOpenDelete: () => void;
   live: LiveStatus;
   onMove: (request: MoveRequest) => void;
   onMoveTo: (cardId: string, columnId: string) => void;
@@ -419,18 +446,13 @@ function BoardFrame({
   const filtering = visible.length !== cards.length;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="flex min-w-0 items-baseline gap-3">
-          <h1 className="truncate font-display text-h1 text-ink">{board.name}</h1>
-          <span className="font-mono text-mono-sm text-ink-subtle">
-            {board.owner.username}/{board.slug}
-          </span>
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <BoardName board={board} canRename={caller.can_manage} />
           <span data-testid="caller-chip">
             <Chip>{callerLabel(caller)}</Chip>
           </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
           <Chip>{t(`board.visibility.${board.visibility}`)}</Chip>
           {board.closed_at === null ? null : (
             <span data-testid="board-closed-chip">
@@ -442,45 +464,9 @@ function BoardFrame({
               {t('common.label.reconnecting')}
             </span>
           ) : null}
-          <BoardFilters
-            filters={filters}
-            onChange={onFiltersChange}
-            cards={cards}
-            members={members}
-            shown={visible.length}
-          />
-          <ShareButton boardState={boardState} />
-          <MembersButton boardState={boardState} />
-          {caller.can_moderate ? (
-            <ModerationButton boardId={board.id} count={boardState.pending_count} />
-          ) : null}
-          <Button size="sm" variant="secondary" onClick={onOpenActivity}>
-            {t('board.activity.title')}
-          </Button>
-          {caller.can_export ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={onOpenData}
-              data-testid="open-board-data"
-            >
-              {t('board.data.open')}
-            </Button>
-          ) : null}
-          {board.closed_at === null ? (
-            caller.can_close && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={onOpenClose}
-                data-testid="open-close-board"
-              >
-                {t('board.close.open')}
-              </Button>
-            )
-          ) : (
+          {board.closed_at === null ? null : (
             <Link
-              className="inline-flex h-8 items-center rounded-sm border border-border bg-surface-2 px-3 text-body-sm text-ink hover:bg-surface-muted"
+              className="inline-flex h-7 items-center rounded-full border border-border bg-surface-2 px-3 text-label text-ink hover:bg-surface-muted"
               to="/boards/$boardId/summary"
               params={{ boardId: board.id }}
               data-testid="open-board-summary"
@@ -489,7 +475,25 @@ function BoardFrame({
             </Link>
           )}
         </div>
-      </div>
+        <div className="flex items-center gap-2">
+          <BoardFilters
+            filters={filters}
+            onChange={onFiltersChange}
+            cards={cards}
+            members={members}
+            shown={visible.length}
+          />
+          <BoardSettingsMenu
+            boardState={boardState}
+            onOpenShare={onOpenShare}
+            onOpenMembers={onOpenMembers}
+            onOpenActivity={onOpenActivity}
+            onOpenData={onOpenData}
+            onOpenModeration={onOpenModeration}
+            onOpenDelete={onOpenDelete}
+          />
+        </div>
+      </header>
 
       <ActiveFilters filters={filters} onChange={onFiltersChange} />
 
@@ -705,6 +709,229 @@ function AddColumn({ boardId }: { boardId: string }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * The name is the headline and the way to change it: click it, type, Enter. Esc
+ * restores and sends nothing, so does an empty or unchanged value, and the slug
+ * is never sent — a rename must not move the board's URL.
+ */
+function BoardName({ board, canRename }: { board: Board; canRename: boolean }) {
+  const queryClient = useQueryClient();
+  const { notify } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(board.name);
+  const cancelled = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
+  const hintId = useId();
+
+  useEffect(() => {
+    if (!editing) return;
+    input.current?.focus();
+    input.current?.select();
+  }, [editing]);
+
+  const rename = useMutation({
+    mutationFn: (name: string) =>
+      api.updateBoard(board.id, { name, expected_updated_at: board.updated_at }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.board(board.id) });
+    },
+    onError: (error) => {
+      setDraft(board.name);
+      notify(failureMessage(error), 'danger');
+    },
+  });
+
+  const commit = (): void => {
+    setEditing(false);
+    const next = draft.trim();
+    if (next === '' || next === board.name) {
+      setDraft(board.name);
+      return;
+    }
+    rename.mutate(next);
+  };
+
+  if (!canRename) {
+    return <h1 className="truncate font-display text-h1 text-ink">{board.name}</h1>;
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={input}
+        value={draft}
+        maxLength={80}
+        aria-label={t('board.rename.label')}
+        data-testid="board-name-input"
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          // Esc removes the input; a blur that follows it must not save.
+          if (cancelled.current) {
+            cancelled.current = false;
+            return;
+          }
+          commit();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            cancelled.current = true;
+            setDraft(board.name);
+            setEditing(false);
+          }
+        }}
+        className="w-full min-w-0 rounded-sm border border-control-border bg-surface-2 px-2 font-display text-h1 text-ink"
+      />
+    );
+  }
+
+  return (
+    <h1 className="min-w-0">
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(board.name);
+          setEditing(true);
+        }}
+        title={t('board.rename.label')}
+        aria-describedby={hintId}
+        data-testid="board-name"
+        className="block max-w-full truncate rounded-sm font-display text-h1 text-ink underline-offset-4 hover:underline hover:decoration-ink-subtle"
+      >
+        {board.name}
+      </button>
+      <span id={hintId} className="sr-only">
+        {t('board.rename.label')}
+      </span>
+    </h1>
+  );
+}
+
+/**
+ * One control for everything the row used to carry. The order is the order of
+ * the menu; what a caller may not do is not rendered at all, because the server
+ * would refuse it anyway and a disabled row explains nothing.
+ */
+function BoardSettingsMenu({
+  boardState,
+  onOpenShare,
+  onOpenMembers,
+  onOpenActivity,
+  onOpenData,
+  onOpenModeration,
+  onOpenDelete,
+}: {
+  boardState: BoardState;
+  onOpenShare: () => void;
+  onOpenMembers: () => void;
+  onOpenActivity: () => void;
+  onOpenData: () => void;
+  onOpenModeration: () => void;
+  onOpenDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { notify } = useToast();
+  const { board, caller, members, pending_count } = boardState;
+
+  const copyLink = async (): Promise<void> => {
+    const url = board.url ?? `${window.location.origin}/${board.owner.username}/${board.slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      notify(t('board.link.copied'));
+    } catch {
+      notify(t('board.link.copyFailed'), 'danger');
+    }
+  };
+
+  const then = (action: () => void) => () => {
+    setOpen(false);
+    action();
+  };
+
+  return (
+    <DropdownMenu
+      label={t('board.settings.label')}
+      open={open}
+      onOpenChange={setOpen}
+      align="end"
+      trigger={(wiring) => (
+        <button
+          type="button"
+          {...wiring}
+          title={t('board.settings.label')}
+          data-testid="open-board-settings"
+          className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2 text-label text-ink transition-colors duration-[var(--dur-fast)] hover:bg-surface-muted"
+        >
+          <span className="relative inline-flex">
+            <Settings2 aria-hidden className="h-4 w-4" strokeWidth={1.75} />
+            {caller.can_moderate && pending_count > 0 ? (
+              <span
+                aria-hidden
+                data-testid="moderation-badge"
+                className="absolute -right-2 -top-2 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-danger px-0.5 font-mono text-mono-sm leading-none text-primary-foreground"
+              >
+                {pending_count}
+              </span>
+            ) : null}
+          </span>
+          <span className="hidden sm:inline">{t('board.settings.label')}</span>
+        </button>
+      )}
+    >
+      <DropdownItem
+        icon={<Copy aria-hidden className="h-4 w-4" strokeWidth={1.75} />}
+        onSelect={() => void copyLink()}
+        testId="copy-board-link"
+      >
+        {t('board.settings.copyLink')}
+      </DropdownItem>
+      {caller.can_manage ? (
+        <DropdownItem onSelect={then(onOpenShare)} testId="open-share">
+          {t('board.share.open')}
+        </DropdownItem>
+      ) : null}
+      {caller.can_manage ? (
+        <DropdownItem
+          trailing={members.length}
+          onSelect={then(onOpenMembers)}
+          testId="open-members"
+        >
+          {t('board.members.open')}
+        </DropdownItem>
+      ) : null}
+      <DropdownItem onSelect={then(onOpenActivity)} testId="open-activity">
+        {t('board.activity.title')}
+      </DropdownItem>
+      {caller.can_export ? (
+        <DropdownItem onSelect={then(onOpenData)} testId="open-board-data">
+          {t('board.data.open')}
+        </DropdownItem>
+      ) : null}
+      {caller.can_moderate ? (
+        <DropdownItem
+          trailing={pending_count}
+          onSelect={then(onOpenModeration)}
+          testId="open-moderation"
+        >
+          {t('board.settings.moderation')}
+        </DropdownItem>
+      ) : null}
+      {caller.can_close ? (
+        <>
+          <DropdownSeparator />
+          <DropdownItem tone="danger" onSelect={then(onOpenDelete)} testId="open-delete-board">
+            {t('board.delete.open')}
+          </DropdownItem>
+        </>
+      ) : null}
+    </DropdownMenu>
   );
 }
 

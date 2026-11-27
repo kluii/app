@@ -21,22 +21,7 @@ const VISIBILITIES: Visibility[] = ['private', 'link', 'public'];
 const LINK_ROLES: LinkRole[] = ['read', 'edit', 'none'];
 const ANON_POLICIES: AnonWrite[] = ['off', 'open', 'moderated'];
 
-export function ShareButton({ boardState }: { boardState: BoardState }) {
-  const [open, setOpen] = useState(false);
-  if (!boardState.caller.can_manage) return null;
-  return (
-    <>
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)} data-testid="open-share">
-        {t('board.share.open')}
-      </Button>
-      {/* Unmounted on close: the created token lives in this component's state,
-          so closing the panel is what makes it unrecoverable (K3-06). */}
-      {open ? <ShareDialog boardState={boardState} open onClose={() => setOpen(false)} /> : null}
-    </>
-  );
-}
-
-function ShareDialog({
+export function ShareDialog({
   boardState,
   open,
   onClose,

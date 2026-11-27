@@ -220,6 +220,9 @@ export const api = {
       expected_updated_at?: string;
     },
   ) => request<Board>('PATCH', `/boards/${boardId}`, input),
+  /** Irreversible: the board, its columns, cards and comments go with it. */
+  deleteBoard: (boardId: string) =>
+    request<void>('DELETE', `/boards/${boardId}`, { confirm: true }),
   rotateSuffix: (boardId: string) =>
     request<Board>('POST', `/boards/${boardId}/link-suffix/rotate`, { confirm: true }),
   links: (boardId: string) => request<{ items: BoardLink[] }>('GET', `/boards/${boardId}/links`),
