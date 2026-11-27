@@ -211,7 +211,7 @@ the same address. Both take effect on the next request, with no restart.
 | `PATCH` | `/columns/:id` | `{name?, position?, expected_updated_at?}`. |
 | `DELETE` | `/columns/:id` | `409 column_not_empty` unless `{move_cards_to:"<column id>"}` or `{delete_cards:true}`. |
 | `POST` | `/boards/:id/cards` | `{column, title, description?, assignee?, due_at?, tags?, done?, cap_token?}`. `column` is a column id, not a name. `cap_token` is only read for an anonymous actor past the captcha threshold. |
-| `POST` | `/boards/:id/cards/bulk` | `{column, items:[…]}` max 200; one transaction; returns `{created:[Card]}`. Partial failure rolls back everything. `column` must belong to this board, or `404 column_not_found` and no card is written. |
+| `POST` | `/boards/:id/cards/bulk` | `{column, items:[…]}` max 200; one transaction; returns `{created:[Card]}`. Partial failure rolls back everything. `column` must belong to this board, or `404 column_not_found` and no card is written. An anonymous actor on a `moderated` board gets `202 {status:"pending", board_id, items:[{id,title}…]}` instead: one queue row per item, in one transaction, no card and no event. |
 | `GET` | `/cards/:id` | Card + `comments_count`. |
 | `PATCH` | `/cards/:id` | Any of `{title, description, assignee, assignee_label, due_at, tags, done, expected_updated_at}`. |
 | `DELETE` | `/cards/:id` | `204`. |
@@ -221,7 +221,7 @@ the same address. Both take effect on the next request, with no restart.
 | `PATCH` | `/comments/:id` | `{body}`. Author only; sets `edited_at`. |
 | `DELETE` | `/comments/:id` | Author, or owner/admin for moderation. |
 
-**Anonymous actors.** `POST /boards/:id/cards` as an anonymous actor answers `201` on `anon_write: open` (the card carries `actor_label` and `mine: true` for its author) and `202 {status:"pending", id, title}` on `moderated` — no card, no event, one `PendingCard`. `PATCH /cards/:id` accepts only changes to `title`, `description` and `done`, and only on a card whose `anon_actor_id` is the caller's; anything else is `403` naming the field. `DELETE`, `move` and comments are always `403` for an anonymous actor.
+**Anonymous actors.** `POST /boards/:id/cards` as an anonymous actor answers `201` on `anon_write: open` (the card carries `actor_label` and `mine: true` for its author) and `202 {status:"pending", id, title}` on `moderated` — no card, no event, one `PendingCard`. `POST /boards/:id/cards/bulk` takes the same branch: `201 {created}` on `open`, `202 {status:"pending", items:[{id,title}…]}` on `moderated`, one queue row per item in one transaction. `off` answers `403` on both. `PATCH /cards/:id` accepts only changes to `title`, `description` and `done`, and only on a card whose `anon_actor_id` is the caller's; anything else is `403` naming the field. `DELETE`, `move` and comments are always `403` for an anonymous actor.
 
 **Card field rules.** `title` 1–200 chars, trimmed, no newline. `description` ≤ 10 000 chars, markdown subset (no raw HTML, no images). `tags` ≤ 8 entries, each `{name, color?}`; `name` is 1–24 chars `[a-z0-9-]`, normalised lowercase, deduplicated; `color` is `#RRGGBB` or omitted (omitted → the board default, else the neutral chip). A bare string in the `tags` array is accepted on input as shorthand for `{name}`; responses always emit objects. `due_at` ISO date or datetime, stored UTC. `assignee` is a member user id; `assignee_label` is a display name (v1 import, anonymous creation) — setting both is a `400`. `done` is a boolean on the card; toggling it records `card.completed` / `card.reopened`.
 

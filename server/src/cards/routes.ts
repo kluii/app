@@ -14,7 +14,7 @@ import { requireActor } from '../auth/request.js';
 import { AppError, fromZod } from '../lib/errors.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
 import { guardAnonWrite } from '../anon/limits.js';
-import { createPendingCard } from './service.js';
+import { createPendingCard, createPendingCards } from './service.js';
 import {
   bulkCreateCards,
   createCard,
@@ -85,6 +85,28 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
       const loaded = await loadBoardFor(db, actor, id, 'card.create');
       assertAllowed(loaded.decision);
       await guardAnonWrite(request, reply, context.env, db, id, parsed.data.cap_token);
+      // The same branch `POST /cards` takes: a moderated board queues every
+      // item and shows none of them until an owner approves (K3-03 → K3-04).
+      // Without it, bulk was the open door beside a locked one.
+      if (loaded.board.anon_write === 'moderated') {
+        const items = await createPendingCards(db, {
+          boardId: id,
+          columnId: parsed.data.column,
+          label: actor.label,
+          anonId: actor.anonId,
+          items: parsed.data.items.map((item) => ({
+            title: item.title,
+            description: item.description ?? null,
+            dueAt: item.due_at ? new Date(item.due_at) : null,
+            tags: item.tags,
+          })),
+        });
+        return reply.code(202).send({
+          status: 'pending',
+          board_id: id,
+          items: items.map((item) => ({ id: item.id, title: item.title })),
+        });
+      }
     }
     const result = await bulkCreateCards({ db, actor, hub: context.hub }, id, parsed.data);
     return reply.code(201).send(result);

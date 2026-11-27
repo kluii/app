@@ -43,6 +43,19 @@ async function moderatedBoard(owner: TestClient): Promise<{ board: Board; column
   return { board: patched.json() as Board, columnId: column.id };
 }
 
+async function joinAs(visitor: TestClient, boardId: string, label: string): Promise<string> {
+  const join = await visitor.app.inject({
+    method: 'POST',
+    url: `/api/v1/boards/${boardId}/anon`,
+    headers: { 'content-type': 'application/json' },
+    payload: JSON.stringify({ label }),
+  });
+  expect(join.statusCode).toBe(200);
+  const header = join.headers['set-cookie'];
+  const raw = Array.isArray(header) ? header[0] : header;
+  return raw?.split(';')[0] ?? '';
+}
+
 async function pendingFrom(
   visitor: TestClient,
   boardId: string,
@@ -50,15 +63,7 @@ async function pendingFrom(
   title: string,
   label: string,
 ): Promise<Pending> {
-  const join = await visitor.app.inject({
-    method: 'POST',
-    url: `/api/v1/boards/${boardId}/anon`,
-    headers: { 'content-type': 'application/json' },
-    payload: JSON.stringify({ label }),
-  });
-  const header = join.headers['set-cookie'];
-  const raw = Array.isArray(header) ? header[0] : header;
-  const cookie = raw?.split(';')[0] ?? '';
+  const cookie = await joinAs(visitor, boardId, label);
   const created = await visitor.app.inject({
     method: 'POST',
     url: `/api/v1/boards/${boardId}/cards`,
@@ -67,6 +72,40 @@ async function pendingFrom(
   });
   expect(created.statusCode).toBe(202);
   return created.json() as Pending;
+}
+
+/** The same board, writing live: the policy the moderation queue is not. */
+async function openBoard(owner: TestClient): Promise<{ board: Board; columnId: string }> {
+  await owner.signup(`open-${owner.suffix}`);
+  const created = await owner.request('POST', '/api/v1/boards', {
+    name: 'Open to visitors',
+    visibility: 'link',
+  });
+  const board = created.json() as Board;
+  await owner.request('PATCH', `/api/v1/boards/${board.id}`, {
+    link_role: 'edit',
+    anon_write: 'open',
+  });
+  const state = await owner.request('GET', `/api/v1/boards/${board.id}/state`);
+  const [column] = (state.json() as { columns: { id: string }[] }).columns;
+  if (!column) throw new Error('no column');
+  return { board, columnId: column.id };
+}
+
+async function bulkFrom(
+  visitor: TestClient,
+  boardId: string,
+  columnId: string,
+  titles: string[],
+  cookie: string,
+): Promise<{ statusCode: number; body: string }> {
+  const response = await visitor.app.inject({
+    method: 'POST',
+    url: `/api/v1/boards/${boardId}/cards/bulk`,
+    headers: { 'content-type': 'application/json', cookie },
+    payload: JSON.stringify({ column: columnId, items: titles.map((title) => ({ title })) }),
+  });
+  return { statusCode: response.statusCode, body: response.body };
 }
 
 describe('the queue', () => {
@@ -160,6 +199,74 @@ describe('the queue', () => {
       where: { board_id: board.id, type: 'pending_rejected' },
     });
     expect(event).not.toBeNull();
+  });
+});
+
+describe('the bulk door', () => {
+  it('queues every item on a moderated board, and approving them makes the cards', async () => {
+    const owner = harness.client();
+    const { board, columnId } = await moderatedBoard(owner);
+    const visitor = harness.client();
+    const cookie = await joinAs(visitor, board.id, 'Bulk visitor');
+
+    const queued = await bulkFrom(visitor, board.id, columnId, ['One', 'Two', 'Three'], cookie);
+    expect(queued.statusCode).toBe(202);
+    const body = JSON.parse(queued.body) as {
+      status: string;
+      items: { id: string; title: string }[];
+    };
+    expect(body.status).toBe('pending');
+    expect(body.items.map((item) => item.title)).toEqual(['One', 'Two', 'Three']);
+
+    // Nothing reached the board, and no card event was written: a moderated
+    // write is a row in a queue, whatever door it came through.
+    const state = await owner.request('GET', `/api/v1/boards/${board.id}/state`);
+    expect((state.json() as { cards: unknown[] }).cards).toEqual([]);
+    expect(
+      await harness.db.event.count({ where: { board_id: board.id, type: 'card_created' } }),
+    ).toBe(0);
+
+    // Three rows written in one transaction share the transaction timestamp, so
+    // `created_at` cannot order them: the queue is a set, and the ids travel in
+    // the 202 body above.
+    const listed = await owner.request('GET', `/api/v1/boards/${board.id}/pending`);
+    expect((listed.json() as { items: Pending[] }).items.map((item) => item.title).sort()).toEqual([
+      'One',
+      'Three',
+      'Two',
+    ]);
+
+    for (const item of body.items) {
+      const approved = await owner.request(
+        'POST',
+        `/api/v1/boards/${board.id}/pending/${item.id}/approve`,
+        {},
+      );
+      expect(approved.statusCode).toBe(201);
+    }
+    const after = await owner.request('GET', `/api/v1/boards/${board.id}/state`);
+    expect(
+      (after.json() as { cards: { title: string }[] }).cards.map((card) => card.title).sort(),
+    ).toEqual(['One', 'Three', 'Two']);
+    expect(await harness.db.pendingCard.count({ where: { board_id: board.id } })).toBe(0);
+  });
+
+  it('leaves an open board writing live cards, in one transaction', async () => {
+    const owner = harness.client();
+    const { board, columnId } = await openBoard(owner);
+    const visitor = harness.client();
+    const cookie = await joinAs(visitor, board.id, 'Open visitor');
+
+    const written = await bulkFrom(visitor, board.id, columnId, ['A', 'B', 'C'], cookie);
+    expect(written.statusCode).toBe(201);
+    const created = (JSON.parse(written.body) as { created: { id: string }[] }).created;
+    expect(created).toHaveLength(3);
+
+    expect(await harness.db.card.count({ where: { board_id: board.id } })).toBe(3);
+    expect(await harness.db.pendingCard.count({ where: { board_id: board.id } })).toBe(0);
+    expect(
+      await harness.db.event.count({ where: { board_id: board.id, type: 'card_created' } }),
+    ).toBe(3);
   });
 });
 

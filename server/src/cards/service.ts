@@ -247,10 +247,51 @@ export function positionString(value: number): string {
 }
 
 /**
- * A moderated write: no card, no event, a row the owner can approve or reject
- * (docs/features/links-and-anonymous.md §5). Seven days, then the sweeper drops
- * it (K3-04).
+ * A moderated write: no card, no event, one row per item the owner can approve
+ * or reject (docs/features/links-and-anonymous.md §5). Seven days, then the
+ * sweeper drops it (K3-04).
+ *
+ * One row per item in **one** transaction, and one function for the single and
+ * the bulk door: a moderated board that queued one card through `POST /cards`
+ * and wrote 200 live ones through `POST /cards/bulk` protected the door nobody
+ * used. The row carries what the queue can replay — title, description, due
+ * date, tags — like the single path always did.
  */
+export async function createPendingCards(
+  db: Db,
+  input: {
+    boardId: string;
+    columnId: string;
+    label: string;
+    anonId: string;
+    items: { title: string; description: string | null; dueAt: Date | null; tags: unknown }[];
+  },
+): Promise<{ id: string; title: string }[]> {
+  if (input.items.length === 0) return [];
+  await requireColumnInBoard(db, input.boardId, input.columnId);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  return db.$transaction(
+    input.items.map((item) =>
+      db.pendingCard.create({
+        data: {
+          id: newId('pnd'),
+          board_id: input.boardId,
+          column_id: input.columnId,
+          title: item.title,
+          description: item.description,
+          tags: item.tags === undefined ? undefined : (item.tags as Prisma.InputJsonValue),
+          due_at: item.dueAt,
+          actor_label: input.label,
+          anon_actor_id: input.anonId,
+          expires_at: expiresAt,
+        },
+        select: { id: true, title: true },
+      }),
+    ),
+  );
+}
+
+/** The single-write shape of the same queue: one row, same transaction rules. */
 export async function createPendingCard(
   db: Db,
   input: {
@@ -264,26 +305,23 @@ export async function createPendingCard(
     anonId: string;
   },
 ): Promise<{ id: string; title: string }> {
-  const column = await db.column.findFirst({
-    where: { id: input.columnId, board_id: input.boardId },
-    select: { id: true },
+  const [row] = await createPendingCards(db, {
+    boardId: input.boardId,
+    columnId: input.columnId,
+    label: input.label,
+    anonId: input.anonId,
+    items: [
+      {
+        title: input.title,
+        description: input.description,
+        dueAt: input.dueAt,
+        tags: input.tags,
+      },
+    ],
   });
-  if (!column) throw new AppError('column_not_found');
-  const row = await db.pendingCard.create({
-    data: {
-      id: newId('pnd'),
-      board_id: input.boardId,
-      column_id: column.id,
-      title: input.title,
-      description: input.description,
-      tags: input.tags === undefined ? undefined : (input.tags as Prisma.InputJsonValue),
-      due_at: input.dueAt,
-      actor_label: input.label,
-      anon_actor_id: input.anonId,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    },
-    select: { id: true, title: true },
-  });
+  if (!row) {
+    throw new AppError('internal', { message: 'the queue accepted nothing', hint: null });
+  }
   return row;
 }
 
