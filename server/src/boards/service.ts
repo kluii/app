@@ -7,6 +7,7 @@ import type { Prisma } from '@prisma/client';
 import type { Db } from '../db.js';
 import {
   can,
+  canCreateBoard,
   type Action,
   type Actor,
   type BoardPolicy,
@@ -309,11 +310,21 @@ export type BoardWrite = {
 
 export async function createBoard(context: BoardWrite, input: CreateBoardInput): Promise<BoardDto> {
   const { db, actor } = context;
-  if (actor.kind !== 'user' && actor.kind !== 'agent') {
+  const decision = canCreateBoard(actor);
+  if (!decision.allow) {
     throw new AppError('forbidden', {
-      message: 'Only an account can create a board.',
-      hint: 'Sign in, or ask a member for a link.',
+      message:
+        actor.kind === 'agent'
+          ? 'A board-scoped agent key cannot create a new board.'
+          : 'Only an account can create a board.',
+      hint:
+        actor.kind === 'agent'
+          ? 'Use a user-scoped agent key or a user session to create a board.'
+          : 'Sign in, or ask a member for a link.',
     });
+  }
+  if (actor.kind !== 'user' && actor.kind !== 'agent') {
+    throw new AppError('forbidden');
   }
   const userId = actor.userId;
 

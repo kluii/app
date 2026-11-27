@@ -169,3 +169,22 @@ actually charged. Doing it in `onRequest` would mean parsing the body twice.
 Until then: one bucket, the write one, and §5's read allowance is a promise the
 endpoint does not keep. The next agent that touches `settings/ratelimit.ts`
 should close it, and the test is a key that reads 100 times and writes once.
+
+### D-58 — Board creation is decided by `canCreateBoard(actor)` in `authz.ts`
+
+Creating a board has no existing `BoardPolicy` target to pass to `can()`, so
+`boards/service.ts` used to guard `createBoard()` with an inline
+`actor.kind !== 'user' && actor.kind !== 'agent'` check. That missed
+`actor.scope === 'board'`, letting a board-scoped agent key open a second
+private board through both `POST /api/v1/boards` and MCP `create_board` (D2).
+
+Two ways to put the decision back inside `server/src/lib/authz.ts` (so neither
+a route nor an MCP tool ever grows its own `if (key.scope === 'board')`): add a
+dummy `board.create` action to `can()` with a synthetic `BoardPolicy`, or export
+`canCreateBoard(actor)` right beside `can()` in `server/src/lib/authz.ts`. We
+chose `canCreateBoard(actor)`: a synthetic board would invent meaningless cells
+in the 211 680-cell matrix ("create a board on a closed private board as a
+non-member"), whereas `canCreateBoard(actor)` keeps the single authorization
+module as the sole decision point and is tested over every actor kind and scope
+in `server/test/authz-matrix.test.ts`. A `user` or `scope: 'user'` agent is
+allowed; `scope: 'board'`, `link` and `anon` actors receive `forbidden`.

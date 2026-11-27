@@ -155,8 +155,8 @@ Moderated writes produce a `PendingCard` and a `pending.created` event visible o
 
 An agent actor is evaluated as the **intersection** of its owner's membership and its key scope:
 
-- `scope: 'user'` → the owner's role on every board they belong to.
-- `scope: 'board'` → the owner's role on that one board, `not_found` on every other board, regardless of `is_instance_admin`.
+- `scope: 'user'` → the owner's role on every board they belong to, and may create new boards (`canCreateBoard()`).
+- `scope: 'board'` → the owner's role on that one board, `not_found` on every other board, regardless of `is_instance_admin`; cannot create new boards (`canCreateBoard()` answers `forbidden`, D-58).
 - An agent never gets a role it does not have as a user. A viewer's key is a viewer's key.
 - `agent_key.create` is denied to agents (a key cannot mint a key).
 

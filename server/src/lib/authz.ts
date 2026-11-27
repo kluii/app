@@ -290,6 +290,18 @@ function anonDecision(
   return FORBIDDEN;
 }
 
+/**
+ * Board creation has no existing board to pass to `can()`, so it lives beside
+ * it here rather than as an ad-hoc check in a service or an MCP tool (D-58).
+ * Only a signed-in user or a user-scoped agent key may open a new board; a
+ * board-scoped key is bound to its single board and cannot mint a second.
+ */
+export function canCreateBoard(actor: Actor): Decision {
+  if (actor.kind === 'user') return ALLOW;
+  if (actor.kind === 'agent' && actor.scope === 'user') return ALLOW;
+  return FORBIDDEN;
+}
+
 /** A closed board's write refusal carries its own code so the client can explain it. */
 export function isClosedWrite(decision: Decision): boolean {
   return !decision.allow && decision.code === 'board_closed';

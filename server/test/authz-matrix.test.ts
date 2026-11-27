@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTIONS,
   can,
+  canCreateBoard,
   type Action,
   type Actor,
   type AnonWrite,
@@ -305,5 +306,22 @@ describe('the authorization matrix', () => {
     expect(can(actor, 'card.move', policy, null, { isOwnCard: true }).allow).toBe(false);
     expect(can(actor, 'comment.create', policy, null, { isOwnCard: true }).allow).toBe(false);
     expect(can(actor, 'card.delete', policy, null, { isOwnCard: true }).allow).toBe(false);
+  });
+
+  it('allows board creation only for a user or a user-scoped agent key', () => {
+    expect(canCreateBoard({ kind: 'user', userId: 'usr_1' }).allow).toBe(true);
+    expect(canCreateBoard({ kind: 'agent', userId: 'usr_1', scope: 'user' }).allow).toBe(true);
+    expect(
+      canCreateBoard({ kind: 'agent', userId: 'usr_1', scope: 'board', boardId: 'brd_1' }),
+    ).toEqual({ allow: false, reason: 'forbidden', code: 'forbidden' });
+    expect(
+      canCreateBoard({ kind: 'link', boardId: 'brd_1', role: 'edit', linkId: 'lnk_1' }),
+    ).toEqual({ allow: false, reason: 'forbidden', code: 'forbidden' });
+    expect(
+      canCreateBoard({ kind: 'link', boardId: 'brd_1', role: 'read', linkId: 'lnk_2' }),
+    ).toEqual({ allow: false, reason: 'forbidden', code: 'forbidden' });
+    expect(
+      canCreateBoard({ kind: 'anon', boardId: 'brd_1', label: 'Sam', anonId: 'anon-1' }),
+    ).toEqual({ allow: false, reason: 'forbidden', code: 'forbidden' });
   });
 });
