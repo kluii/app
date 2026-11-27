@@ -12,7 +12,7 @@ import type { AppContext } from '../app.js';
 import { AppError } from '../lib/errors.js';
 import { readVersion } from '../lib/version.js';
 import { TOOL_EXAMPLES, TOOL_NAMES, TOOL_SCHEMAS, type ToolName } from './schemas.js';
-import { TOOL_HANDLERS } from './tools.js';
+import { LISTED_TOOLS, handlerFor } from './registry.js';
 import { appErrorToRpc, closestTools, zodToRpc, type RpcId } from './errors.js';
 import { createHub } from '../realtime/events.js';
 
@@ -52,7 +52,7 @@ function toolSchemas(): {
   description: string;
   inputSchema: Record<string, unknown>;
 }[] {
-  return TOOL_NAMES.map((name) => ({
+  return LISTED_TOOLS.map((name) => ({
     name,
     description: DESCRIPTIONS[name],
     inputSchema: z.toJSONSchema(TOOL_SCHEMAS[name], { io: 'input' }) as Record<string, unknown>,
@@ -99,12 +99,16 @@ async function handleToolCall(
     });
   }
   const name = params.name;
-  if (!TOOL_NAMES.includes(name as ToolName)) {
+  // A frozen name with no handler is not callable: it is not in `tools/list`, so
+  // calling it is calling an unknown tool. -32603 is reserved for a genuine
+  // internal failure, never for "not built yet".
+  const tool = TOOL_NAMES.find((candidate) => candidate === name);
+  const handler = tool === undefined ? undefined : handlerFor(tool);
+  if (tool === undefined || handler === undefined) {
     return errorOf(id, -32601, `Unknown tool: ${name}.`, {
-      hint: `Did you mean ${closestTools(name, TOOL_NAMES).join(', ')}?`,
+      hint: `Did you mean ${closestTools(name, LISTED_TOOLS).join(', ')}?`,
     });
   }
-  const tool = name as ToolName;
   const parsed = TOOL_SCHEMAS[tool].safeParse(params.arguments ?? {});
   if (!parsed.success) return { jsonrpc: '2.0', id, error: zodToRpc(tool, parsed.error) };
 
@@ -113,7 +117,7 @@ async function handleToolCall(
   if (!request.actor) throw new AppError('unauthenticated');
 
   try {
-    const result = await TOOL_HANDLERS[tool](
+    const result = await handler(
       { db, actor: request.actor, env: context.env, hub: context.hub ?? createHub() },
       parsed.data as never,
     );

@@ -10,6 +10,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type TestClient } from './helpers/server.js';
 import { TOOL_NAMES } from '../src/mcp/schemas.js';
+import { LISTED_TOOLS, TOOL_HANDLERS } from '../src/mcp/registry.js';
 
 type Rpc = {
   jsonrpc: '2.0';
@@ -70,8 +71,7 @@ describe('the MCP transport', () => {
     const list = await rpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
     expect(list.statusCode).toBe(200);
     const tools = (list.body.result as { tools: { name: string; inputSchema: unknown }[] }).tools;
-    expect(tools.map((tool) => tool.name).sort()).toEqual([...TOOL_NAMES].sort());
-    expect(tools).toHaveLength(21);
+    expect(tools.map((tool) => tool.name).sort()).toEqual([...LISTED_TOOLS].sort());
     // Every tool carries a real JSON Schema, not a free-form object.
     for (const tool of tools) {
       const schema = tool.inputSchema as { type?: string; properties?: Record<string, unknown> };
@@ -81,6 +81,44 @@ describe('the MCP transport', () => {
     const move = tools.find((tool) => tool.name === 'move_card');
     expect(JSON.stringify(move)).toContain('before');
     expect(JSON.stringify(move)).toContain('after');
+  });
+
+  /**
+   * Listing is a claim, so the wire response is the registry minus the names
+   * that have no handler. This is the test that keeps the filter honest: it
+   * fails the moment a tool is advertised without one, and the moment a handler
+   * exists but is hidden from the client.
+   */
+  it('serves exactly the tools it has a handler for', async () => {
+    const list = await rpc({ jsonrpc: '2.0', id: 11, method: 'tools/list' });
+    const listed = (list.body.result as { tools: { name: string }[] }).tools.map(
+      (tool) => tool.name,
+    );
+
+    for (const name of listed) {
+      expect(TOOL_HANDLERS[name as (typeof TOOL_NAMES)[number]], `${name} has no handler`).toBeTypeOf(
+        'function',
+      );
+    }
+    const served = TOOL_NAMES.filter((name) => TOOL_HANDLERS[name] !== undefined);
+    expect([...listed].sort()).toEqual([...served].sort());
+
+    // The frozen surface the parity test asserts does not shrink with the wire.
+    expect(TOOL_NAMES).toHaveLength(21);
+  });
+
+  it('answers a frozen tool that has no handler with -32601, never -32603', async () => {
+    const unbuilt = TOOL_NAMES.find((name) => TOOL_HANDLERS[name] === undefined);
+    // Once all 21 land the filter is a no-op and there is nothing to ask for.
+    if (unbuilt === undefined) return;
+    const response = await rpc({
+      jsonrpc: '2.0',
+      id: 12,
+      method: 'tools/call',
+      params: { name: unbuilt, arguments: {} },
+    });
+    expect(response.body.error?.code).toBe(-32601);
+    expect(String(response.body.error?.data?.hint)).toContain('Did you mean');
   });
 
   it('answers an unknown tool with -32601 and the closest three names', async () => {
