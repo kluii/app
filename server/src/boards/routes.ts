@@ -5,28 +5,23 @@ import type { Db } from '../db.js';
 import { requireActor } from '../auth/request.js';
 import { AppError, boardNotFound, fromZod } from '../lib/errors.js';
 import { newId } from '../lib/ids.js';
-import { RANK_STEP } from '../lib/ranks.js';
 import { recordEvent } from '../lib/events.js';
 import { commitEvent } from '../realtime/events.js';
 import {
   assertAllowed,
+  createBoard,
+  deleteBoard,
   humanBoardPath,
+  linkSuffix,
   loadBoardFor,
   resolvePublicBoard,
   toBoardDto,
   toPolicy,
-  uniqueSlug,
-  slugify,
-  linkSuffix,
+  updateBoard,
   boardUrl,
 } from './service.js';
 import { can } from '../lib/authz.js';
-import {
-  createBoardSchema,
-  patchBoardSchema,
-  rotateSuffixSchema,
-  sharePolicyConflict,
-} from '../contracts/boards.js';
+import { createBoardSchema, patchBoardSchema, rotateSuffixSchema } from '../contracts/boards.js';
 import { toBoardMembers } from '../boards/members.js';
 import { boardStateFor } from './state.js';
 import { conflictIfStale } from '../lib/concurrency.js';
@@ -58,68 +53,13 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
 
   app.post('/api/v1/boards', async (request, reply) => {
     const actor = requireActor(request);
-    if (actor.kind !== 'user' && actor.kind !== 'agent') {
-      throw new AppError('forbidden', {
-        message: 'Only an account can create a board.',
-        hint: 'Sign in, or ask a member for a link.',
-      });
-    }
     const parsed = createBoardSchema.safeParse(request.body);
     if (!parsed.success) throw fromZod(parsed.error);
-    const input = parsed.data;
-    const db = database();
-
-    const board = await db.$transaction(async (tx) => {
-      const slug = await uniqueSlug(tx, actor.userId, slugify(input.name));
-      const visibility = input.visibility ?? 'private';
-      const created = await tx.board.create({
-        data: {
-          id: newId('brd'),
-          owner_id: actor.userId,
-          name: input.name,
-          slug,
-          visibility,
-          link_role: 'none',
-          anon_write: 'off',
-          link_suffix: visibility === 'link' ? linkSuffix() : null,
-        },
-        include: { owner: { select: { id: true, username: true } } },
-      });
-      await tx.boardMember.create({
-        data: { id: newId('bmb'), board_id: created.id, user_id: actor.userId, role: 'owner' },
-      });
-      const template = input.template ?? 'classic';
-      if (template === 'classic') {
-        const names = ['To do', 'Doing', 'Done'];
-        for (const [index, name] of names.entries()) {
-          await tx.column.create({
-            data: {
-              id: newId('col'),
-              board_id: created.id,
-              name,
-              position: (index + 1) * RANK_STEP,
-            },
-          });
-        }
-      }
-      await recordEvent(tx, {
-        boardId: created.id,
-        actor,
-        type: 'board.created',
-        payload: { board_id: created.id, name: created.name, visibility: created.visibility },
-      });
-      return created;
-    });
-
-    commitEvent(context.hub, {
-      boardId: board.id,
-      type: 'board.created',
-      entity: 'board',
-      action: 'created',
-      payload: { board_id: board.id },
-      actorLabel: actor.kind,
-    });
-    return reply.code(201).send(toBoardDto(board, context.env.KLUI_PUBLIC_URL));
+    const board = await createBoard(
+      { db: database(), actor, publicUrl: context.env.KLUI_PUBLIC_URL, hub: context.hub },
+      parsed.data,
+    );
+    return reply.code(201).send(board);
   });
 
   app.get('/api/v1/boards/:id', async (request) => {
@@ -135,150 +75,22 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
     const { id } = request.params as { id: string };
     const parsed = patchBoardSchema.safeParse(request.body);
     if (!parsed.success) throw fromZod(parsed.error);
-    const input = parsed.data;
-    const db = database();
-    const loaded = await loadBoardFor(db, actor, id, 'board.update');
-    assertAllowed(loaded.decision);
-
-    conflictIfStale(
-      loaded.board.updated_at,
-      input.expected_updated_at,
-      toBoardDto(loaded.board, context.env.KLUI_PUBLIC_URL),
+    return updateBoard(
+      { db: database(), actor, publicUrl: context.env.KLUI_PUBLIC_URL, hub: context.hub },
+      id,
+      parsed.data,
     );
-
-    // The rule is about the state the request produces, not the payload it
-    // carries: `{link_role}` alone has no `visibility` to check against.
-    // `visibility: 'private'` coerces both fields in the same request, so the
-    // requested values are what count here.
-    const nextVisibility = input.visibility ?? loaded.board.visibility;
-    const nextLinkRole =
-      input.link_role ?? (input.visibility === 'private' ? 'none' : loaded.board.link_role);
-    const nextAnonWrite =
-      input.anon_write ?? (input.visibility === 'private' ? 'off' : loaded.board.anon_write);
-    const conflict = sharePolicyConflict({
-      visibility: nextVisibility,
-      link_role: nextLinkRole,
-      anon_write: nextAnonWrite,
-    });
-    if (conflict) {
-      throw new AppError('validation_failed', {
-        message: conflict.message,
-        hint: 'A private board has no share policy. Change visibility in the same request.',
-        details: [{ path: conflict.field, code: 'custom', message: conflict.message }],
-      });
-    }
-
-    const changes: Record<string, [unknown, unknown]> = {};
-    const data: Record<string, unknown> = {};
-
-    if (input.name !== undefined && input.name !== loaded.board.name) {
-      changes.name = [loaded.board.name, input.name];
-      data.name = input.name;
-    }
-    if (input.slug !== undefined && input.slug !== loaded.board.slug) {
-      changes.slug = [loaded.board.slug, input.slug];
-      data.slug = input.slug;
-    }
-    if (input.visibility !== undefined && input.visibility !== loaded.board.visibility) {
-      changes.visibility = [loaded.board.visibility, input.visibility];
-      data.visibility = input.visibility;
-      if (input.visibility === 'private') {
-        data.link_role = 'none';
-        data.anon_write = 'off';
-        data.link_suffix = null;
-      }
-      if (input.visibility === 'link' && !loaded.board.link_suffix) {
-        data.link_suffix = linkSuffix();
-      }
-      if (input.visibility === 'public') {
-        data.link_suffix = null;
-      }
-    }
-    if (input.link_role !== undefined && input.link_role !== loaded.board.link_role) {
-      changes.link_role = [loaded.board.link_role, input.link_role];
-      data.link_role = input.link_role;
-    }
-    if (input.anon_write !== undefined && input.anon_write !== loaded.board.anon_write) {
-      changes.anon_write = [loaded.board.anon_write, input.anon_write];
-      data.anon_write = input.anon_write;
-    }
-
-    const board = await db.$transaction(async (tx) => {
-      if (Object.keys(data).length === 0) return loaded.board;
-      const updated = await tx.board.update({
-        where: { id },
-        data,
-        include: { owner: { select: { id: true, username: true } } },
-      });
-      if (changes.slug) {
-        await tx.boardSlugReservation.create({
-          data: {
-            id: newId('bsr'),
-            board_id: id,
-            slug: String(changes.slug[0]),
-            redirect_slug: updated.slug,
-            reserved_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-          },
-        });
-      }
-      if (Object.keys(changes).length > 0) {
-        await recordEvent(tx, {
-          boardId: id,
-          actor,
-          type: 'board.updated',
-          payload: { board_id: id, changes },
-        });
-      }
-      return updated;
-    });
-
-    return toBoardDto(board, context.env.KLUI_PUBLIC_URL);
   });
 
   app.delete('/api/v1/boards/:id', async (request, reply) => {
     const actor = requireActor(request);
     const { id } = request.params as { id: string };
     const body = (request.body ?? {}) as { confirm?: boolean };
-    const db = database();
-    const loaded = await loadBoardFor(db, actor, id, 'board.delete');
-    assertAllowed(loaded.decision);
-    if (body.confirm !== true) {
-      throw new AppError('validation_failed', {
-        message: 'Deleting a board requires confirmation.',
-        hint: 'Send {"confirm": true} after the user has seen what will be deleted.',
-        details: [{ path: 'confirm', code: 'invalid_literal', message: 'expected true' }],
-      });
-    }
-    // D-23 and D-54: the one mutation that destroys the audit trail records it
-    // itself. Counts are read and both events written inside the same
-    // transaction as the delete, so a failure leaves neither a deletion nor a
-    // record of one. The board-scoped row is what the SSE payload describes and
-    // it dies with the cascade; the instance-scoped row is the durable record.
-    await db.$transaction(async (tx) => {
-      const [columns, cards, comments] = await Promise.all([
-        tx.column.count({ where: { board_id: id } }),
-        tx.card.count({ where: { board_id: id } }),
-        tx.comment.count({ where: { board: { id } } }),
-      ]);
-      const payload = {
-        board_id: id,
-        name: loaded.board.name,
-        slug: loaded.board.slug,
-        owner: loaded.board.owner?.username ?? null,
-        counts: { columns, cards, comments },
-      };
-      await recordEvent(tx, { boardId: id, actor, type: 'board.deleted', payload });
-      await recordEvent(tx, { boardId: null, actor, type: 'board.deleted', payload });
-      await tx.board.delete({ where: { id } });
-    });
-    commitEvent(context.hub, {
-      boardId: id,
-      type: 'board.deleted',
-      entity: 'board',
-      action: 'deleted',
-      payload: { board_id: id },
-      actorLabel: actor.kind,
-    });
+    await deleteBoard(
+      { db: database(), actor, publicUrl: context.env.KLUI_PUBLIC_URL, hub: context.hub },
+      id,
+      body.confirm === true,
+    );
     return reply.code(204).send();
   });
 

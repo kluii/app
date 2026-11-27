@@ -9,6 +9,15 @@
  */
 import type { Comment } from '@prisma/client';
 import type { Db } from '../db.js';
+import type { Actor } from '../lib/authz.js';
+import { AppError } from '../lib/errors.js';
+import { newId } from '../lib/ids.js';
+import { recordEvent } from '../lib/events.js';
+import { commitEvent, type Hub } from '../realtime/events.js';
+import { assertAllowed, loadBoardFor } from '../boards/service.js';
+
+/** The page cap docs/api.md §5 documents for a thread. */
+const MAX_PAGE = 100;
 
 export type CommentDto = {
   id: string;
@@ -76,4 +85,99 @@ export async function commentById(db: Db, id: string): Promise<CommentWithAuthor
     where: { id },
     include: { author: { select: { id: true, username: true } } },
   });
+}
+
+/**
+ * Reading and writing a thread, extracted from the routes so `/mcp` and REST
+ * return the same page and write the same event. `board.read` gates the read;
+ * `comment.create` the write, and no link or anonymous actor holds it — they
+ * can read the board, so the answer is `403`, never `404`.
+ */
+export type CommentWrite = { db: Db; actor: Actor; hub?: Hub };
+
+export async function listComments(
+  context: CommentWrite,
+  cardId: string,
+  page: { limit: number; cursor: string | null },
+): Promise<{ items: CommentDto[]; next_cursor: string | null }> {
+  const { db, actor } = context;
+  const card = await db.card.findUnique({ where: { id: cardId }, select: { id: true, board_id: true } });
+  if (!card) throw new AppError('card_not_found');
+  const loaded = await loadBoardFor(db, actor, card.board_id, 'board.read');
+  assertAllowed(loaded.decision);
+
+  const limit = Math.min(MAX_PAGE, Math.max(1, page.limit));
+  const cursor = parseCommentCursor(page.cursor ?? undefined);
+  const items = await db.comment.findMany({
+    where: {
+      card_id: cardId,
+      ...(cursor === null
+        ? {}
+        : {
+            OR: [
+              { created_at: { gt: cursor.at } },
+              { created_at: cursor.at, id: { gt: cursor.id } },
+            ],
+          }),
+    },
+    include: { author: { select: { id: true, username: true } } },
+    orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+    take: limit + 1,
+  });
+  const rows = items.slice(0, limit);
+  const last = rows[rows.length - 1];
+  return {
+    items: rows.map(toCommentDto),
+    next_cursor: items.length > limit && last ? commentCursor(last) : null,
+  };
+}
+
+export async function createComment(
+  context: CommentWrite,
+  cardId: string,
+  body: string,
+): Promise<CommentDto> {
+  const { db, actor } = context;
+  const card = await db.card.findUnique({ where: { id: cardId }, select: { id: true, board_id: true } });
+  if (!card) throw new AppError('card_not_found');
+  const loaded = await loadBoardFor(db, actor, card.board_id, 'comment.create');
+  assertAllowed(loaded.decision);
+
+  const authorId = actor.kind === 'user' || actor.kind === 'agent' ? actor.userId : null;
+  const comment = await db.$transaction(async (tx) => {
+    const created = await tx.comment.create({
+      data: {
+        id: newId('cmt'),
+        board_id: card.board_id,
+        card_id: card.id,
+        author_id: authorId,
+        author_type: actor.kind === 'agent' ? 'agent' : actor.kind === 'anon' ? 'anon' : 'user',
+        author_label: actor.kind === 'user' || actor.kind === 'agent' ? null : 'link',
+        body,
+      },
+      include: { author: { select: { id: true, username: true } } },
+    });
+    await recordEvent(tx, {
+      boardId: card.board_id,
+      actor,
+      type: 'comment.created',
+      payload: {
+        board_id: card.board_id,
+        card_id: card.id,
+        comment_id: created.id,
+        body_excerpt: bodyExcerpt(created.body),
+      },
+    });
+    return created;
+  });
+
+  commitEvent(context.hub, {
+    boardId: card.board_id,
+    type: 'comment.created',
+    entity: 'comment',
+    action: 'created',
+    payload: { comment: toCommentDto(comment) },
+    actorLabel: actor.kind,
+  });
+  return toCommentDto(comment);
 }

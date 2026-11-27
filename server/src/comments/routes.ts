@@ -19,16 +19,9 @@ import type { AppContext } from '../app.js';
 import { requireActor } from '../auth/request.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
 import { AppError, fromZod } from '../lib/errors.js';
-import { newId } from '../lib/ids.js';
 import { recordEvent } from '../lib/events.js';
 import { commitEvent } from '../realtime/events.js';
-import {
-  bodyExcerpt,
-  commentById,
-  commentCursor,
-  parseCommentCursor,
-  toCommentDto,
-} from './service.js';
+import { bodyExcerpt, commentById, createComment, listComments, toCommentDto } from './service.js';
 
 const bodySchema = z.object({ body: z.string().trim().min(1).max(20_000) }).strict();
 
@@ -44,89 +37,24 @@ export function registerCommentRoutes(app: FastifyInstance, context: AppContext)
     const actor = requireActor(request);
     const { id } = request.params as { id: string };
     const query = request.query as { limit?: string; cursor?: string };
-    const db = database();
-
-    const card = await db.card.findUnique({ where: { id }, select: { id: true, board_id: true } });
-    if (!card) throw new AppError('card_not_found');
-    const loaded = await loadBoardFor(db, actor, card.board_id, 'board.read');
-    assertAllowed(loaded.decision);
-
     const requested = Number(query.limit ?? 50);
-    const limit = Math.min(MAX_PAGE, Math.max(1, Number.isFinite(requested) ? requested : 50));
-    const cursor = parseCommentCursor(query.cursor);
-    const items = await db.comment.findMany({
-      where: {
-        card_id: id,
-        ...(cursor === null
-          ? {}
-          : {
-              OR: [
-                { created_at: { gt: cursor.at } },
-                { created_at: cursor.at, id: { gt: cursor.id } },
-              ],
-            }),
-      },
-      include: { author: { select: { id: true, username: true } } },
-      orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
-      take: limit + 1,
+    return listComments({ db: database(), actor, hub: context.hub }, id, {
+      limit: Math.min(MAX_PAGE, Math.max(1, Number.isFinite(requested) ? requested : 50)),
+      cursor: query.cursor ?? null,
     });
-    const page = items.slice(0, limit);
-    const last = page[page.length - 1];
-    return {
-      items: page.map(toCommentDto),
-      next_cursor: items.length > limit && last ? commentCursor(last) : null,
-    };
   });
 
   app.post('/api/v1/cards/:id/comments', async (request, reply) => {
     const actor = requireActor(request);
     const { id } = request.params as { id: string };
-    const db = database();
     const parsed = bodySchema.safeParse(request.body);
     if (!parsed.success) throw fromZod(parsed.error);
-
-    const card = await db.card.findUnique({ where: { id }, select: { id: true, board_id: true } });
-    if (!card) throw new AppError('card_not_found');
-    const loaded = await loadBoardFor(db, actor, card.board_id, 'comment.create');
-    assertAllowed(loaded.decision);
-
-    const authorId = actor.kind === 'user' || actor.kind === 'agent' ? actor.userId : null;
-    const comment = await db.$transaction(async (tx) => {
-      const created = await tx.comment.create({
-        data: {
-          id: newId('cmt'),
-          board_id: card.board_id,
-          card_id: card.id,
-          author_id: authorId,
-          author_type: actor.kind === 'agent' ? 'agent' : actor.kind === 'anon' ? 'anon' : 'user',
-          author_label: actor.kind === 'user' || actor.kind === 'agent' ? null : 'link',
-          body: parsed.data.body,
-        },
-        include: { author: { select: { id: true, username: true } } },
-      });
-      await recordEvent(tx, {
-        boardId: card.board_id,
-        actor,
-        type: 'comment.created',
-        payload: {
-          board_id: card.board_id,
-          card_id: card.id,
-          comment_id: created.id,
-          body_excerpt: bodyExcerpt(created.body),
-        },
-      });
-      return created;
-    });
-
-    commitEvent(context.hub, {
-      boardId: card.board_id,
-      type: 'comment.created',
-      entity: 'comment',
-      action: 'created',
-      payload: { comment: toCommentDto(comment) },
-      actorLabel: actor.kind,
-    });
-    return reply.code(201).send(toCommentDto(comment));
+    const comment = await createComment(
+      { db: database(), actor, hub: context.hub },
+      id,
+      parsed.data.body,
+    );
+    return reply.code(201).send(comment);
   });
 
   app.patch('/api/v1/comments/:id', async (request) => {
