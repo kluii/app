@@ -24,6 +24,7 @@ import {
   unsubscribe,
   updateDigestPref,
 } from './service.js';
+import { rewriteDigest } from './llm.js';
 
 export function registerDigestRoutes(app: FastifyInstance, context: AppContext): void {
   const database = (): Db => {
@@ -66,13 +67,13 @@ export function registerDigestRoutes(app: FastifyInstance, context: AppContext):
     });
     if (!user) throw new AppError('not_found', { message: 'Not found.', hint: null });
 
-    const digest = await digestFor(db, {
+    const computed = await digestFor(db, {
       userId,
       now: new Date(),
       timezone: pref?.timezone ?? 'UTC',
       since: pref?.last_sent_at ?? null,
     });
-    if (digest.empty) return { sent: false, reason: 'empty' };
+    if (computed.empty) return { sent: false, reason: 'empty' };
 
     if (pref === null || (pref.webhook_url === null && pref.email === null)) {
       throw new AppError('validation_failed', {
@@ -85,6 +86,10 @@ export function registerDigestRoutes(app: FastifyInstance, context: AppContext):
     if (pref.email !== null && mail === null && pref.webhook_url === null) {
       throw new AppError('email_not_configured');
     }
+    const digest = await rewriteDigest(computed, {
+      url: context.env.KLUI_DIGEST_LLM_URL,
+      apiKey: context.env.KLUI_DIGEST_LLM_KEY,
+    });
     const result = await deliverDigest({ mail, pref, digest });
     if (!result.ok) {
       if (result.error === 'email_not_configured') throw new AppError('email_not_configured');
