@@ -15,7 +15,11 @@ import { AppError } from '../lib/errors.js';
 import type { Hub } from '../realtime/events.js';
 import { TOOL_NAMES, TOOL_SCHEMAS, type ToolName } from './schemas.js';
 import { boardsTools } from './tools/boards.js';
+import { cardTools } from './tools/cards.js';
+import { columnTools } from './tools/columns.js';
+import { commentTools } from './tools/comments.js';
 import { identityTools } from './tools/identity.js';
+import { readTools } from './tools/read.js';
 
 export type ToolContext = { db: Db; actor: Actor; env: Env; hub: Hub };
 
@@ -65,6 +69,10 @@ export function toTagRows(
 
 export const TOOL_HANDLERS: Partial<Record<ToolName, ToolHandler>> = {
   ...boardsTools,
+  ...columnTools,
+  ...cardTools,
+  ...commentTools,
+  ...readTools,
   ...identityTools,
 };
 

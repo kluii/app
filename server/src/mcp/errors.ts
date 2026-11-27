@@ -35,6 +35,9 @@ const PROTOCOL_CODES: Partial<Record<ErrorCode, number>> = {
   rate_limited: -32004,
   too_many_attempts: -32004,
   validation_failed: -32602,
+  // docs/mcp.md §4: an export over the inline limit names the REST endpoint
+  // rather than truncating. -32006 is the one code this file adds to §2.
+  payload_too_large: -32006,
   service_unavailable: -32603,
 };
 
@@ -61,7 +64,12 @@ export function appErrorToRpc(error: AppError): {
  */
 export function zodToRpc(tool: ToolName, error: ZodError): RpcErrorBody['error'] {
   const issue = error.issues[0];
-  const parameter = issue?.path.map(String).join('.') ?? '';
+  // An unknown key has an empty path; naming it is the difference between
+  // "something is wrong" and "`board_id` is not a parameter, send `board`".
+  const parameter =
+    issue?.code === 'unrecognized_keys'
+      ? (issue.keys?.[0] ?? '')
+      : (issue?.path.map(String).join('.') ?? '');
   const received = issue?.code === 'invalid_type' ? String(issue.input) : undefined;
   return {
     code: -32602,
