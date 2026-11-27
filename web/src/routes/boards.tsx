@@ -74,7 +74,7 @@ function BoardsPage() {
 
 function BoardTile({ board }: { board: Board }) {
   const visibility = t(`boards.meta.${board.visibility}`);
-  const role = board.role ? t(`boards.meta.role.${board.role}`) : null;
+  const role = board.role ? t(`board.role.${board.role}`) : null;
   return (
     <Link
       to="/boards/$boardId"
@@ -89,9 +89,6 @@ function BoardTile({ board }: { board: Board }) {
       <span className="flex flex-wrap items-center gap-1.5">
         <Chip>{visibility}</Chip>
         {role ? <Chip>{role}</Chip> : null}
-        <span className="font-mono text-mono-sm text-ink-subtle">
-          {board.owner.username}/{board.slug}
-        </span>
       </span>
     </Link>
   );
