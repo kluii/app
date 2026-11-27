@@ -46,6 +46,7 @@ import { registerMemberRoutes } from './boards/members-routes.js';
 import { registerAgentKeyRoutes } from './agents/routes.js';
 import { registerMcpRoutes } from './mcp/routes.js';
 import { llmsTxt } from './public/llms.js';
+import { registerAnalytics } from './public/analytics.js';
 import { renderHtmlPage, robotsTxt, sitemapXml } from './public/pages.js';
 import type { Mailer } from './lib/mail.js';
 
@@ -84,7 +85,7 @@ export function buildApp(context: AppContext): FastifyInstance {
   const assets = loadStaticAssets(
     context.webDir ?? new URL('../../web/dist', import.meta.url).pathname,
   );
-  const csp = contentSecurityPolicy(assets?.bootstrapHash ?? null);
+  const csp = contentSecurityPolicy(assets?.bootstrapHash ?? null, context.env.KLUI_ANALYTICS_URL);
 
   const app: FastifyInstance = Fastify({
     logger: context.logger ?? loggerOptions(context.env.KLUI_LOG_LEVEL),
@@ -121,6 +122,9 @@ export function buildApp(context: AppContext): FastifyInstance {
       .header('cache-control', 'no-store')
       .redirect(request.actor ? '/boards' : '/login', 302);
   });
+
+  // K5-02: the tag exists only when the variable does, on every HTML document.
+  registerAnalytics(app, context.env);
 
   if (assets) {
     registerStatic(app, assets);

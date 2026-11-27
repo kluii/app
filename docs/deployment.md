@@ -87,7 +87,7 @@ Names are a contract: compose files, docs and the site depend on them.
 | `KLUI_REGISTRATION_OPEN` | `true` | Admin can override at runtime in settings |
 | `KLUI_TOTP_POLICY` | `available` | `available` / `required` / `disabled` |
 | `KLUI_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` / `_FROM` | unset | Unset → email features fail closed with `503` |
-| `KLUI_ANALYTICS_URL` | unset | Unset → no script tag, no outbound request (asserted by test) |
+| `KLUI_ANALYTICS_URL` | unset | Unset → no script tag, no outbound request (asserted by `server/test/analytics.test.ts`). Set → one deferred tag before `</head>`, and its origin is added to the CSP `script-src` and `connect-src`; without that the policy would block the tag and the feature would only look shipped |
 | `KLUI_METRICS_ENABLED` | `false` | When true, bind to loopback or require a token |
 | `KLUI_METRICS_TOKEN` | unset | Bearer token for `/metrics` |
 | `KLUI_CAPTCHA_ENABLED` | `false` | Cap, self-hosted, anonymous writes only, past the threshold |

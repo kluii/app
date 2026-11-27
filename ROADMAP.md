@@ -292,7 +292,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `instance_name`, logo (SVG/PNG ≤512×512), `accent_color`, `tab_title`, favicon. Accent validated at save time: compute the readable foreground and **reject** accents failing AA against the surfaces they land on.
   **Exit:** saving `#FFFF00` as accent is rejected with the measured ratio in the message; defaults are served through the same variables (no special "unbranded" code path).
 
-- [ ] **K5-02 — Analytics, gated** `S` · dep: —
+- [x] **K5-02 — Analytics, gated** `S` · dep: —
   Snippet injected at request time from `KLUI_ANALYTICS_URL`; unset emits no script tag and no request.
   **Exit:** a test asserts zero outbound requests with the variable unset, and exactly one script tag with it set.
 

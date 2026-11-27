@@ -127,7 +127,7 @@ Cache-Control: no-store on HTML and credentialed JSON
 - Fail-closed boot test: production without `KLUI_SESSION_SECRET` must exit non-zero.
 - Authz matrix test.
 - XSS corpus test on the markdown renderer and OG escaping.
-- A test asserting `KLUI_ANALYTICS_URL` unset produces no outbound request.
+- A test asserting `KLUI_ANALYTICS_URL` unset produces no outbound request (`server/test/analytics.test.ts`: no tag, no absolute script URL, `fetch` never called).
 - A test asserting `/metrics` is `404` by default.
 
 ## 12. Disclosure

@@ -56,17 +56,39 @@ export function isSpaNavigation(url: string, accept: string | undefined): boolea
   return !/\.[a-z0-9]{2,5}$/i.test(path);
 }
 
-export function contentSecurityPolicy(bootstrapHash: string | null): string {
-  const scriptSrc = bootstrapHash ? `'self' '${bootstrapHash}'` : "'self'";
+/**
+ * The CSP is `'self'` plus the theme bootstrap hash, and nothing else, unless an
+ * analytics URL is configured: a tag the policy blocks is a feature that only
+ * looks shipped. The origin of `KLUI_ANALYTICS_URL` is then allowed for
+ * `script-src` (the tag) and `connect-src` (the beacon the script sends).
+ */
+export function contentSecurityPolicy(
+  bootstrapHash: string | null,
+  analyticsUrl: string | null = null,
+): string {
+  const analyticsOrigin = analyticsUrl === null ? null : originOf(analyticsUrl);
+  const scripts = [bootstrapHash ? `'${bootstrapHash}'` : null, analyticsOrigin].filter(
+    (part): part is string => part !== null,
+  );
+  const scriptSrc = ["'self'", ...scripts].join(' ');
   return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
-    "connect-src 'self'",
+    `connect-src ${["'self'", ...(analyticsOrigin === null ? [] : [analyticsOrigin])].join(' ')}`,
     "font-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'none'",
     "form-action 'self'",
   ].join('; ');
+}
+
+/** `https://analytics.example.com/a/b.js` → `https://analytics.example.com`. */
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
 }
