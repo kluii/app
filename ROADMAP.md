@@ -288,7 +288,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
 
 **Wave exit:** every line of `PROMPT.md` §12 is verified and pasted into `docs/verify/k5.md`; `docker compose up -d` from the published image works on a clean machine.
 
-- [ ] **K5-01 — Branding admin** `M` · dep: K2-01
+- [x] **K5-01 — Branding admin** `M` · dep: K2-01 — verified in `docs/verify/k5.md` § K5-01
   `instance_name`, logo (SVG/PNG ≤512×512), `accent_color`, `tab_title`, favicon. Accent validated at save time: compute the readable foreground and **reject** accents failing AA against the surfaces they land on.
   **Exit:** saving `#FFFF00` as accent is rejected with the measured ratio in the message; defaults are served through the same variables (no special "unbranded" code path).
 
