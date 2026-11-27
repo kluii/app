@@ -337,8 +337,3 @@ names a roadmap id that does not exist.
 
 | Method | Path | Serves it |
 |---|---|---|
-| `DELETE` | `/me` | K5-08 |
-| `GET` | `/auth/oidc/:provider/start` | K5-09 |
-| `GET` | `/auth/oidc/:provider/callback` | K5-09 |
-| `POST` | `/auth/oidc/:provider/link` | K5-09 |
-| `GET` | `/metrics` | K5-03 |

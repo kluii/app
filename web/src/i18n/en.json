@@ -493,8 +493,7 @@
   "oidc.admin.clientId": "Client ID",
   "oidc.admin.clientSecret": "Client secret",
   "oidc.admin.enabledLabel": "Enable on sign-in page",
-  "oidc.admin.addSubmit": "Add provider"
-,
+  "oidc.admin.addSubmit": "Add provider",
   "notifications.bellLabel": "Notifications",
   "notifications.title": "Notifications",
   "notifications.empty": "No notifications yet.",

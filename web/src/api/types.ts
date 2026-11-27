@@ -37,6 +37,8 @@ export type DigestPrefDto = {
   last_result: 'sent' | 'empty' | null;
   rss_url?: string;
   unsubscribe_url?: string;
+};
+
 export type Branding = {
   instance_name: string;
   tab_title: string | null;
