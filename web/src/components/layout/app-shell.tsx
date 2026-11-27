@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { api } from '../../api/client';
 import { cn } from '../../lib/cn';
 import { queryKeys } from '../../lib/query-client';
-import { currentTheme } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 import { t } from '../../i18n';
 import whiteLogo from '../../assets/klui-logo-white.png';
 import blackLogo from '../../assets/klui-logo-black.png';
@@ -13,10 +13,9 @@ import { AccountMenu } from './account-menu';
 
 /**
  * 56 px bar, canvas ground, hairline bottom, no shadow (DESIGN.md §4).
- * The footer is mandatory on every page (AGENTS.md §8).
  */
 export function AppShell({ children, actions }: { children?: ReactNode; actions?: ReactNode }) {
-  const [theme] = useState(currentTheme);
+  const { theme } = useTheme();
   // A board is a fixed frame: its rail scrolls, the page does not. Every other
   // screen is a document and keeps scrolling normally.
   const onBoard = useRouterState({
@@ -77,17 +76,6 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
       >
         {children ?? <Outlet />}
       </main>
-
-      <footer className="border-t border-border px-4 py-3">
-        <a
-          href="https://wyliam.dev"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-body-sm text-ink-subtle underline-offset-4 hover:text-ink-muted hover:underline"
-        >
-          {t('common.footer.madeBy')}
-        </a>
-      </footer>
     </div>
   );
 }

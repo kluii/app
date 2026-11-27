@@ -304,9 +304,9 @@ export function BoardView({ boardId }: { boardId: string }) {
 }
 
 /**
- * The name gate. A stranger on a board that accepts anonymous writes names
- * themselves, and the name is remembered per board in this browser only
- * (docs/features/links-and-anonymous.md §4).
+ * The name gate. On a read-only link board a stranger names themselves to open
+ * it: the name is the read credential, and it is remembered per board in this
+ * browser only (docs/features/links-and-anonymous.md §4).
  */
 function AnonymousEntry({ boardId }: { boardId: string }) {
   const queryClient = useQueryClient();

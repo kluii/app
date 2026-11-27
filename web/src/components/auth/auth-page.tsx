@@ -31,16 +31,6 @@ export function AuthPage({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
-      <footer className="px-4 py-3 text-center">
-        <a
-          href="https://wyliam.dev"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-body-sm text-ink-subtle underline-offset-4 hover:text-ink-muted hover:underline"
-        >
-          {t('common.footer.madeBy')}
-        </a>
-      </footer>
     </div>
   );
 }
