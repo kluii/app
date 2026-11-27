@@ -1,5 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Board, BoardState, Card, Column, EventDto, Me, Page, PublicBoard } from './types';
+import type {
+  AnonWrite,
+  Board,
+  BoardState,
+  Card,
+  Column,
+  EventDto,
+  Me,
+  Page,
+  PublicBoard,
+  Visibility,
+} from './types';
 
 /**
  * The one place the SPA talks to the API. `credentials: 'same-origin'` carries
@@ -169,6 +180,20 @@ export const api = {
   createBoard: (input: { name: string; template?: 'classic' | 'blank' }) =>
     request<Board>('POST', '/boards', input),
   boardState: (boardId: string) => request<BoardState>('GET', `/boards/${boardId}/state`),
+  boardPublic: (boardId: string) =>
+    request<{
+      id: string;
+      name: string;
+      visibility: Visibility;
+      anon_write: AnonWrite;
+      accepts_anon: boolean;
+    }>('GET', `/boards/${boardId}/public`),
+  joinBoard: (boardId: string, label: string) =>
+    request<{ board_id: string; label: string; actor_kind: 'anon' }>(
+      'POST',
+      `/boards/${boardId}/anon`,
+      { label },
+    ),
   card: (cardId: string) => request<Card>('GET', `/cards/${cardId}`),
   activity: (boardId: string, cursor?: string, actorKind?: string) =>
     request<Page<EventDto>>(

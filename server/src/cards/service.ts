@@ -6,6 +6,7 @@
 import type { Prisma } from '@prisma/client';
 import type { Db } from '../db.js';
 import { AppError } from '../lib/errors.js';
+import { newId } from '../lib/ids.js';
 import { RANK_STEP, planRank, renumberPositions } from '../lib/ranks.js';
 import { recordEvent } from '../lib/events.js';
 import type { CardDto, ColumnDto, TagDto } from '../contracts/dto.js';
@@ -32,6 +33,7 @@ export function toCardDto(
   card: Prisma.CardGetPayload<{ include: { tags: true } }>,
   assignee: { id: string; username: string } | null,
   boardTagColors: Map<string, string>,
+  viewer?: Actor | null,
 ): CardDto {
   const tags: TagDto[] = card.tags
     .slice()
@@ -44,6 +46,8 @@ export function toCardDto(
     description: card.description,
     assignee,
     assignee_label: card.assignee_label,
+    actor_label: card.actor_label,
+    mine: viewer?.kind === 'anon' && card.anon_actor_id === viewer.anonId,
     due_at: card.due_at ? card.due_at.toISOString() : null,
     done: card.done,
     position: card.position.toString(),
@@ -231,4 +235,45 @@ export async function createTagRows(
 
 export function positionString(value: number): string {
   return value.toFixed(10).replace(/\.?0+$/, '');
+}
+
+/**
+ * A moderated write: no card, no event, a row the owner can approve or reject
+ * (docs/features/links-and-anonymous.md §5). Seven days, then the sweeper drops
+ * it (K3-04).
+ */
+export async function createPendingCard(
+  db: Db,
+  input: {
+    boardId: string;
+    columnId: string;
+    title: string;
+    description: string | null;
+    dueAt: Date | null;
+    tags: unknown;
+    label: string;
+    anonId: string;
+  },
+): Promise<{ id: string; title: string }> {
+  const column = await db.column.findFirst({
+    where: { id: input.columnId, board_id: input.boardId },
+    select: { id: true },
+  });
+  if (!column) throw new AppError('column_not_found');
+  const row = await db.pendingCard.create({
+    data: {
+      id: newId('pnd'),
+      board_id: input.boardId,
+      column_id: column.id,
+      title: input.title,
+      description: input.description,
+      tags: input.tags === undefined ? undefined : (input.tags as Prisma.InputJsonValue),
+      due_at: input.dueAt,
+      actor_label: input.label,
+      anon_actor_id: input.anonId,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+    select: { id: true, title: true },
+  });
+  return row;
 }

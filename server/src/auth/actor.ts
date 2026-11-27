@@ -11,6 +11,7 @@ import { hashToken } from '../lib/hash.js';
 import { sessionCookieName } from '../contracts/auth.js';
 import type { Actor } from '../lib/authz.js';
 import { clearLinkCookie, findActiveLink, readLinkCookie, touchLink } from '../links/service.js';
+import { readAnonCookie } from '../anon/service.js';
 
 export function bearerToken(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization;
@@ -35,6 +36,7 @@ export async function resolveActor(
   const raw = bearer ?? cookie;
   if (!raw) {
     await resolveLinkActor(db, request, reply);
+    if (!request.actor) resolveAnonActor(request);
     return;
   }
 
@@ -45,8 +47,9 @@ export async function resolveActor(
 
   if (!session || session.revoked_at !== null || session.expires_at.getTime() <= Date.now()) {
     if (bearer) throw new AppError('invalid_credential');
-    // A stale session cookie is not a reason to ignore a valid link cookie.
+    // A stale session cookie is not a reason to ignore a link or anon cookie.
     await resolveLinkActor(db, request, reply);
+    if (!request.actor) resolveAnonActor(request);
     return;
   }
 
@@ -96,4 +99,20 @@ async function resolveLinkActor(
     linkId: link.id,
   } satisfies Actor;
   await touchLink(db, link.id);
+}
+
+/**
+ * The third credential: an anonymous visitor who gave a display name. It is a
+ * signed value, not a database row — `can()` decides what it may read and write,
+ * and the board it names is part of the value.
+ */
+function resolveAnonActor(request: FastifyRequest): void {
+  const identity = readAnonCookie(request);
+  if (!identity) return;
+  request.actor = {
+    kind: 'anon',
+    boardId: identity.boardId,
+    label: identity.label,
+    anonId: identity.anonId,
+  } satisfies Actor;
 }

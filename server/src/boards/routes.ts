@@ -332,6 +332,10 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
             ? 'link'
             : (self?.username ?? ''),
       can_write: can(actor, 'card.create', policy, loaded.membership).allow,
+      can_delete_card: can(actor, 'card.delete', policy, loaded.membership).allow,
+      can_move_card: can(actor, 'card.move', policy, loaded.membership).allow,
+      can_comment: can(actor, 'comment.create', policy, loaded.membership).allow,
+      can_manage_columns: can(actor, 'column.create', policy, loaded.membership).allow,
       can_manage: can(actor, 'board.update', policy, loaded.membership).allow,
       can_moderate: can(actor, 'moderation.decide', policy, loaded.membership).allow,
       can_close: can(actor, 'board.close', policy, loaded.membership).allow,
@@ -345,6 +349,7 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
           card,
           card.assignee_id ? (assigneeById.get(card.assignee_id) ?? null) : null,
           tagColors,
+          actor,
         ),
       ),
       members,
@@ -443,6 +448,39 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
   });
 
   /**
+   * The public face of a board for a visitor with no credential: enough to
+   * decide whether to ask for a display name, and nothing that is content
+   * (K3-03). A private board is a 404, like everywhere else.
+   */
+  app.get('/api/v1/boards/:id/public', async (request, reply) => {
+    const db = database();
+    const { id } = request.params as { id: string };
+    const board = await db.board.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        owner_id: true,
+        visibility: true,
+        anon_write: true,
+        link_role: true,
+        closed_at: true,
+      },
+    });
+    if (!board) throw boardNotFound();
+    const anonymous = { kind: 'anon', boardId: id, label: 'visitor', anonId: 'visitor' } as const;
+    if (!can(anonymous, 'board.read', toPolicy(board), null).allow) throw boardNotFound();
+    reply.header('cache-control', 'no-store').header('x-robots-tag', 'noindex');
+    return {
+      id: board.id,
+      name: board.name,
+      visibility: board.visibility,
+      anon_write: board.anon_write,
+      accepts_anon: board.anon_write !== 'off',
+    };
+  });
+
+  /**
    * The SPA equivalent of opening a board URL: the route resolves the segment
    * through the same `can()` and hands back the id-addressed board. A URL never
    * grants anything by itself, and a failure is the standard 404 (K3-01).
@@ -451,11 +489,22 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
     const db = database();
     const { username, segment } = request.params as { username: string; segment: string };
     const target = await resolvePublicBoard(db, username, segment);
-    const actor = request.actor;
-    if (!target || !actor) throw boardNotFound();
-    const loaded = await loadBoardFor(db, actor, target.id, 'board.read');
+    if (!target) throw boardNotFound();
+
+    // A readable URL is a way in only when the board takes anonymous writes: a
+    // stranger holding the suffix is exactly the visitor K3-03 is for. Without
+    // that, the id is not handed out and the page stays a 404.
+    const visitor =
+      request.actor ??
+      ({ kind: 'anon', boardId: target.id, label: 'visitor', anonId: 'visitor' } as const);
+    const loaded = await loadBoardFor(db, visitor, target.id, 'board.read');
     assertAllowed(loaded.decision);
-    return { board_id: loaded.board.id, url: humanBoardPath(loaded.board) };
+    if (!request.actor && loaded.board.anon_write === 'off') throw boardNotFound();
+    return {
+      board_id: loaded.board.id,
+      url: humanBoardPath(loaded.board),
+      accepts_anon: loaded.board.anon_write !== 'off',
+    };
   });
 
   /**

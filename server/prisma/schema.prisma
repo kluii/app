@@ -386,6 +386,8 @@ model Card {
   done           Boolean   @default(false)
   position       Decimal   @db.Decimal(30, 10)
   anon_actor_id  String?
+  /// The display name an anonymous actor chose; null for an account or a link.
+  actor_label    String?
   created_at     DateTime  @default(now())
   updated_at     DateTime  @default(now()) @updatedAt
 

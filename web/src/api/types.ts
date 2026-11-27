@@ -55,6 +55,8 @@ export type Card = {
   description: string | null;
   assignee: { id: string; username: string } | null;
   assignee_label: string | null;
+  actor_label: string | null;
+  mine: boolean;
   due_at: string | null;
   done: boolean;
   position: string;
@@ -70,7 +72,11 @@ export type Caller = {
   role: MemberRole | null;
   label: string;
   can_write: boolean;
+  can_delete_card: boolean;
+  can_move_card: boolean;
+  can_comment: boolean;
   can_manage: boolean;
+  can_manage_columns: boolean;
   can_moderate: boolean;
   can_close: boolean;
 };

@@ -12,6 +12,7 @@ import { conflictIfStale } from '../lib/concurrency.js';
 import { assertAllowed, loadBoardFor } from '../boards/service.js';
 import {
   boardTagColors,
+  createPendingCard,
   createTagRows,
   lockColumnForAppend,
   nextAppendPosition,
@@ -41,6 +42,26 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
 
     const loaded = await loadBoardFor(db, actor, id, 'card.create');
     assertAllowed(loaded.decision);
+    // A moderated board accepts the write and shows it to nobody until an owner
+    // approves it: no card, no event, one pending row (K3-03 → K3-04).
+    if (actor.kind === 'anon' && loaded.board.anon_write === 'moderated') {
+      const pending = await createPendingCard(db, {
+        boardId: id,
+        columnId: parsed.data.column,
+        title: parsed.data.title,
+        description: parsed.data.description ?? null,
+        dueAt: parsed.data.due_at ? new Date(parsed.data.due_at) : null,
+        tags: parsed.data.tags,
+        label: actor.label,
+        anonId: actor.anonId,
+      });
+      return reply.code(202).send({
+        status: 'pending',
+        id: pending.id,
+        board_id: id,
+        title: pending.title,
+      });
+    }
     const card = await createCard(db, { boardId: id, actor, input: parsed.data });
     commitEvent(context.hub, {
       boardId: id,
@@ -146,7 +167,7 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
         : Promise.resolve(null),
       db.comment.count({ where: { card_id: card.id } }),
     ]);
-    return { ...toCardDto(card, assignee, tagColors), comments_count: commentsCount };
+    return { ...toCardDto(card, assignee, tagColors, actor), comments_count: commentsCount };
   });
 
   app.patch('/api/v1/cards/:id', async (request) => {
@@ -165,6 +186,40 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
       isOwnCard: actor.kind === 'anon' && card.anon_actor_id === actor.anonId,
     });
     assertAllowed(loaded.decision);
+    // "Edit a card they created" is title, description and done — never an
+    // assignment, a due date or a tag (docs/permissions.md §4.3). A field sent
+    // back unchanged is not a change: the editor posts the whole form.
+    if (actor.kind === 'anon') {
+      const tagsChanged =
+        input.tags !== undefined &&
+        JSON.stringify(input.tags.map((tag) => tag.name).sort()) !==
+          JSON.stringify(card.tags.map((tag) => tag.name).sort());
+      const dueChanged =
+        input.due_at !== undefined &&
+        (input.due_at === null ? null : new Date(input.due_at).getTime()) !==
+          (card.due_at?.getTime() ?? null);
+      const forbidden = [
+        input.assignee !== undefined && (input.assignee ?? null) !== card.assignee_id
+          ? 'assignee'
+          : null,
+        input.assignee_label !== undefined && input.assignee_label !== card.assignee_label
+          ? 'assignee_label'
+          : null,
+        dueChanged ? 'due_at' : null,
+        tagsChanged ? 'tags' : null,
+      ].filter((field): field is string => field !== null);
+      if (forbidden.length > 0) {
+        throw new AppError('forbidden', {
+          message: 'An anonymous visitor can only change the title, the description and done.',
+          hint: 'Ask a member to make the change, or sign in.',
+          details: forbidden.map((key) => ({
+            path: key,
+            code: 'custom',
+            message: 'not available to an anonymous actor',
+          })),
+        });
+      }
+    }
     conflictIfStale(card.updated_at, input.expected_updated_at, toCardDto(card, null, new Map()));
 
     const changes: Record<string, [unknown, unknown]> = {};
@@ -255,7 +310,7 @@ export function registerCardRoutes(app: FastifyInstance, context: AppContext): v
       payload: { card_id: card.id },
       actorLabel: actor.kind,
     });
-    return toCardDto(updated, assignee, tagColors);
+    return toCardDto(updated, assignee, tagColors, actor);
   });
 
   app.delete('/api/v1/cards/:id', async (request, reply) => {
@@ -405,6 +460,7 @@ async function createCard(
         done: input.input.done ?? false,
         position,
         anon_actor_id: input.actor.kind === 'anon' ? input.actor.anonId : null,
+        actor_label: input.actor.kind === 'anon' ? input.actor.label : null,
       },
       include: { tags: true },
     });
@@ -425,7 +481,7 @@ async function createCard(
 
   const tags = await db.cardTag.findMany({ where: { card_id: card.id } });
   const tagColors = await boardTagColors(db, input.boardId);
-  return toCardDto({ ...card, tags }, assignee, tagColors);
+  return toCardDto({ ...card, tags }, assignee, tagColors, input.actor);
 }
 
 async function resolveAssignee(

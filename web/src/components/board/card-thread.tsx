@@ -15,11 +15,9 @@ import { getLocale, t } from '../../i18n';
 import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
 
+/** The server decides (`comment.create`); the client only reads its answer. */
 function canComment(caller: Caller): boolean {
-  return (
-    caller.actor_kind === 'user' &&
-    (caller.role === 'owner' || caller.role === 'admin' || caller.role === 'editor')
-  );
+  return caller.can_comment;
 }
 
 function formatDay(iso: string, locale: string): string {

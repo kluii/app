@@ -15,14 +15,16 @@ import { Popover } from '../ui/popover';
 export function CardMenu({
   card,
   columns,
-  canWrite,
+  canMove,
+  canDelete,
   onOpen,
   onMove,
   onDelete,
 }: {
   card: Card;
   columns: Column[];
-  canWrite: boolean;
+  canMove: boolean;
+  canDelete: boolean;
   onOpen: () => void;
   onMove: (columnId: string) => void;
   onDelete: () => void;
@@ -75,7 +77,7 @@ export function CardMenu({
               {t('board.card.open')}
             </button>
           </li>
-          {canWrite
+          {canMove
             ? otherColumns.map((column) => (
                 <li role="none" key={column.id}>
                   <button
@@ -92,7 +94,7 @@ export function CardMenu({
                 </li>
               ))
             : null}
-          {canWrite ? (
+          {canDelete ? (
             <li role="none">
               <button
                 type="button"

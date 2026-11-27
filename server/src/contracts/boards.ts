@@ -57,6 +57,11 @@ export function sharePolicyConflict(next: {
   return null;
 }
 
+/** The display name an anonymous visitor chooses; it is a label, never an account. */
+export const anonLabelSchema = z.string().trim().min(2).max(32);
+
+export const joinBoardSchema = z.object({ label: anonLabelSchema }).strict();
+
 /**
  * Rotating the readable suffix is destructive for whoever holds the old URL, so
  * it carries the same explicit `confirm: true` every irreversible action does.

@@ -150,6 +150,8 @@ next request is `401` and the next login answers `403 banned`.
 | `POST` | `/boards/:id/import` | `{format:"v2"|"v1"|"trello", data:<parsed json>}` or multipart `file` (one part named `file`, 5 MB; the format is read from the file, `?format=` overrides it). `202` with `{job_id, status, replayed, result}`; `import.progress` over SSE, `import.completed` in the event log. Idempotent on `(board_id, source_hash)`: the second call returns the first job with `replayed: true`. All-or-nothing: one invalid card writes nothing. `400 unsupported_schema` for a file that is none of the three, `413 payload_too_large` past a limit. |
 | `POST` | `/boards/:id/close` | `{confirm:true, note?}`. Generates the summary, sets `closed_at`. `409` if already closed. Irreversible. |
 | `GET` | `/boards/:id/summary` | The stored close-out summary (JSON). `404` until closed. |
+| `POST` | `/boards/:id/anon` | `{label}` (2–32 characters, trimmed). `200 {board_id, label, actor_kind:"anon"}` and a signed `klui_anon` cookie (12 h). `404` for a private board, `403` when `anon_write` is `off`. No account is created. |
+| `GET` | `/boards/:id/public` | The board's name, visibility and `anon_write` for a credential-less visitor, plus `accepts_anon`. `404` unless an anonymous actor could read the board. |
 | `GET` | `/boards/:id/members` | `[{user_id, username, role, joined_at}]`. |
 | `POST` | `/boards/:id/members` | `{username, role}`. `201`. Owner/admin. |
 | `PATCH` | `/boards/:id/members/:userId` | `{role, expected_updated_at?}`. Cannot demote the last owner. |
@@ -200,6 +202,8 @@ next request is `401` and the next login answers `403 banned`.
 | `POST` | `/cards/:id/comments` | `{body}`. Users with `editor+` only. `403` for link/anon actors (never `404`: they can read the card). |
 | `PATCH` | `/comments/:id` | `{body}`. Author only; sets `edited_at`. |
 | `DELETE` | `/comments/:id` | Author, or owner/admin for moderation. |
+
+**Anonymous actors.** `POST /boards/:id/cards` as an anonymous actor answers `201` on `anon_write: open` (the card carries `actor_label` and `mine: true` for its author) and `202 {status:"pending", id, title}` on `moderated` — no card, no event, one `PendingCard`. `PATCH /cards/:id` accepts only changes to `title`, `description` and `done`, and only on a card whose `anon_actor_id` is the caller's; anything else is `403` naming the field. `DELETE`, `move` and comments are always `403` for an anonymous actor.
 
 **Card field rules.** `title` 1–200 chars, trimmed, no newline. `description` ≤ 10 000 chars, markdown subset (no raw HTML, no images). `tags` ≤ 8 entries, each `{name, color?}`; `name` is 1–24 chars `[a-z0-9-]`, normalised lowercase, deduplicated; `color` is `#RRGGBB` or omitted (omitted → the board default, else the neutral chip). A bare string in the `tags` array is accepted on input as shorthand for `{name}`; responses always emit objects. `due_at` ISO date or datetime, stored UTC. `assignee` is a member user id; `assignee_label` is a display name (v1 import, anonymous creation) — setting both is a `400`. `done` is a boolean on the card; toggling it records `card.completed` / `card.reopened`.
 

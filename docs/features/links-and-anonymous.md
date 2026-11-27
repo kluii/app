@@ -53,6 +53,7 @@ Requirements: a display name, 2–32 characters, chosen client-side, stored per 
 - **Can:** create a card, edit a card they created in the same session, mark their own card done.
 - **Cannot:** comment, attach (no attachments in 2.0), delete, move a card to another column, change settings, export, or see anything a link `read` holder cannot see.
 - `off`: no write affordance at all. `open`: direct write. `moderated`: writes create `PendingCard` rows, invisible to everyone but owner/admin.
+- The name is remembered per board in the visitor's own browser (`localStorage`); the cookie carries it for the session, and nothing else stores it.
 - A name collision between two anons is allowed and expected. Attribution is "someone calling themselves X", and the UI says so on hover.
 
 ## 5. Moderation

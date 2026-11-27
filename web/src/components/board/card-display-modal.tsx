@@ -45,7 +45,7 @@ export function CardDisplayModal({
       description={due ? t('board.card.dueOn', { date: due }) : undefined}
       footer={
         <>
-          {caller.can_write ? (
+          {caller.can_write && (caller.actor_kind !== 'anon' || card.mine) ? (
             <Button
               variant="ghost"
               loading={done.isPending}
@@ -74,6 +74,12 @@ export function CardDisplayModal({
               <Check aria-hidden className="h-3 w-3" strokeWidth={2} />
             </span>
             {t('board.card.done')}
+          </p>
+        ) : null}
+
+        {card.actor_label ? (
+          <p className="text-body-sm text-ink-subtle">
+            {t('board.card.by', { label: card.actor_label })}
           </p>
         ) : null}
 

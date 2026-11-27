@@ -175,8 +175,9 @@ export function BoardView({ boardId }: { boardId: string }) {
   if (state.isError) {
     const status = state.error instanceof ApiError ? state.error.status : 0;
     if (status === 404 || status === 403) return <Unreadable />;
-    // No credential at all: a board URL is not a way in without one.
-    if (status === 401) return <NoCredential />;
+    // No credential at all: a board URL is not a way in without one — unless
+    // the board accepts a display name (K3-03).
+    if (status === 401) return <AnonymousEntry boardId={boardId} />;
     return (
       <div className="px-6 py-8">
         <p className="text-body-sm text-ink-muted">{t('common.error.generic')}</p>
@@ -253,6 +254,92 @@ export function BoardView({ boardId }: { boardId: string }) {
         }}
       />
     </BoardFrame>
+  );
+}
+
+/**
+ * The name gate. A stranger on a board that accepts anonymous writes names
+ * themselves, and the name is remembered per board in this browser only
+ * (docs/features/links-and-anonymous.md §4).
+ */
+function AnonymousEntry({ boardId }: { boardId: string }) {
+  const queryClient = useQueryClient();
+  const info = useQuery({
+    queryKey: ['board-public', boardId],
+    queryFn: () => api.boardPublic(boardId),
+    retry: false,
+  });
+  const storageKey = `klui-anon-${boardId}`;
+  const [label, setLabel] = useState(() => {
+    try {
+      return window.localStorage.getItem(storageKey) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [error, setError] = useState<string | null>(null);
+  const join = useMutation({
+    mutationFn: () => api.joinBoard(boardId, label.trim()),
+    onSuccess: async () => {
+      try {
+        window.localStorage.setItem(storageKey, label.trim());
+      } catch {
+        // A private window refuses storage; the session still works.
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.board(boardId) });
+    },
+    onError: (failure) => {
+      setError(failure instanceof ApiError ? failure.message : t('common.error.generic'));
+    },
+  });
+
+  if (info.isPending) {
+    return <p className="px-6 py-8 text-body-sm text-ink-subtle">{t('common.label.loading')}</p>;
+  }
+  if (info.isError || !info.data.accepts_anon) return <NoCredential />;
+
+  return (
+    <div className="mx-auto flex min-h-96 w-full max-w-96 flex-col justify-center gap-3 px-6 py-8">
+      <h1 className="text-h2">{info.data.name}</h1>
+      <p className="text-body-sm text-ink-muted">{t('board.anon.body')}</p>
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (label.trim().length < 2) {
+            setError(t('board.anon.hint'));
+            return;
+          }
+          setError(null);
+          join.mutate();
+        }}
+      >
+        <label htmlFor="anon-label" className="text-label text-ink">
+          {t('board.anon.label')}
+        </label>
+        <Input
+          id="anon-label"
+          value={label}
+          maxLength={32}
+          autoComplete="nickname"
+          onChange={(event) => setLabel(event.target.value)}
+        />
+        <p className="text-body-sm text-ink-subtle">{t('board.anon.hint')}</p>
+        {error ? (
+          <p role="alert" className="text-body-sm text-danger">
+            {error}
+          </p>
+        ) : null}
+        <Button
+          type="submit"
+          variant="primary"
+          loading={join.isPending}
+          className="mt-1 self-start"
+        >
+          {t('board.anon.submit')}
+        </Button>
+      </form>
+    </div>
   );
 }
 
@@ -385,7 +472,11 @@ function BoardFrame({
 
       {columns.length === 0 ? (
         <div className="px-4 py-6">
-          <ColumnRail boardId={board.id} canWrite={caller.can_write} className="border-none p-0" />
+          <ColumnRail
+            boardId={board.id}
+            canWrite={caller.can_manage_columns}
+            className="border-none p-0"
+          />
         </div>
       ) : (
         <div className="flex-1 overflow-x-auto" data-testid="board-scroll">
@@ -408,7 +499,7 @@ function BoardFrame({
                 keyboard={keyboard}
               />
             ))}
-            {caller.can_write ? <AddColumn boardId={board.id} /> : null}
+            {caller.can_manage_columns ? <AddColumn boardId={board.id} /> : null}
           </div>
         </div>
       )}
@@ -474,7 +565,7 @@ function ColumnSection({
   const droppable = useColumnDroppable({
     columnId: column.id,
     cards: allCards,
-    canWrite: caller.can_write,
+    canWrite: caller.can_move_card,
     onMove,
   });
 
@@ -501,7 +592,9 @@ function ColumnSection({
               card={card}
               cards={allCards}
               columns={columns}
-              canWrite={caller.can_write}
+              canMove={caller.can_move_card}
+              canDelete={caller.can_delete_card}
+              canTick={caller.can_write && (caller.actor_kind !== 'anon' || card.mine)}
               lifted={keyboard.drag?.cardId === card.id}
               onOpen={() => onOpenCard(card)}
               onMove={onMove}

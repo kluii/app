@@ -218,7 +218,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   `POST /boards/:id/links` (role, optional label), `DELETE /boards/:id/links/:linkId`, token `≥22` base62, stored as `sha256`, shown once, `last_used_at` tracked, `/l/<token>` resolves to an actor.
   **Exit:** the raw token appears nowhere after creation (grep the DB); revoking answers `404` on the next request; a `none` link role cannot read.
 
-- [ ] **K3-03 — Anonymous actors** `L` · dep: K3-02
+- [x] **K3-03 — Anonymous actors** `L` · dep: K3-02
   Display-name gate (2–32 chars, client-only, per board), signed anon cookie (12 h), `actor_label` on events and cards, limits from `docs/permissions.md`, `anon_write` off/open/moderated.
   **Exit:** an anon can create a card and mark it done; cannot comment, delete, or move; a second anon cannot edit the first one's card; `private` forces anon off.
 
