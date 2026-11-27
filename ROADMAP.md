@@ -296,7 +296,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Snippet injected at request time from `KLUI_ANALYTICS_URL`; unset emits no script tag and no request.
   **Exit:** a test asserts zero outbound requests with the variable unset, and exactly one script tag with it set.
 
-- [ ] **K5-03 — Metrics** `S` · dep: —
+- [x] **K5-03 — Metrics** `S` · dep: — — verified in `docs/verify/k5.md` § K5-03
   `/metrics` off unless `KLUI_METRICS_ENABLED=true`, then loopback-bound or bearer-protected.
   **Exit:** `404` when off; `401` without the token when on; `200` with it.
 

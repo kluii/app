@@ -324,4 +324,3 @@ names a roadmap id that does not exist.
 | `GET` | `/auth/oidc/:provider/callback` | K5-09 |
 | `POST` | `/auth/oidc/:provider/link` | K5-09 |
 | `DELETE` | `/me` | K5-08 |
-| `GET` | `/metrics` | K5-03 |
