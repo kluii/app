@@ -45,6 +45,10 @@ test('axe is clean on the signed-in routes', async ({ page, request }) => {
   ]) {
     await page.goto(route, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('main')).toBeVisible();
+    // The board draws its h1 once its state arrives: waiting for the heading is
+    // the same claim axe makes (`page-has-heading-one`), not a weaker one, and
+    // it stops the scan from racing the first paint.
+    await expect(page.locator('main h1').first()).toBeVisible();
     const results = await new AxeBuilder({ page }).analyze();
     expect(
       results.violations.map((violation) => violation.id),

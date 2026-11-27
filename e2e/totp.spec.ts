@@ -113,6 +113,11 @@ test('the account page reveals the secret and the recovery codes once', async ({
   await page.getByRole('menuitem', { name: 'Account settings' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Account' })).toBeVisible();
 
+  // One section at a time: the second factor lives behind its own rail row.
+  await page.getByTestId('settings-tab-security').click();
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Two-factor authentication' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Turn on two-factor' }).click();
   await expect(page.getByTestId('recovery-code')).toHaveCount(10);
   await expect(page.getByRole('button', { name: 'Turn it on' })).toBeVisible();

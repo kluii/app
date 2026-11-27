@@ -14,7 +14,11 @@ test('revoking the current session in /settings signs out immediately (K5-08)', 
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Account' }).click();
+  // The bar carries one identity: the avatar opens the menu, the menu opens the
+  // screen, the rail opens the section.
+  await page.getByRole('button', { name: 'Account' }).click();
+  await page.getByRole('menuitem', { name: 'Account settings' }).click();
+  await page.getByTestId('settings-tab-sessions').click();
   await expect(page.getByRole('heading', { level: 2, name: 'Active sessions' })).toBeVisible();
 
   const currentRow = page.getByTestId('session-row').filter({ hasText: 'Current' });
