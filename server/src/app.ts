@@ -38,6 +38,7 @@ import { registerCommentRoutes } from './comments/routes.js';
 import { registerCloseoutRoutes } from './closeout/routes.js';
 import { registerResetRoutes } from './auth/reset-routes.js';
 import { registerAdminRoutes } from './admin/routes.js';
+import { registerBrandingRoutes } from './settings/branding.js';
 import { registerExportRoutes } from './export/routes.js';
 import { registerImportRoutes } from './import/routes.js';
 import { registerLinkRoutes } from './links/routes.js';
@@ -205,6 +206,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerActivityRoutes(scoped, { ...context, hub });
     registerResetRoutes(scoped, { ...context, hub });
     registerAdminRoutes(scoped, { ...context, hub });
+    registerBrandingRoutes(scoped, { ...context, hub });
     registerExportRoutes(scoped, { ...context, hub });
     registerImportRoutes(scoped, { ...context, hub });
     registerRealtimeRoutes(scoped, { ...context, hub });

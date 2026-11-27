@@ -142,6 +142,9 @@ never grants board content. An admin who is not a board member gets the same
 | `GET` | `/admin/bans` | `{items:[{id, subject, subject_kind:"user"|"ip", reason, expires_at, created_at}]}`: every active ban, both kinds, newest first, 100 maximum. |
 | `POST` | `/admin/bans/ip` | `{ip, confirm:true, reason?, expires_at?}` → `201 {banned_until}`. `400` for an address that is not IPv4/IPv6. |
 | `DELETE` | `/admin/bans/ip/:ip` | `204`; lifts every ban on that address. `404` when it was not banned. |
+| `GET` | `/branding` | Public instance branding (`{instance_name, tab_title, logo_url, favicon_url, accent_color, accent_foreground}`). Defaults flow through the same fields. |
+| `PATCH` | `/admin/branding` | Instance admin only. Updates `instance_name`, `tab_title`, `accent_color` (validated for WCAG AA contrast; fails with the measured ratio in the message) or clears `logo_url`/`favicon_url`. |
+| `POST` | `/admin/branding/logo` | Instance admin only. Multipart upload (`file`, PNG or SVG ≤ 256 KB and ≤ 512×512; `?kind=favicon` sets the favicon). |
 
 A user ban is enforced before authorization: the credential stops resolving, so
 the next request is `401` and the next login answers `403 banned`. An address
