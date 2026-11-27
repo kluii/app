@@ -149,6 +149,17 @@ jobs:
       - name: Boot it
         run: docker compose up -d --wait --wait-timeout 180
 
+      # The image carried 404 MB of node_modules: the web workspace's production
+      # dependencies beside a built SPA, and a peer-installed typescript. The
+      # ceiling is a regression guard, not a target: 251 MB of it is the node
+      # base and 176 MB is the Prisma toolchain `migrate deploy` runs, so the
+      # honest floor is ~500 MB and docs/deployment.md records the arithmetic.
+      - name: Print the image size, and fail if it regrows
+        run: |
+          size=$(docker image inspect --format '{{.Size}}' "klui:$(node -p "require('./package.json').version")")
+          printf 'image %s bytes (%s MB)\n' "$size" "$((size / 1000000))"
+          test "$size" -lt 700000000
+
       - name: Assert the instance is healthy
         run: |
           for attempt in $(seq 1 60); do

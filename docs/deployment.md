@@ -192,6 +192,8 @@ docker compose up -d
 
 Postgres is the memory consumer; give it 1 GB and a `shared_buffers` of 256 MB for anything beyond a personal instance. The app itself is comfortable in 256 MB.
 
+**Image size, measured.** `docker images` reports about 660 MB for the image (`klui:0.1.0`, 2026-11-27), down from 790 MB. The runtime stage copies the server's production `node_modules` and nothing else: the peak was web's dependencies beside an already-built SPA (`lucide-react` 48 MB, `react-dom`, `@tanstack`) plus a peer-installed `typescript` (23 MB), which no runtime file imports. What remains is mostly not ours to cut: the `node:26-alpine` base is 251 MB by itself, and the Prisma toolchain — CLI 67, client 74, engines 36, `effect` 33 — is 176 MB of it, because the container runs `prisma migrate deploy` at boot. A 300 MB image would need migrations in a separate container and a hand-pruned vendor tree; this document does not claim one. The `docker` job fails above 700 MB, so the 404 MB regression cannot return quietly.
+
 ## 9. Hosted instance (same image)
 
 The cloud instance runs the same image and the same compose file with different env: `KLUI_ANALYTICS_URL`, `KLUI_METRICS_ENABLED`, `KLUI_DEMO_RESET=true` for the landing demo board, backups on a timer, and a reverse proxy with a real certificate. It sells capacity and service. It enables no feature that a self-hosted instance cannot enable.
