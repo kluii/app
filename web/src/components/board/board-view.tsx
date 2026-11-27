@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Copy, Plus, Settings2 } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
 import { failureMessage } from '../../lib/api-error';
 import type { Board, BoardState, Caller, Card, Column } from '../../api/types';
@@ -123,6 +123,19 @@ export function BoardView({ boardId }: { boardId: string }) {
     },
   });
 
+  // The card that just landed keeps a 400 ms trace of the gesture, and only it:
+  // a re-render of the whole board would read as a flash.
+  const [settling, setSettling] = useState<string | null>(null);
+  const settleTimer = useRef<number | null>(null);
+  const markSettling = (cardId: string): void => {
+    if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+    setSettling(cardId);
+    settleTimer.current = window.setTimeout(() => {
+      settleTimer.current = null;
+      setSettling(null);
+    }, 400);
+  };
+
   // One in-flight move per card (PROMPT.md §10.1): a second drop computed from
   // a stale position would write the same card twice.
   const inFlight = useRef(new Set<string>());
@@ -215,6 +228,8 @@ export function BoardView({ boardId }: { boardId: string }) {
       onMoveTo={(cardId, columnId) =>
         requestMove({ cardId, column: columnId, before: null, after: null })
       }
+      settlingCardId={settling}
+      onSettle={markSettling}
       onDeleteCard={(cardId) => removeCard.mutate(cardId)}
       onToggleDone={(card) => toggleDone.mutate({ cardId: card.id, done: !card.done })}
       keyboard={keyboard}
@@ -415,6 +430,8 @@ function BoardFrame({
   onMoveTo,
   onDeleteCard,
   onToggleDone,
+  settlingCardId,
+  onSettle,
   keyboard,
   announcement,
   children,
@@ -435,6 +452,8 @@ function BoardFrame({
   onMoveTo: (cardId: string, columnId: string) => void;
   onDeleteCard: (cardId: string) => void;
   onToggleDone: (card: Card) => void;
+  settlingCardId: string | null;
+  onSettle: (cardId: string) => void;
   keyboard: ReturnType<typeof useKeyboardDrag>;
   announcement: string;
   children?: ReactNode;
@@ -517,6 +536,8 @@ function BoardFrame({
                 allCards={cards}
                 caller={caller}
                 filtering={filtering}
+                settlingCardId={settlingCardId}
+                onSettle={onSettle}
                 onOpenCard={onOpenCard}
                 onAddCard={onAddCard}
                 onMove={onMove}
@@ -563,12 +584,28 @@ function ColumnRail({
   );
 }
 
+/** Where the 2 px rule goes: above or below a card, or after the last one. */
+type Hint = { cardId: string | null; below: boolean };
+
+function InsertLine({ leaving }: { leaving: boolean }) {
+  return (
+    <li
+      aria-hidden
+      data-testid="insert-line"
+      data-leaving={leaving ? 'true' : undefined}
+      className="insert-line"
+    />
+  );
+}
+
 function ColumnSection({
   column,
   cards,
   allCards,
   caller,
   filtering,
+  settlingCardId,
+  onSettle,
   onOpenCard,
   onAddCard,
   onMove,
@@ -583,6 +620,8 @@ function ColumnSection({
   allCards: Card[];
   caller: Caller;
   filtering: boolean;
+  settlingCardId: string | null;
+  onSettle: (cardId: string) => void;
   onOpenCard: (card: Card) => void;
   onAddCard: (columnId: string) => void;
   onMove: (request: MoveRequest) => void;
@@ -592,11 +631,51 @@ function ColumnSection({
   columns: Column[];
   keyboard: ReturnType<typeof useKeyboardDrag>;
 }) {
+  // One hint per column, lifted out of the rows: two cards cannot both own it,
+  // and the rule has to be able to sit between them.
+  const [hint, setHint] = useState<Hint | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const [active, setActive] = useState(false);
+  const hintRef = useRef<Hint | null>(null);
+  const timer = useRef<number | null>(null);
+
+  const showHint = (next: Hint | null): void => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    setLeaving(false);
+    hintRef.current = next;
+    setHint(next);
+  };
+
+  // The line fades instead of vanishing: 120 ms, the same beat as a hover.
+  const hideHint = (): void => {
+    if (hintRef.current === null || timer.current !== null) return;
+    setLeaving(true);
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      hintRef.current = null;
+      setHint(null);
+      setLeaving(false);
+    }, 120);
+  };
+
+  useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+
   const droppable = useColumnDroppable({
     columnId: column.id,
     cards: allCards,
     canWrite: caller.can_move_card,
     onMove,
+    onHoverEndOfColumn: () => showHint({ cardId: null, below: true }),
+    onHoverEnd: hideHint,
+    onActiveChange: setActive,
   });
 
   return (
@@ -604,6 +683,7 @@ function ColumnSection({
       ref={droppable.ref}
       className="board-column flex w-column shrink-0 flex-col gap-2 rounded-md bg-column p-2"
       data-testid={`column-${column.id}`}
+      data-drop-active={active ? 'true' : undefined}
     >
       <header className="flex items-center justify-between px-1 py-1">
         <h2 className="truncate text-label uppercase tracking-caps text-ink-muted">
@@ -612,7 +692,7 @@ function ColumnSection({
         <span className="font-mono text-mono-sm text-ink-subtle">{cards.length}</span>
       </header>
 
-      {cards.length === 0 ? (
+      {cards.length === 0 && hint === null ? (
         <p className="px-1 pb-1 text-body-sm text-ink-subtle">
           {filtering
             ? t('board.column.emptyFiltered')
@@ -623,23 +703,31 @@ function ColumnSection({
       ) : (
         <ul className="flex flex-col gap-2">
           {cards.map((card) => (
-            <CardRow
-              key={card.id}
-              card={card}
-              cards={allCards}
-              columns={columns}
-              canMove={caller.can_move_card}
-              canDelete={caller.can_delete_card}
-              canTick={caller.can_write && (caller.actor_kind !== 'anon' || card.mine)}
-              lifted={keyboard.drag?.cardId === card.id}
-              onOpen={() => onOpenCard(card)}
-              onMove={onMove}
-              onMoveTo={(columnId) => onMoveTo(card.id, columnId)}
-              onDelete={() => onDeleteCard(card.id)}
-              onToggleDone={() => onToggleDone(card)}
-              onKeyDown={keyboard.onKeyDown}
-            />
+            <Fragment key={card.id}>
+              {hint?.cardId === card.id && !hint.below ? <InsertLine leaving={leaving} /> : null}
+              <CardRow
+                card={card}
+                cards={allCards}
+                columns={columns}
+                canMove={caller.can_move_card}
+                canDelete={caller.can_delete_card}
+                canTick={caller.can_write && (caller.actor_kind !== 'anon' || card.mine)}
+                lifted={keyboard.drag?.cardId === card.id}
+                settling={settlingCardId === card.id}
+                onOpen={() => onOpenCard(card)}
+                onMove={onMove}
+                onMoveTo={(columnId) => onMoveTo(card.id, columnId)}
+                onDelete={() => onDeleteCard(card.id)}
+                onToggleDone={() => onToggleDone(card)}
+                onKeyDown={keyboard.onKeyDown}
+                onHover={(below) => showHint({ cardId: card.id, below })}
+                onHoverEnd={hideHint}
+                onSettle={onSettle}
+              />
+              {hint?.cardId === card.id && hint.below ? <InsertLine leaving={leaving} /> : null}
+            </Fragment>
           ))}
+          {hint !== null && hint.cardId === null ? <InsertLine leaving={leaving} /> : null}
         </ul>
       )}
 
