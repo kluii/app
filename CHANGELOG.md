@@ -5,6 +5,34 @@ HTTP or MCP surface. The format follows Keep a Changelog; the versions are the
 `package.json` version, which is also what `/healthz` reports and what the image
 is tagged with (D-42).
 
+## 2.0.1 — 2026-11-27
+
+Security and authorization bug-fix release. No schema migrations; no new
+environment variables.
+
+### Fixed
+
+- **`/mcp` credential kinds (D1)**: `POST /mcp` now serves `user` and `agent`
+  actors only. Unauthenticated requests, anonymous visitor cookies
+  (`klui_anon`) and write-link cookies (`klui_link`) are refused in `preParsing`
+  before the body is read with HTTP `401`, `WWW-Authenticate: Bearer` and
+  JSON-RPC `-32001`, regardless of the method or tool. This closes the bypass
+  where an anonymous cookie on `/mcp` skipped `guardAnonWrite` (IP bans, Cap
+  captcha threshold, per-IP and per-board hourly caps).
+- **Board creation with board-scoped agent keys (D2)**: added
+  `canCreateBoard(actor)` in `server/src/lib/authz.ts` (D-58) and called it in
+  `boards/service.ts` before the transaction. A `scope: 'board'` agent key now
+  receives `403 forbidden` on `POST /api/v1/boards` and JSON-RPC `-32002`
+  (`data.code: "forbidden"`) on MCP `create_board`; `scope: 'user'` keys and
+  user sessions continue to create boards. Audited `list_boards` (filtered by
+  `can(..., 'board.read', ...)`) and `search_cards` (board-scoped via
+  `loadBoardFor(..., 'board.read')`), both of which already enforce key scope.
+
+### Upgrade and rollback
+
+Pull the `2.0.1` image and restart (`docker compose up -d --wait`). No
+migrations run and rollback to `2.0.0` requires only changing the image tag.
+
 ## 2.0.0 — 2026-11-27
 
 The first release. Everything below is in the image tagged `2.0.0` for

@@ -184,3 +184,98 @@ describe('the board list is the read decision', () => {
     expect(asLink.items).toEqual([]);
   });
 });
+
+describe('creating a board respects key scope (D2)', () => {
+  it('refuses create_board for a board-scoped agent key on both MCP and REST, while user-scoped keys succeed', async () => {
+    const owner = harness.client();
+    await owner.signup(`scope-create-${owner.suffix}`);
+    const bound = await newBoard(owner, 'Bound board');
+    const other = await newBoard(owner, 'Other board');
+    const boardKey = await mint(owner, { name: 'one-board', scope: 'board', board_id: bound.id });
+    const userKey = await mint(owner, { name: 'all-boards', scope: 'user' });
+
+    const mcpRefused = await harness.app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: { authorization: `Bearer ${boardKey.key}`, 'content-type': 'application/json' },
+      payload: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'create_board', arguments: { name: 'Escaped board' } },
+      }),
+    });
+    expect(mcpRefused.statusCode).toBe(200);
+    const mcpBody = mcpRefused.json() as {
+      error?: { code: number; data?: { code?: string } };
+    };
+    expect(mcpBody.error?.code).toBe(-32002);
+    expect(mcpBody.error?.data?.code).toBe('forbidden');
+
+    const restRefused = await harness.app.inject({
+      method: 'POST',
+      url: '/api/v1/boards',
+      headers: { authorization: `Bearer ${boardKey.key}`, 'content-type': 'application/json' },
+      payload: JSON.stringify({ name: 'Escaped via REST' }),
+    });
+    expect(restRefused.statusCode).toBe(403);
+    expect((restRefused.json() as { error: { code: string } }).error.code).toBe('forbidden');
+
+    // Audit check on search_cards: board-scoped key reads its bound board and 404s another.
+    const searchForeign = await harness.app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: { authorization: `Bearer ${boardKey.key}`, 'content-type': 'application/json' },
+      payload: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'search_cards', arguments: { board: other.id, query: 'anything' } },
+      }),
+    });
+    expect(searchForeign.statusCode).toBe(200);
+    expect(
+      (searchForeign.json() as { error?: { code: number; data?: { code?: string } } }).error,
+    ).toMatchObject({ code: -32001, data: { code: 'board_not_found' } });
+
+    const searchBound = await harness.app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: { authorization: `Bearer ${boardKey.key}`, 'content-type': 'application/json' },
+      payload: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: { name: 'search_cards', arguments: { board: bound.id } },
+      }),
+    });
+    expect(searchBound.statusCode).toBe(200);
+    expect((searchBound.json() as { error?: unknown }).error).toBeUndefined();
+
+    // User-scoped key still creates boards on both MCP and REST.
+    const mcpAllowed = await harness.app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: { authorization: `Bearer ${userKey.key}`, 'content-type': 'application/json' },
+      payload: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/call',
+        params: { name: 'create_board', arguments: { name: 'Allowed via MCP' } },
+      }),
+    });
+    expect(mcpAllowed.statusCode).toBe(200);
+    expect(
+      (mcpAllowed.json() as { result?: { structuredContent?: { name?: string } } }).result
+        ?.structuredContent?.name,
+    ).toBe('Allowed via MCP');
+
+    const restAllowed = await harness.app.inject({
+      method: 'POST',
+      url: '/api/v1/boards',
+      headers: { authorization: `Bearer ${userKey.key}`, 'content-type': 'application/json' },
+      payload: JSON.stringify({ name: 'Allowed via REST' }),
+    });
+    expect(restAllowed.statusCode).toBe(201);
+  });
+});

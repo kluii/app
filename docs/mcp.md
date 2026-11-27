@@ -9,7 +9,7 @@ Parity rule: every tool has an app equivalent and vice versa. The mapping is a t
 ## 1. Transport
 
 - `POST /mcp`, `Content-Type: application/json`, `Accept: application/json, text/event-stream`.
-- No session header. Every call carries its own credential: `Authorization: Bearer kb_…` (agent key) or a session token.
+- No session header. `/mcp` serves **`user` and `agent` credentials only**: `Authorization: Bearer kb_…` (agent key) or a user session (bearer session token or session cookie). Unauthenticated calls, anonymous visitor cookies (`klui_anon`) and write-link cookies (`klui_link`) are refused before the body is read with HTTP `401` and JSON-RPC `-32001`, regardless of the method or tool.
 - A `GET /mcp` returns `405` with a hint pointing at `POST`. Server-initiated messages are not used in 2.0.
 - Batch requests (JSON array) are accepted and answered in order.
 - Notifications (`notifications/initialized`, `notifications/cancelled`) are accepted with `202 Accepted` and an empty body.

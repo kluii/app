@@ -9,7 +9,7 @@ services:
     # package.json files and /healthz disagree, so the four cannot drift.
     # K5-10 raises them to 2.0.0 in one commit; a release build may override
     # KLUI_VERSION.
-    image: klui:${KLUI_VERSION:-2.0.0}
+    image: klui:${KLUI_VERSION:-2.0.1}
     restart: unless-stopped
     depends_on:
       db:
