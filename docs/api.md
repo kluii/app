@@ -254,9 +254,11 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 | `GET` | `/agent-keys` | `{items:[…]}` without `key` or `key_hash`: id, name, scope, board, role, created, last used, expires, revoked. |
 | `DELETE` | `/agent-keys/:id` | `204`; effective on the next request (`401 invalid_credential`). Idempotent on an already-revoked key. |
 | `POST` | `/agent-keys/:id/test` | `{key?}` → `200 {ok:true, via:"mcp"\|"inline", board, role, key}` or `{ok:false, via, reason:"revoked"\|"expired"\|"key_mismatch"\|"key_required"\|"board_not_found"\|"forbidden"\|"unreachable"\|"mcp_error"}`. With `KLUI_PUBLIC_URL` set the server calls its own `/mcp` (`initialize` then `tools/call whoami`, plus `list_boards` for a board-scoped key) with the presented key, so an unreachable endpoint or a `-32603` is a refusal; `key_required` means the key was not presented and a hash cannot authenticate. `via:"inline"` is the in-process fallback for an instance with no public URL. |
-| `GET` | `/me/digest` | `{enabled, hour, timezone, channels:{webhook,email,rss}, last_sent_at, rss_url?}`. `rss_url` is returned only immediately after rotation. |
-| `PATCH` | `/me/digest` | `{enabled?, hour?, timezone?, webhook?, email?, rss?: "rotate"|"disable"}`. |
-| `POST` | `/me/digest/test` | Builds the digest for real events and delivers to the configured channel; `{sent, sections, bytes}`. Empty digest → `{sent:false, reason:"empty"}`. |
+| `GET` | `/me/digest` | `{enabled, hour, timezone, channels:{webhook,email,rss}, last_sent_at, last_result, rss_url?, unsubscribe_url?}`. `last_result` is `"sent"`, `"empty"`, or `null` before the first run. `rss_url` and `unsubscribe_url` appear only in the response that minted them: both tokens are hashed at rest and cannot be read back. |
+| `PATCH` | `/me/digest` | `{enabled?, hour? (0..23), timezone? (an IANA zone: `Mars/Olympus` and `+01:00` both answer `400 validation_failed`), webhook? (https or `null`), email?, rss?: "rotate"|"disable"}`. `rss:"rotate"` mints a new RSS token and a new unsubscribe token; `"disable"` drops the RSS hash. Writes one `digest.updated` event. |
+| `POST` | `/me/digest/test` | Builds the digest from the account's real events and cards, then delivers it to the configured channel: `{sent:true, sections, bytes}`. An empty digest sends nothing and answers `{sent:false, reason:"empty"}`; no channel configured is `400`; an email-only account with SMTP unset is `503 email_not_configured`. |
+| `GET` | `/me/digest/rss/:token` | `application/rss+xml`, `X-Robots-Tag: noindex`. One item: the last digest actually delivered, so nothing is invented for a reader. `404` before the first send, after `rss:"disable"`, and for a token a rotation replaced. No session: the token is the credential. |
+| `GET` | `/me/digest/unsubscribe/:token` | `text/html`, `X-Robots-Tag: noindex`, sets `enabled:false` and deletes nothing. No session and no CSRF: the point of the link is that it works from a mail client after the session is gone. `404` for an unknown token. |
 | `GET` | `/healthz` | `{"status":"ok","version":"<package version>","db":"up"}`; `503` with `db:"down"` otherwise. No auth. |
 | `GET` | `/metrics` | Off by default (`404`). When enabled: loopback or `Authorization: Bearer $KLUI_METRICS_TOKEN`. |
 | `POST` | `/mcp` | See `docs/mcp.md`. |
@@ -280,9 +282,9 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 | `member.removed` | `{board_id, user_id}` |
 | `column.created` / `column.updated` / `column.deleted` | `{board_id, column_id, name?, from?, to?}` |
 | `card.created` | `{board_id, card_id, column_id, title}` |
-| `card.updated` | `{board_id, card_id, column_id, changes:{field: [old, new]}}` |
-| `card.moved` | `{board_id, card_id, from_column, to_column, before, after}` |
-| `card.completed` / `card.reopened` | `{board_id, card_id, column_id}` |
+| `card.updated` | `{board_id, card_id, column_id, title, changes:{field: [old, new]}}` |
+| `card.moved` | `{board_id, card_id, title, from_column, to_column, to_column_name, before, after}` |
+| `card.completed` / `card.reopened` | `{board_id, card_id, column_id, title}` |
 | `card.deleted` | `{board_id, card_id, column_id, title}` |
 | `comment.created` / `comment.updated` / `comment.deleted` | `{board_id, card_id, comment_id, body_excerpt}` — `deleted` keeps the excerpt so the digest can say what was removed |
 | `link.created` / `link.revoked` | `{board_id, link_id, role}` |
@@ -290,6 +292,7 @@ Every mutation response is also published to the board's SSE subscribers. **An e
 | `pending.approved` / `pending.rejected` | `{board_id, pending_id, card_id?, title, actor_label, approved_by}` — one event per decision, actor is the approver |
 | `pending.expired` | `{board_id, pending_id, title}` — written by the sweeper with `actor_kind: system` |
 | `agent_key.created` / `agent_key.revoked` | `{key_id, name, scope, board_id?}` |
+| `digest.updated` | `{changes:[field, …]}` — `board_id: null`: the digest is an account setting, and the log says it moved |
 | `import.completed` | `{board_id, format, columns, cards, comments}` |
 
 `changes[field]` uses `[old, new]` with `null` for absence. `body_excerpt` is at most 120 characters and is the only place comment text is duplicated into the event log — it exists so the digest can say what happened without a join, and it is stripped on export.
@@ -321,7 +324,4 @@ names a roadmap id that does not exist.
 | `GET` | `/auth/oidc/:provider/callback` | K5-09 |
 | `POST` | `/auth/oidc/:provider/link` | K5-09 |
 | `DELETE` | `/me` | K5-08 |
-| `GET` | `/me/digest` | K5-05 |
-| `PATCH` | `/me/digest` | K5-05 |
-| `POST` | `/me/digest/test` | K5-05 |
 | `GET` | `/metrics` | K5-03 |

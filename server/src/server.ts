@@ -84,11 +84,22 @@ app.log.info({ port: env.KLUI_PORT, env: env.KLUI_ENV }, 'klui listening');
 // the process can still exit (docs/architecture.md §1). The first run is a boot
 // minute after listen, not before: a slow sweep must not delay the port.
 const { sweepExpiredPendingCards } = await import('./moderation/service.js');
+const { runDueDigests } = await import('./digest/service.js');
 const sweeper = setInterval(
   () => {
     void sweepExpiredPendingCards(db).catch((error: unknown) => {
       app.log.error({ err: error }, 'pending sweeper failed');
     });
+    // K5-05: the digest runs on the same five-minute beat. It sends only when an
+    // account's local hour has come and it has not had a run today, so a quiet
+    // tick is the normal case.
+    void runDueDigests(db, { env, mail })
+      .then((result) => {
+        if (result.runs > 0) app.log.info(result, 'digest runs');
+      })
+      .catch((error: unknown) => {
+        app.log.error({ err: error }, 'digest run failed');
+      });
   },
   5 * 60 * 1000,
 );

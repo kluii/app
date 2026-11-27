@@ -595,7 +595,14 @@ export async function updateCard(
         boardId: card.board_id,
         actor,
         type: input.done ? 'card.completed' : 'card.reopened',
-        payload: { board_id: card.board_id, card_id: card.id, column_id: card.column_id },
+        // The title rides along: a reader of the log (the digest, an export)
+        // must not need a join to say what was completed.
+        payload: {
+          board_id: card.board_id,
+          card_id: card.id,
+          column_id: card.column_id,
+          title: card.title,
+        },
       });
     }
     const rest = Object.fromEntries(Object.entries(changes).filter(([key]) => key !== 'done'));
@@ -608,6 +615,7 @@ export async function updateCard(
           board_id: card.board_id,
           card_id: card.id,
           column_id: card.column_id,
+          title: row.title,
           changes: rest,
         },
       });
@@ -671,8 +679,11 @@ export async function moveCard(
       payload: {
         board_id: card.board_id,
         card_id: cardId,
+        title: card.title,
         from_column: card.column_id,
         to_column: column.id,
+        // Ids are for machines; the digest prints a column name.
+        to_column_name: column.name,
         before: plan.before,
         after: plan.after,
       },

@@ -35,6 +35,7 @@ export type EventTypeName =
   | 'pending.rejected'
   | 'pending.expired'
   | 'agent_key.created'
+  | 'digest.updated'
   | 'agent_key.revoked'
   | 'import.completed'
   | 'security.login'
