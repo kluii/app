@@ -54,6 +54,41 @@ export type LoadedBoard = {
   decision: ReturnType<typeof can>;
 };
 
+export type BoardListDto = BoardDto & { role: MemberRole };
+
+/**
+ * The boards an actor may read, and the one place that answers it
+ * (docs/api.md §3, docs/mcp.md §3).
+ *
+ * `GET /boards` and `list_boards` used to answer differently: the route read
+ * every membership row for the account while the tool filtered each row through
+ * `can()`, so a board-scoped key listed its owner's other boards and then got a
+ * 404 from the board's own route. The filter below is `can()` — the structural
+ * scope rule lives there and is not restated here.
+ *
+ * A link or an anonymous visitor has no membership to read: an empty list, not
+ * a refusal.
+ */
+export async function listBoardsFor(
+  db: Db,
+  actor: Actor,
+  publicUrl: string | null,
+): Promise<{ items: BoardListDto[] }> {
+  if (actor.kind !== 'user' && actor.kind !== 'agent') return { items: [] };
+  const memberships = await db.boardMember.findMany({
+    where: { user_id: actor.userId },
+    include: { board: { include: { owner: { select: { id: true, username: true } } } } },
+    orderBy: [{ board: { updated_at: 'desc' } }, { board_id: 'asc' }],
+  });
+  const items = memberships
+    .filter(
+      (membership) =>
+        can(actor, 'board.read', toPolicy(membership.board), { role: membership.role }).allow,
+    )
+    .map((membership) => ({ ...toBoardDto(membership.board, publicUrl), role: membership.role }));
+  return { items };
+}
+
 export async function loadBoardFor(
   db: Db,
   actor: Actor,

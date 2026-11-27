@@ -13,6 +13,7 @@ import {
   deleteBoard,
   humanBoardPath,
   linkSuffix,
+  listBoardsFor,
   loadBoardFor,
   resolvePublicBoard,
   toBoardDto,
@@ -33,21 +34,7 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
 
   app.get('/api/v1/boards', async (request) => {
     const actor = requireActor(request);
-    const db = database();
-    const userId = actor.kind === 'user' || actor.kind === 'agent' ? actor.userId : null;
-    if (!userId) return { items: [] };
-
-    const memberships = await db.boardMember.findMany({
-      where: { user_id: userId },
-      include: { board: { include: { owner: { select: { id: true, username: true } } } } },
-      orderBy: { board: { updated_at: 'desc' } },
-    });
-    return {
-      items: memberships.map((row) => ({
-        ...toBoardDto(row.board, context.env.KLUI_PUBLIC_URL),
-        role: row.role,
-      })),
-    };
+    return listBoardsFor(database(), actor, context.env.KLUI_PUBLIC_URL);
   });
 
   app.post('/api/v1/boards', async (request, reply) => {

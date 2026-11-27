@@ -8,14 +8,7 @@ import type { z } from 'zod';
 import type { ToolContext } from '../registry.js';
 import { handler } from '../registry.js';
 import { boardStateFor } from '../../boards/state.js';
-import {
-  createBoard,
-  deleteBoard,
-  toBoardDto,
-  toPolicy,
-  updateBoard,
-} from '../../boards/service.js';
-import { can } from '../../lib/authz.js';
+import { createBoard, deleteBoard, listBoardsFor, updateBoard } from '../../boards/service.js';
 import { AppError } from '../../lib/errors.js';
 import type { TOOL_SCHEMAS } from '../schemas.js';
 
@@ -29,23 +22,8 @@ async function listBoards(context: ToolContext, _args: Args<'list_boards'>): Pro
       hint: 'Use an agent key or a session.',
     });
   }
-  const memberships = await db.boardMember.findMany({
-    where: { user_id: actor.userId },
-    include: {
-      board: { include: { owner: { select: { id: true, username: true } } } },
-    },
-    orderBy: [{ board: { updated_at: 'desc' } }, { board_id: 'asc' }],
-  });
-  const items = memberships
-    .filter((membership) => {
-      const policy = toPolicy(membership.board);
-      return can(actor, 'board.read', policy, { role: membership.role }).allow;
-    })
-    .map((membership) => ({
-      ...toBoardDto(membership.board, env.KLUI_PUBLIC_URL),
-      role: membership.role,
-    }));
-  return { items };
+  // The same function `GET /boards` calls: one question, one answer.
+  return listBoardsFor(db, actor, env.KLUI_PUBLIC_URL);
 }
 
 async function getBoard(context: ToolContext, args: Args<'get_board'>): Promise<unknown> {
