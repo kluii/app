@@ -27,6 +27,7 @@ import { createHub, type Hub } from './realtime/events.js';
 import { registerRealtimeRoutes } from './realtime/routes.js';
 import { resolveActor } from './auth/actor.js';
 import { registerAuthRoutes } from './auth/routes.js';
+import { registerOidcRoutes } from './auth/oidc-routes.js';
 import { CSRF_EXEMPT_PATHS, csrfMatches } from './auth/sessions.js';
 import { sessionCookieName } from './contracts/auth.js';
 import { registerBoardRoutes } from './boards/routes.js';
@@ -189,6 +190,7 @@ export function buildApp(context: AppContext): FastifyInstance {
 
   app.register(async (scoped) => {
     registerAuthRoutes(scoped, { ...context, hub });
+    registerOidcRoutes(scoped, { ...context, hub });
     registerBoardRoutes(scoped, { ...context, hub });
     registerSearchRoutes(scoped, { ...context, hub });
     registerMemberRoutes(scoped, { ...context, hub });

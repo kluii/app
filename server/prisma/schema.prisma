@@ -238,6 +238,22 @@ model OAuthAccount {
   @@map("oauth_accounts")
 }
 
+/// Admin-configured OIDC provider, off by default; secret is AES-256-GCM sealed (K5-09).
+model OidcProvider {
+  id                String   @id
+  slug              String   @unique
+  name              String
+  issuer_url        String
+  client_id         String
+  client_secret_enc String
+  scopes            String   @default("openid profile email")
+  enabled           Boolean  @default(false)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now()) @updatedAt
+
+  @@map("oidc_providers")
+}
+
 /// Singleton row, id = 1. Branding, registration, TOTP policy, captcha.
 model InstanceSettings {
   id                Int        @id @default(1)
