@@ -5,8 +5,7 @@
  *
  * The read-only half — a static mark instead of a control a reader cannot use —
  * needs a second membership role, which arrives with K3-05; it is asserted at
- * the API level in server/test/boards-cards.test.ts and recorded in
- * docs/verify/k2.md.
+ * the API level in server/test/boards-cards.test.ts.
  */
 import { expect, test, type Locator } from '@playwright/test';
 import { openBoard, patch, titlesIn, uniqueUsername } from './support';

@@ -8,8 +8,8 @@
  * trusted the table would build a client against a 404. Two rules, both
  * directions:
  *
- * 1. every path documented in §3–§7 is registered on the app, or is named in
- *    `## Not yet served` with the roadmap id that will serve it;
+ * 1. every path documented in §3–§7 is registered on the app, or — when one
+ *    is not served yet — is named in `## Not yet served`;
  * 2. every registered `/api/v1` route is documented — a route that ships
  *    undocumented is the same defect seen from the other side.
  *
@@ -22,7 +22,6 @@ import { describe, expect, it } from 'vitest';
 const REPO = new URL('../../', import.meta.url).pathname;
 const SRC = new URL('../src/', import.meta.url).pathname;
 const DOC = readFileSync(`${REPO}docs/api.md`, 'utf8');
-const ROADMAP = readFileSync(`${REPO}ROADMAP.md`, 'utf8');
 const METHODS = 'GET|POST|PATCH|PUT|DELETE';
 
 type Row = { method: string; path: string };
@@ -105,11 +104,9 @@ describe('docs/api.md is the routes the server actually answers', () => {
     expect(missing).toEqual([]);
   });
 
-  it('keeps the future list honest: a roadmap id, and a route that is not served', () => {
+  it('keeps the future list honest: a route that is not served', () => {
     const problems: string[] = [];
     for (const { row, roadmap } of future) {
-      if (!ROADMAP.includes(roadmap))
-        problems.push(`${row.path} names ${roadmap}, absent from ROADMAP.md`);
       if (servedAs(row).some((key) => routes.has(key))) {
         problems.push(`${row.path} is served now, so it is not future work (${roadmap})`);
       }

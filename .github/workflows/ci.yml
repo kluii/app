@@ -1,7 +1,7 @@
 # The gate, on every push to every branch, and on a release tag — a tag push
 # matches no branch, so without `tags` the `release` job below could never run.
-# A workflow that exists but never ran is not CI (docs/testing.md §11), so the run
-# URL is recorded in docs/verify/.
+# A workflow that exists but never ran is not CI (docs/testing.md §11); the run
+# URL lives in the GitHub Actions run itself, not in a file that goes stale.
 name: ci
 
 on:

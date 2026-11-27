@@ -124,7 +124,8 @@ export function CardRow({
       </div>
 
       {/* The card opens from anywhere on the row; the tick and the menu stop
-          propagation on pointerdown so they never arm a drag (PROMPT.md §10.3). */}
+          propagation on pointerdown so they never arm a drag
+          (docs/features/board-interaction.md §1.6). */}
       <button
         ref={ref}
         type="button"

@@ -622,7 +622,7 @@ describe('the done flag', () => {
       },
     });
 
-    // Readable, so the refusal is a 403 and not a pretend-404 (PROMPT.md §3.4).
+    // Readable, so the refusal is a 403 and not a pretend-404 (docs/permissions.md §5).
     const attempt = await reader.request('PATCH', `/api/v1/cards/${card.id}`, { done: true });
     expect(attempt.statusCode).toBe(403);
     const after = await harness.db.card.findUniqueOrThrow({ where: { id: card.id } });

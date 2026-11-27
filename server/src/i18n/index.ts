@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * The server's message catalogue (K5-07, docs/i18n.md §2).
+ * The server's message catalogue (K5-07, docs/features/i18n.md §2).
  *
  * The web has had `en`/`fr` since K2-03. The server had English literals: the
  * error envelope's `message`, the validation hint, the reset mail, the

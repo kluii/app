@@ -98,7 +98,7 @@ test('the keyboard moves a card, announces it, and the order survives a reload',
   await expect(page.getByTestId('drag-announcement')).toContainText('Bravo moved to To do');
 
   // The announcement is local: wait for the write before reloading, or the
-  // reload can abort the request (PROMPT.md §10.1).
+  // reload can abort the request (docs/features/board-interaction.md §1.1).
   await expect.poll(() => titlesIn(page, toDo)).toEqual(['Bravo', 'Alpha', 'Charlie']);
 
   await page.reload({ waitUntil: 'domcontentloaded' });

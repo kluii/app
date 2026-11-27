@@ -4,7 +4,7 @@ import { t } from '../i18n';
 import { loadMe } from '../lib/session';
 import { rootRoute } from './root';
 
-/** PROMPT.md §0: `/` answers with a redirect, never marketing copy. */
+/** `/` answers with a redirect, never marketing copy (docs/decisions.md D-01). */
 export const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',

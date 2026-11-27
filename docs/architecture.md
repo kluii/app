@@ -25,7 +25,7 @@ One Node process serves everything:
 
 - No worker process in 2.0. Background work (lifecycle sweeper, pending expiry, digest, event retention) runs in-process on an interval, guarded by a Postgres advisory lock so two instances against one database cannot both run it.
 - Graceful shutdown: stop accepting, drain in-flight requests, close the SSE hub (send `event: close`), disconnect Prisma, exit. A 15 s hard timeout then `process.exit(1)`.
-- The SPA is served by `@fastify/static` from `web/dist` with a fallback to `index.html`. **The asset list is snapshotted at boot** — restart after every web build (trap 7 in `PROMPT.md`).
+- The SPA is served by `@fastify/static` from `web/dist` with a fallback to `index.html`. **The asset list is snapshotted at boot** — restart after every web build, or a rebuilt bundle is served from a stale manifest.
 - `index.html` is sent with `Cache-Control: no-store`; hashed assets are immutable.
 - `server.ts` boots in this order: env validation → secrets resolution (fail closed) → Prisma connect → plugin registration → sweeper start → listen. A failure at any step exits non-zero with one actionable message.
 
@@ -221,7 +221,7 @@ Indexes required from day one: `events(board_id, created_at, id)`, `cards(board_
 | SSE disconnected | Board stays usable; a subtle `--ink-subtle` line says "Reconnecting"; polling fallback every 15 s until connected. |
 | SMTP missing | Email features answer `503 email_not_configured` at the API boundary and the UI hides the email channel with an explanation. Never a silent no-op. |
 | OIDC provider down | Local login still works; the provider button shows the real error after the redirect. Break-glass admin is the documented escape. |
-| Static bundle stale | Server restart required after build (trap in `PROMPT.md`); `/healthz` version identifies the running build. |
+| Static bundle stale | Server restart required after build (§2: the asset list is snapshotted at boot); `/healthz` version identifies the running build. |
 | Rate limit hit | `429` + `Retry-After`; the client shows a neutral toast with the wait time. |
 | Migration fails at boot | Container exits non-zero; compose surfaces the log; the previous image can be restored without data loss because migrations are additive (see `docs/deployment.md` §Rollback). |
 

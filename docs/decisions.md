@@ -4,7 +4,7 @@ Every decision below is **closed**. Reopening one requires an ADR with the alter
 
 The register exists because this codebase will be read by agents that have no memory of the conversations that produced it. A decision that lives only in a chat log will be "cleaned up" by the third agent that touches the file.
 
-Status legend: **locked** (decided, implement as written) · **open** (needs a human input before the wave that depends on it).
+Status legend: **locked** (decided, implement as written) · **open** (needs a human input before the change that depends on it).
 
 ---
 
@@ -25,9 +25,9 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 | D-06 | **An instance admin has no access to board content.** `is_instance_admin` grants user management, bans, instance settings and provider configuration — nothing else. | An ops role that can read every private board is a backdoor with a friendly name, and it makes the 404 promise a lie. | ADR-0002 |
 | D-07 | **`viewer` is read-only, including comments.** Comments require `editor` or above. | A comment is a write; a read-only role that writes is not read-only. | ADR-0002 |
 | D-08 | **Comments require a user actor.** Link holders and anonymous actors cannot comment. | Comments need attribution and an account to notify. Anonymous comments are the fastest route to an unusable board. | ADR-0002 |
-| D-09 | **Link actors (`role: edit`) cannot delete.** They can create, edit, move and complete cards. No deletes of cards, columns or anything else. | A revocable token that can destroy work makes every shared link a risk the owner cannot audit. | ADR-0002 |
-| D-10 | **Anonymous actors** may create a card, edit a card they created in the same session, and mark it done. Nothing else. | The wedge is participation, not administration. | ADR-0003 |
-| D-11 | **An anonymous session is a signed cookie (12 h) carrying `anon_actor_id`.** Cards and events store that id (hashed in the cookie payload, opaque in the DB). | "Edit a card you just created" needs an identity that survives a reload without creating an account. A per-request random id cannot enforce it; an IP cannot be trusted. | ADR-0003 |
+| D-09 | ~~**Link actors (`role: edit`) cannot delete.**~~ *(superseded by D-59: `edit` links grant nothing at all; a share link is a reader.)* | A revocable token that can destroy work makes every shared link a risk the owner cannot audit. | ADR-0002 |
+| D-10 | ~~**Anonymous actors** may create a card, edit a card they created in the same session, and mark it done. Nothing else.~~ *(superseded by D-59: an anonymous visitor reads and writes nothing.)* | The wedge is participation, not administration. | ADR-0003 |
+| D-11 | ~~**An anonymous session is a signed cookie (12 h) carrying `anon_actor_id`.** Cards and events store that id (hashed in the cookie payload, opaque in the DB).~~ *(superseded by D-59: the cookie still names an actor, but it grants no write.)* | "Edit a card you just created" needs an identity that survives a reload without creating an account. A per-request random id cannot enforce it; an IP cannot be trusted. | ADR-0003 |
 | D-12 | **The board's readable URL never grants write.** Writes by link use `/l/<token>`; the token is ≥ 22 base62 chars, stored as `sha256`, revocable, regenerable. | Three separate things: the address you can say out loud, the secret you can revoke, the account you can attribute to. | ADR-0003 |
 | D-13 | **Username and slug renames reserve the old value for 90 days** and answer `301` to the new one. | A shared link that silently points at a stranger's board is worse than a redirect. | ADR-0004 |
 | D-14 | **OIDC never auto-links by email.** An existing local account signs in locally and links explicitly. | Email collision is a security decision, not a UX one. | ADR-0008 |
@@ -105,7 +105,7 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 
 ---
 
-## Open decisions (need a human before the dependent wave)
+## Open decisions (need a human before the dependent change)
 
 | ID | Question | Blocks | Default if unanswered |
 |---|---|---|---|
@@ -188,3 +188,31 @@ non-member"), whereas `canCreateBoard(actor)` keeps the single authorization
 module as the sole decision point and is tested over every actor kind and scope
 in `server/test/authz-matrix.test.ts`. A `user` or `scope: 'user'` agent is
 allowed; `scope: 'board'`, `link` and `anon` actors receive `forbidden`.
+
+### D-59 — Anonymous writes are retired; a board is written by its members
+
+The 2.0 build let a stranger create, edit and complete a card through a signed
+`klui_anon` cookie, capped per board (D-10, D-11, ADR-0004). That surface is
+gone. `POST /boards/:id/cards`, `PATCH /cards/:id` and every other write answer
+`403 forbidden` for an `anon` actor and for a `link` actor, whatever
+`link_role` or `anon_write` store — the permission comes from the actor's kind,
+not from a board policy a forwarded link could carry.
+
+`can()` in `server/src/lib/authz.ts` is what enforces it: the matrix denies both
+kinds on every write action, and `server/test/authz-matrix.test.ts` asserts the
+denial for each board policy. Reads are unchanged: a link or public board stays
+readable without an account.
+
+What is kept, because old data must not break:
+
+- `cards.anon_actor_id`, `events.actor_anon_id` and the `klui_anon` cookie stay,
+  so a card written before the change still names its author.
+- `anon_write` stays on the row and only `off` can be written
+  (`400 validation_failed`, `anonymous writes are no longer available`); an
+  existing `open` or `moderated` grants nothing.
+- `pending_cards` still drains: approval creates a card, rejection does not, and
+  nothing can add a row any more.
+
+Why: a share link can be forwarded to anyone, so it cannot be a write
+credential, and a board whose writes come from outside its member list cannot be
+attributed, moderated or closed out honestly.

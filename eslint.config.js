@@ -41,11 +41,13 @@ const noLiteralString = [
 const noOwnerComparison = [
   {
     selector: `BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='ownerId']`,
-    message: 'Permission decisions belong in server/src/lib/authz.ts only (PROMPT.md §3.3).',
+    message:
+      'Permission decisions belong in server/src/lib/authz.ts only (docs/permissions.md §1).',
   },
   {
     selector: `BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='owner_id']`,
-    message: 'Permission decisions belong in server/src/lib/authz.ts only (PROMPT.md §3.3).',
+    message:
+      'Permission decisions belong in server/src/lib/authz.ts only (docs/permissions.md §1).',
   },
 ];
 

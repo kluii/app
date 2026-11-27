@@ -132,7 +132,7 @@ Cache-Control: no-store on HTML and credentialed JSON
 
 ## 12. Disclosure
 
-`SECURITY.md` at the repository root: a contact address, a 72-hour acknowledgement commitment, a scope statement (the app, not the operator's host), and a "please do not test on someone else's instance" line. No bounty is promised.
+The instance's operator publishes a `SECURITY.md` at the repository root of their own repository, and it must carry: a contact address, a 72-hour acknowledgement commitment, a scope statement (the app, not the operator's host), and a "please do not test on someone else's instance" line. No bounty is promised.
 
 ## 13. Known limitations (state them, do not hide them)
 

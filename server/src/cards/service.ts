@@ -360,7 +360,7 @@ export async function resolveAssignee(
 
 async function requireColumnInBoard(db: Db, boardId: string, columnId: string): Promise<void> {
   // The column must belong to *this* board: `card.create` on board A is not
-  // permission to write into a column of board B (PROMPT.md §3.3).
+  // permission to write into a column of board B (docs/permissions.md §1).
   const column = await db.column.findFirst({ where: { id: columnId, board_id: boardId } });
   if (!column) throw new AppError('column_not_found');
 }

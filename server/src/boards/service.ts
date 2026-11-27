@@ -245,7 +245,7 @@ export function humanBoardPath(board: {
  * `test`, which 404'd a public board whose name happened to end in a word.
  *
  * Renames are followed here so a 90-day reservation redirects, but the redirect
- * is only emitted after the readability check (PROMPT.md §3.4).
+ * is only emitted after the readability check (docs/permissions.md §5).
  */
 export async function resolvePublicBoard(
   db: Db,
@@ -280,7 +280,7 @@ export async function resolvePublicBoard(
     }
 
     // Renames inside their 90-day reservation redirect, after the caller has
-    // checked readability of the target (PROMPT.md §3.4).
+    // checked readability of the target (docs/permissions.md §5).
     const renamedOwner = await usernameRedirect(db, owner);
     const nextOwner = renamedOwner !== null && renamedOwner !== owner ? renamedOwner : owner;
     const renamedSlug =

@@ -217,7 +217,7 @@ The cloud instance runs the same image and the same compose file with different 
 
 1. Version bumped in `server/package.json` and `web/package.json`.
 2. CHANGELOG entry with migrations, env changes and rollback notes.
-3. Full gate green, recorded in `docs/verify/k5.md`.
+3. Full gate green, with its output pasted in the release's `CHANGELOG.md` entry.
 4. Tag pushed: `git tag -a v2.0.0 -m "Klui 2.0.0" && git push origin v2.0.0`. The
    `release` job in `.github/workflows/ci.yml` runs only for a `v*` tag, refuses
    when the tag and `package.json` disagree, and publishes

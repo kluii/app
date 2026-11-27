@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * K5-04 — in-app notifications, per-type mute, deduplication by event_id, and
- * webhook delivery without retry storms (docs/features/digest.md §1, ROADMAP.md K5-04).
+ * webhook delivery without retry storms (docs/features/digest.md §1).
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startServer } from './helpers/server.js';
