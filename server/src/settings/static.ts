@@ -50,7 +50,8 @@ export function registerStatic(app: FastifyInstance, assets: StaticAssets): void
 
 /** Any non-API GET that is not a file falls through to the SPA shell. */
 export function isSpaNavigation(url: string, accept: string | undefined): boolean {
-  if (url.startsWith('/api/') || url.startsWith('/mcp') || url === '/healthz') return false;
+  if (url.startsWith('/api/') || url.startsWith('/mcp') || url === '/healthz' || url === '/metrics')
+    return false;
   if (!accept || !accept.includes('text/html')) return false;
   const path = url.split('?')[0] ?? url;
   return !/\.[a-z0-9]{2,5}$/i.test(path);

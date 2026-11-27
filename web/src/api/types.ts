@@ -19,6 +19,35 @@ export type Me = {
   created_at: string;
 };
 
+export type SessionDto = {
+  id: string;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+  last_seen_at: string;
+  current: boolean;
+};
+
+export type DigestPrefDto = {
+  enabled: boolean;
+  hour: number;
+  timezone: string;
+  channels: { webhook: boolean; email: boolean; rss: boolean };
+  last_sent_at: string | null;
+  last_result: 'sent' | 'empty' | null;
+  rss_url?: string;
+  unsubscribe_url?: string;
+};
+
+export type Branding = {
+  instance_name: string;
+  tab_title: string | null;
+  logo_url: string | null;
+  favicon_url: string | null;
+  accent_color: string | null;
+  accent_foreground: string | null;
+};
+
 export type Board = {
   id: string;
   name: string;
@@ -175,3 +204,59 @@ export type AgentKeyTest =
       key: string;
     }
   | { ok: false; via: 'mcp' | 'inline' | null; reason: AgentKeyRefusal };
+
+export type PublicOidcProvider = {
+  slug: string;
+  name: string;
+};
+
+export type AdminOidcProvider = {
+  id: string;
+  slug: string;
+  name: string;
+  issuer_url: string;
+  client_id: string;
+  scopes: string;
+  enabled: boolean;
+  has_secret: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LinkedOidcAccount = {
+  id: string;
+  provider: string;
+  provider_account_id: string;
+  created_at: string;
+};
+
+export type OidcTestResult =
+  | {
+      ok: true;
+      issuer: string;
+      authorization_endpoint: string;
+      token_endpoint: string;
+    }
+  | { ok: false; error: string };
+export type NotificationKind =
+  'assignment' | 'mention' | 'due_soon' | 'moderation_pending' | 'invitation' | 'board_closed';
+
+export type NotificationItem = {
+  id: string;
+  kind: string;
+  event_id: string | null;
+  payload: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type NotificationList = {
+  items: NotificationItem[];
+  unread_count: number;
+};
+
+export type NotificationPrefs = {
+  muted_kinds: NotificationKind[];
+  webhook_url: string | null;
+  failures: number;
+};

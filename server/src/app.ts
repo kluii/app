@@ -14,6 +14,7 @@ import { localeOf } from './i18n/index.js';
 import { appErrorToRpc } from './mcp/errors.js';
 import { loggerOptions } from './lib/logger.js';
 import { registerHealth } from './settings/health.js';
+import { registerMetrics } from './settings/metrics.js';
 import { registerRateLimit } from './settings/ratelimit.js';
 import { warnOnUntrustedProxy } from './settings/proxy.js';
 import {
@@ -27,6 +28,7 @@ import { createHub, type Hub } from './realtime/events.js';
 import { registerRealtimeRoutes } from './realtime/routes.js';
 import { resolveActor } from './auth/actor.js';
 import { registerAuthRoutes } from './auth/routes.js';
+import { registerOidcRoutes } from './auth/oidc-routes.js';
 import { CSRF_EXEMPT_PATHS, csrfMatches } from './auth/sessions.js';
 import { sessionCookieName } from './contracts/auth.js';
 import { registerBoardRoutes } from './boards/routes.js';
@@ -38,6 +40,7 @@ import { registerCommentRoutes } from './comments/routes.js';
 import { registerCloseoutRoutes } from './closeout/routes.js';
 import { registerResetRoutes } from './auth/reset-routes.js';
 import { registerAdminRoutes } from './admin/routes.js';
+import { registerBrandingRoutes } from './settings/branding.js';
 import { registerExportRoutes } from './export/routes.js';
 import { registerImportRoutes } from './import/routes.js';
 import { registerLinkRoutes } from './links/routes.js';
@@ -46,6 +49,7 @@ import { registerModerationRoutes } from './moderation/routes.js';
 import { registerMemberRoutes } from './boards/members-routes.js';
 import { registerAgentKeyRoutes } from './agents/routes.js';
 import { registerDigestRoutes } from './digest/routes.js';
+import { registerNotificationRoutes } from './notifications/routes.js';
 import { registerMcpRoutes } from './mcp/routes.js';
 import { llmsTxt } from './public/llms.js';
 import { registerAnalytics } from './public/analytics.js';
@@ -152,8 +156,12 @@ export function buildApp(context: AppContext): FastifyInstance {
   });
 
   // 7. Authentication: resolve the credential into an actor before any handler.
+  // Operational probes (`/healthz`, `/metrics`) handle their own auth so a
+  // scrape bearer token is never misread as a user session credential.
   app.addHook('onRequest', async (request, reply) => {
     if (!context.db) return;
+    const path = request.url.split('?')[0] ?? request.url;
+    if (path === '/healthz' || path === '/metrics') return;
     await resolveActor(context.db, context.secrets.tokenPepper, request, reply);
   });
 
@@ -189,11 +197,13 @@ export function buildApp(context: AppContext): FastifyInstance {
 
   app.register(async (scoped) => {
     registerAuthRoutes(scoped, { ...context, hub });
+    registerOidcRoutes(scoped, { ...context, hub });
     registerBoardRoutes(scoped, { ...context, hub });
     registerSearchRoutes(scoped, { ...context, hub });
     registerMemberRoutes(scoped, { ...context, hub });
     registerAgentKeyRoutes(scoped, { ...context, hub });
     registerDigestRoutes(scoped, { ...context, hub });
+    registerNotificationRoutes(scoped, { ...context, hub });
     registerMcpRoutes(scoped, { ...context, hub });
     registerLinkRoutes(scoped, { ...context, hub });
     registerAnonRoutes(scoped, { ...context, hub });
@@ -205,6 +215,7 @@ export function buildApp(context: AppContext): FastifyInstance {
     registerActivityRoutes(scoped, { ...context, hub });
     registerResetRoutes(scoped, { ...context, hub });
     registerAdminRoutes(scoped, { ...context, hub });
+    registerBrandingRoutes(scoped, { ...context, hub });
     registerExportRoutes(scoped, { ...context, hub });
     registerImportRoutes(scoped, { ...context, hub });
     registerRealtimeRoutes(scoped, { ...context, hub });
@@ -213,6 +224,10 @@ export function buildApp(context: AppContext): FastifyInstance {
   app.register(async (scoped) => {
     registerHealth(scoped, context.db);
   });
+
+  // Registered on the root instance so its `onResponse` counter observes every
+  // route across encapsulated plugins (K5-03).
+  registerMetrics(app, { env: context.env, db: context.db, hub });
 
   // A shutting-down process says so on every open stream, so clients reconnect
   // with backoff instead of waiting for a dead socket (docs/features/realtime.md §1).

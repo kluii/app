@@ -105,6 +105,19 @@ describe('the digest settings', () => {
       webhook: 'http://hooks.example.com/x',
     });
     expect(insecure.statusCode).toBe(400);
+
+    // An account-level URL must not aim the server inside its own network
+    // (same rule as the notification webhook).
+    for (const internal of [
+      'https://127.0.0.1/hook',
+      'https://169.254.169.254/latest/meta-data',
+      'https://localhost/hook',
+      'https://intranet/hook',
+    ]) {
+      const refused = await client.request('PATCH', '/api/v1/me/digest', { webhook: internal });
+      expect(refused.statusCode, internal).toBe(400);
+      expect((refused.json() as { error: { code: string } }).error.code).toBe('validation_failed');
+    }
   });
 
   it('rotates the RSS token once, hashes it, and stops the old URL', async () => {

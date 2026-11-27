@@ -1,22 +1,32 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type {
+  AdminOidcProvider,
   AgentKey,
   AgentKeyTest,
   AnonWrite,
   Board,
   BoardLink,
+  Branding,
   LinkRole,
+  LinkedOidcAccount,
   BoardState,
   Card,
   Column,
   CreatedAgentKey,
+  DigestPrefDto,
   EventDto,
   Me,
+  OidcTestResult,
   Page,
   Member,
   MemberRole,
+  NotificationKind,
+  NotificationList,
+  NotificationPrefs,
   PendingCard,
   PublicBoard,
+  PublicOidcProvider,
+  SessionDto,
   Visibility,
 } from './types';
 
@@ -147,7 +157,42 @@ export type ImportResult = {
 };
 
 export const api = {
+  branding: () => request<Branding>('GET', '/branding'),
+  updateBranding: (input: {
+    instance_name?: string;
+    tab_title?: string | null;
+    accent_color?: string | null;
+    logo_url?: null;
+    favicon_url?: null;
+  }) => request<Branding>('PATCH', '/admin/branding', input),
+  uploadBrandingAsset: (file: File, kind: 'logo' | 'favicon' = 'logo') =>
+    requestFile<Branding>(`/admin/branding/logo?kind=${kind}`, file),
+
   me: () => request<Me>('GET', '/me'),
+  updateProfile: (input: { username?: string; display_name?: string | null; email?: string }) =>
+    request<Me>('PATCH', '/me', input),
+  changePassword: (input: { current_password: string; new_password: string }) =>
+    request<void>('POST', '/me/password', input),
+  deleteAccount: (input: { password: string; confirm: true }) =>
+    request<void>('DELETE', '/me', input),
+  sessions: () => request<{ items: SessionDto[] }>('GET', '/me/sessions'),
+  revokeSession: (id: string) => request<void>('DELETE', `/me/sessions/${encodeURIComponent(id)}`),
+  logoutAll: () => request<void>('POST', '/auth/logout-all'),
+  digest: () => request<DigestPrefDto>('GET', '/me/digest'),
+  updateDigest: (input: {
+    enabled?: boolean;
+    hour?: number;
+    timezone?: string;
+    webhook?: string | null;
+    email?: string | null;
+    rss?: 'rotate' | 'disable';
+  }) => request<DigestPrefDto>('PATCH', '/me/digest', input),
+  testDigest: () =>
+    request<{ sent: boolean; reason?: string; sections?: number; bytes?: number }>(
+      'POST',
+      '/me/digest/test',
+      {},
+    ),
   login: (input: {
     email_or_username: string;
     password: string;
@@ -325,4 +370,46 @@ export const api = {
       `/cards/${cardId}/move`,
       input,
     ),
+
+  oidcProviders: () => request<{ items: PublicOidcProvider[] }>('GET', '/auth/oidc/providers'),
+  linkedOidcAccounts: () => request<{ items: LinkedOidcAccount[] }>('GET', '/me/oidc'),
+  linkOidcProvider: (slug: string) =>
+    request<{ url: string }>('POST', `/auth/oidc/${encodeURIComponent(slug)}/link`, {}),
+  unlinkOidcProvider: (slug: string) =>
+    request<void>('DELETE', `/me/oidc/${encodeURIComponent(slug)}`),
+  adminOidcProviders: () => request<{ items: AdminOidcProvider[] }>('GET', '/admin/oidc/providers'),
+  createAdminOidcProvider: (input: {
+    slug: string;
+    name: string;
+    issuer_url: string;
+    client_id: string;
+    client_secret: string;
+    scopes?: string;
+    enabled?: boolean;
+  }) => request<AdminOidcProvider>('POST', '/admin/oidc/providers', input),
+  updateAdminOidcProvider: (
+    slug: string,
+    input: {
+      name?: string;
+      issuer_url?: string;
+      client_id?: string;
+      client_secret?: string;
+      scopes?: string;
+      enabled?: boolean;
+    },
+  ) =>
+    request<AdminOidcProvider>('PATCH', `/admin/oidc/providers/${encodeURIComponent(slug)}`, input),
+  deleteAdminOidcProvider: (slug: string) =>
+    request<void>('DELETE', `/admin/oidc/providers/${encodeURIComponent(slug)}`),
+  testAdminOidcProvider: (slug: string) =>
+    request<OidcTestResult>('POST', `/admin/oidc/providers/${encodeURIComponent(slug)}/test`, {}),
+  notifications: () => request<NotificationList>('GET', '/me/notifications'),
+  markNotificationRead: (id: string) =>
+    request<void>('POST', `/me/notifications/${encodeURIComponent(id)}/read`, {}),
+  markAllNotificationsRead: () => request<void>('POST', '/me/notifications/read-all', {}),
+  notificationPrefs: () => request<NotificationPrefs>('GET', '/me/notifications/prefs'),
+  updateNotificationPrefs: (input: {
+    muted_kinds?: NotificationKind[];
+    webhook_url?: string | null;
+  }) => request<NotificationPrefs>('PATCH', '/me/notifications/prefs', input),
 };

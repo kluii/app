@@ -288,7 +288,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
 
 **Wave exit:** every line of `PROMPT.md` §12 is verified and pasted into `docs/verify/k5.md`; `docker compose up -d` from the published image works on a clean machine.
 
-- [ ] **K5-01 — Branding admin** `M` · dep: K2-01
+- [x] **K5-01 — Branding admin** `M` · dep: K2-01 — verified in `docs/verify/k5.md` § K5-01
   `instance_name`, logo (SVG/PNG ≤512×512), `accent_color`, `tab_title`, favicon. Accent validated at save time: compute the readable foreground and **reject** accents failing AA against the surfaces they land on.
   **Exit:** saving `#FFFF00` as accent is rejected with the measured ratio in the message; defaults are served through the same variables (no special "unbranded" code path).
 
@@ -296,11 +296,11 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Snippet injected at request time from `KLUI_ANALYTICS_URL`; unset emits no script tag and no request.
   **Exit:** a test asserts zero outbound requests with the variable unset, and exactly one script tag with it set.
 
-- [ ] **K5-03 — Metrics** `S` · dep: —
+- [x] **K5-03 — Metrics** `S` · dep: — — verified in `docs/verify/k5.md` § K5-03
   `/metrics` off unless `KLUI_METRICS_ENABLED=true`, then loopback-bound or bearer-protected.
   **Exit:** `404` when off; `401` without the token when on; `200` with it.
 
-- [ ] **K5-04 — Notifications** `M` · dep: K2-10
+- [x] **K5-04 — Notifications** `M` · dep: K2-10 — verified in `docs/verify/k5.md` § K5-04
   Assignment, mention, due-soon, moderation pending, invitation. In-app bell with unread count + webhook (Discord/Slack-compatible JSON). Per-type mute. Deduplicated by event id.
   **Exit:** the same event delivered twice notifies once; an unconfigured webhook logs a single failed delivery, not a retry storm.
 
@@ -308,7 +308,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Sections in order (Done / In progress / Overdue / Assigned to you / Next top-3), built from `events` since the account's previous send, per-account hour + IANA timezone, channels webhook/email/RSS, empty digest sends nothing, unsubscribe token in the footer working without sign-in.
   **Exit:** golden test on a fixed event log; a digest with no content performs zero sends (asserted); the RSS token is hashed at rest and `noindex`.
 
-- [ ] **K5-06 — Optional LLM layer** `S` · dep: K5-05
+- [x] **K5-06 — Optional LLM layer** `S` · dep: K5-05 — verified in `docs/verify/k5.md` § K5-06
   `KLUI_DIGEST_LLM_URL` + `KLUI_DIGEST_LLM_KEY`; unset means nothing leaves the instance. Set means the model rewrites the already-computed payload, never decides content, length-capped, silent fallback to deterministic text on any failure.
   **Exit:** with the URL unset, a test asserts no outbound call; with a fake endpoint returning garbage, the deterministic text is sent.
 
@@ -316,11 +316,11 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Every user-facing string keyed from the first component, catalogs `en` (source) and `fr`, server strings (errors, emails, digest) through the same catalogs, `glossary.md`, a lint rule for literal strings.
   **Exit:** the lint rule fails on a raw string in a component; switching to `fr` changes every visible string with no missing key (a test scans both catalogs for key parity).
 
-- [ ] **K5-08 — Account and sessions UI** `M` · dep: K1-03
+- [x] **K5-08 — Account and sessions UI** `M` · dep: K1-03 — verified in `docs/verify/k5.md` § K5-08
   Profile, password change, TOTP management, recovery codes, active sessions with revoke, digest preferences, delete account (with the documented cascade).
   **Exit:** revoking the current session signs out immediately; account deletion removes the user's memberships and anonymises their comments per `docs/security.md`.
 
-- [ ] **K5-09 — SSO behind a flag** `L` · dep: K1-03
+- [x] **K5-09 — SSO behind a flag** `L` · dep: K1-03 — verified in `docs/verify/k5.md` § K5-09
   OIDC provider framework: discovery, claim mapping, stable `provider_account_id`, admin UI with "test this provider", secrets encrypted at rest, per-provider enable flags, explicit account linking (never auto-link by email), break-glass local admin.
   **Exit:** a provider with a broken discovery URL shows a readable error in the admin UI and does not lock the instance out; an existing local account with the same email is not auto-linked.
 

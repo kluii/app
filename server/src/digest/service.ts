@@ -16,6 +16,7 @@ import { recordEvent } from '../lib/events.js';
 import { base62 } from '../lib/ids.js';
 import { hashToken } from '../lib/hash.js';
 import type { Mailer } from '../lib/mail.js';
+import { assertPublicWebhookUrl } from '../notifications/service.js';
 import { Prisma } from '@prisma/client';
 import {
   buildDigest,
@@ -26,6 +27,7 @@ import {
   type DigestCard,
   type DigestEvent,
 } from './build.js';
+import { rewriteDigest } from './llm.js';
 
 const MAX_FAILURES = 10;
 
@@ -130,6 +132,9 @@ export async function updateDigestPref(
     });
   }
   if (update.webhook !== undefined && update.webhook !== null) {
+    // Same rule as the notification webhook: an account-level URL must not let a
+    // signed-in reader aim the server at an address inside the network.
+    assertPublicWebhookUrl(update.webhook);
     if (!/^https:\/\//u.test(update.webhook)) {
       throw new AppError('validation_failed', {
         message: 'A webhook URL must be https.',
@@ -275,6 +280,8 @@ export async function deliverDigest(input: {
   const sent: string[] = [];
   if (input.pref.webhook_url !== null) {
     try {
+      // A row stored before the rule existed must not be fetched either.
+      assertPublicWebhookUrl(input.pref.webhook_url);
       const response = await fetch(input.pref.webhook_url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -330,7 +337,7 @@ export async function runDueDigests(
     if (hourIn(pref.timezone, now) !== pref.hour) continue;
     if (pref.last_sent_at !== null && sameDayIn(pref.timezone, pref.last_sent_at, now)) continue;
 
-    const digest = await digestFor(db, {
+    const computed = await digestFor(db, {
       userId: pref.user_id,
       now,
       timezone: pref.timezone,
@@ -338,13 +345,18 @@ export async function runDueDigests(
     });
     runs += 1;
 
-    if (digest.empty) {
+    if (computed.empty) {
       await db.digestPref.update({
         where: { user_id: pref.user_id },
         data: { last_sent_at: now, last_digest: Prisma.DbNull },
       });
       continue;
     }
+
+    const digest = await rewriteDigest(computed, {
+      url: options.env.KLUI_DIGEST_LLM_URL,
+      apiKey: options.env.KLUI_DIGEST_LLM_KEY,
+    });
 
     const result = await deliverDigest({ mail: options.mail, pref, digest });
     if (result.ok) {
