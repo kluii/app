@@ -57,6 +57,12 @@ export function sharePolicyConflict(next: {
   return null;
 }
 
+/**
+ * Rotating the readable suffix is destructive for whoever holds the old URL, so
+ * it carries the same explicit `confirm: true` every irreversible action does.
+ */
+export const rotateSuffixSchema = z.object({ confirm: z.literal(true) }).strict();
+
 export const boardIdParam = z.object({ id: idSchema('brd') });
 
 export type CreateBoardInput = z.infer<typeof createBoardSchema>;

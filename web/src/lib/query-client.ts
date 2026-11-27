@@ -23,4 +23,5 @@ export const queryKeys = {
   activity: (id: string, actorKind?: string) => ['activity', id, actorKind ?? 'all'] as const,
   comments: (cardId: string) => ['comments', cardId] as const,
   summary: (boardId: string) => ['summary', boardId] as const,
+  profile: (username: string) => ['profile', username.toLowerCase()] as const,
 };

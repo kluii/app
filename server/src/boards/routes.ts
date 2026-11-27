@@ -18,9 +18,15 @@ import {
   uniqueSlug,
   slugify,
   linkSuffix,
+  boardUrl,
 } from './service.js';
 import { can } from '../lib/authz.js';
-import { createBoardSchema, patchBoardSchema, sharePolicyConflict } from '../contracts/boards.js';
+import {
+  createBoardSchema,
+  patchBoardSchema,
+  rotateSuffixSchema,
+  sharePolicyConflict,
+} from '../contracts/boards.js';
 import type { BoardStateDto, CallerDto } from '../contracts/dto.js';
 import { toCardDto, toColumnDto, boardTagColors } from '../cards/service.js';
 import { toBoardMembers } from '../boards/members.js';
@@ -380,6 +386,107 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
     assertAllowed(loaded.decision);
 
     return reply.redirect(humanBoardPath(loaded.board), 301);
+  });
+
+  /**
+   * K3-01: a new suffix, and the old URL is a 404 on the next request — not a
+   * redirect, because a redirect would confirm the board exists.
+   */
+  app.post('/api/v1/boards/:id/link-suffix/rotate', async (request) => {
+    const actor = requireActor(request);
+    const { id } = request.params as { id: string };
+    const parsed = rotateSuffixSchema.safeParse(request.body);
+    if (!parsed.success) throw fromZod(parsed.error);
+    const db = database();
+    const loaded = await loadBoardFor(db, actor, id, 'board.update');
+    assertAllowed(loaded.decision);
+    if (loaded.board.visibility !== 'link') {
+      throw new AppError('validation_failed', {
+        message: 'Only a link board has a readable suffix.',
+        hint: 'Set visibility to link first; a private or public board is addressed by its slug alone.',
+        details: [
+          {
+            path: 'visibility',
+            code: 'custom',
+            message: 'expected link',
+          },
+        ],
+      });
+    }
+
+    const previous = loaded.board.link_suffix;
+    const board = await db.$transaction(async (tx) => {
+      let next = linkSuffix();
+      for (let attempt = 0; attempt < 20 && next === previous; attempt += 1) next = linkSuffix();
+      const updated = await tx.board.update({
+        where: { id },
+        data: { link_suffix: next },
+        include: { owner: { select: { id: true, username: true } } },
+      });
+      await recordEvent(tx, {
+        boardId: id,
+        actor,
+        type: 'board.updated',
+        payload: { board_id: id, changes: { link_suffix: [previous, next] } },
+      });
+      return updated;
+    });
+    commitEvent(context.hub, {
+      boardId: id,
+      type: 'board.updated',
+      entity: 'board',
+      action: 'updated',
+      payload: { board_id: id },
+      actorLabel: actor.kind,
+    });
+    return toBoardDto(board, context.env.KLUI_PUBLIC_URL);
+  });
+
+  /**
+   * The SPA equivalent of opening a board URL: the route resolves the segment
+   * through the same `can()` and hands back the id-addressed board. A URL never
+   * grants anything by itself, and a failure is the standard 404 (K3-01).
+   */
+  app.get('/api/v1/users/:username/boards/:segment/resolve', async (request) => {
+    const db = database();
+    const { username, segment } = request.params as { username: string; segment: string };
+    const target = await resolvePublicBoard(db, username, segment);
+    const actor = request.actor;
+    if (!target || !actor) throw boardNotFound();
+    const loaded = await loadBoardFor(db, actor, target.id, 'board.read');
+    assertAllowed(loaded.decision);
+    return { board_id: loaded.board.id, url: humanBoardPath(loaded.board) };
+  });
+
+  /**
+   * The public half of a profile: what the SPA route and the prerendered page
+   * both read. Public boards only — a `link` board's URL is its credential.
+   */
+  app.get('/api/v1/users/:username/boards', async (request) => {
+    const db = database();
+    const { username } = request.params as { username: string };
+    const user = await db.user.findUnique({
+      where: { username: username.toLowerCase() },
+      select: { id: true, username: true },
+    });
+    if (!user) {
+      throw new AppError('not_found', { message: 'Not found.', hint: null });
+    }
+    const boards = await db.board.findMany({
+      where: { owner_id: user.id, visibility: 'public', closed_at: null },
+      orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
+      include: { owner: { select: { id: true, username: true } } },
+    });
+    return {
+      owner: { username: user.username },
+      items: boards.map((board) => ({
+        id: board.id,
+        name: board.name,
+        slug: board.slug,
+        url: boardUrl(context.env.KLUI_PUBLIC_URL, board),
+        updated_at: board.updated_at.toISOString(),
+      })),
+    };
   });
 
   app.get('/api/v1/boards/:id/tag-colors', async (request) => {

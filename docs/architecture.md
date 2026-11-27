@@ -52,6 +52,7 @@ server/src/
   digest/          builder (deterministic), delivery (webhook, mail, rss), scheduler
   settings/        instance settings, branding, accent validation
   realtime/        hub.ts (subscribers, ring buffer), events.ts (envelope)
+  public/          server-rendered profile and board <head>, robots.txt, sitemap.xml
   lib/             errors, ids, ranks, secrets, rate-limit, logger, reserved, authz
   contracts/       Zod schemas shared by REST and MCP
 ```

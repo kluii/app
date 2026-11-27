@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { ApiError } from '../../api/client';
 import type { BoardState, Caller, Card } from '../../api/types';
 import { t } from '../../i18n';
+import { formatDate } from '../../lib/format';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
 import { CardThread } from './card-thread';
@@ -123,13 +124,6 @@ export function errorMessage(error: unknown): string {
     if (error.code === 'board_closed') return t('board.card.boardClosed');
   }
   return t('common.error.generic');
-}
-
-/** `12 Mar` in the reader's locale: a board date is a label, never a timestamp. */
-export function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(
-    new Date(value),
-  );
 }
 
 /** The board state a modal needs, or nothing while the first fetch is in flight. */

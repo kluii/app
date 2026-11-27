@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { Board, BoardState, Card, Column, EventDto, Me, Page } from './types';
+import type { Board, BoardState, Card, Column, EventDto, Me, Page, PublicBoard } from './types';
 
 /**
  * The one place the SPA talks to the API. `credentials: 'same-origin'` carries
@@ -156,6 +156,16 @@ export const api = {
     request<{ recovery_codes: string[] }>('POST', '/auth/recovery-codes', { password }),
 
   boards: () => request<{ items: Board[] }>('GET', '/boards'),
+  userBoards: (username: string) =>
+    request<{ owner: { username: string }; items: PublicBoard[] }>(
+      'GET',
+      `/users/${encodeURIComponent(username)}/boards`,
+    ),
+  resolveBoardUrl: (username: string, segment: string) =>
+    request<{ board_id: string }>(
+      'GET',
+      `/users/${encodeURIComponent(username)}/boards/${encodeURIComponent(segment)}/resolve`,
+    ),
   createBoard: (input: { name: string; template?: 'classic' | 'blank' }) =>
     request<Board>('POST', '/boards', input),
   boardState: (boardId: string) => request<BoardState>('GET', `/boards/${boardId}/state`),

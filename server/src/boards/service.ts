@@ -154,7 +154,7 @@ export function toBoardDto(
 }
 
 export function boardUrl(
-  publicUrl: string,
+  publicUrl: string | null,
   board: {
     slug: string;
     visibility: string;
@@ -163,7 +163,8 @@ export function boardUrl(
   },
 ): string {
   const suffix = board.visibility === 'link' && board.link_suffix ? `-${board.link_suffix}` : '';
-  return `${publicUrl.replace(/\/$/, '')}/${board.owner.username}/${board.slug}${suffix}`;
+  // Without a configured origin the path is still correct, just relative.
+  return `${(publicUrl ?? '').replace(/\/$/, '')}/${board.owner.username}/${board.slug}${suffix}`;
 }
 
 /** `slug-ab12` → `{ base: 'slug', suffix: 'ab12' }`; anything else keeps the segment. */
@@ -194,6 +195,10 @@ export function humanBoardPath(board: {
  * caller still runs `can()`. A suffix that does not match, or a bare slug on a
  * link board, is simply not a board — the old suffix must `404` after rotation.
  *
+ * The exact slug is tried **before** splitting off a suffix: `board-under-test`
+ * ends in four letters and used to be read as board `board-under` + suffix
+ * `test`, which 404'd a public board whose name happened to end in a word.
+ *
  * Renames are followed here so a 90-day reservation redirects, but the redirect
  * is only emitted after the readability check (PROMPT.md §3.4).
  */
@@ -203,33 +208,43 @@ export async function resolvePublicBoard(
   segment: string,
 ): Promise<{ id: string; suffix: string | null } | null> {
   let owner = username.toLowerCase();
-  let { base, suffix } = splitLinkSuffix(segment);
+  let wanted = segment;
+
+  const find = (slug: string, byOwner: string) =>
+    db.board.findFirst({
+      where: { slug, owner: { username: byOwner } },
+      select: { id: true, visibility: true, link_suffix: true },
+    });
 
   // Two hops is enough: a rename of the account and one of the board.
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const board = await db.board.findFirst({
-      where: { slug: base, owner: { username: owner } },
-      select: { id: true, visibility: true, link_suffix: true },
-    });
-    if (board) {
-      if (board.visibility === 'link') {
-        if (suffix === null || suffix !== board.link_suffix) return null;
+    const exact = await find(wanted, owner);
+    if (exact) {
+      // A link board is never addressed by its bare slug; a private or public
+      // board is never addressed with a suffix.
+      return exact.visibility === 'link' ? null : { id: exact.id, suffix: null };
+    }
+
+    const { base, suffix } = splitLinkSuffix(wanted);
+    if (suffix !== null) {
+      const board = await find(base, owner);
+      if (board) {
+        if (board.visibility !== 'link' || suffix !== board.link_suffix) return null;
         return { id: board.id, suffix };
       }
-      // A private or public board is not addressed with a suffix at all.
-      if (suffix !== null) return null;
-      return { id: board.id, suffix: null };
     }
 
     // Renames inside their 90-day reservation redirect, after the caller has
     // checked readability of the target (PROMPT.md §3.4).
     const renamedOwner = await usernameRedirect(db, owner);
     const nextOwner = renamedOwner !== null && renamedOwner !== owner ? renamedOwner : owner;
-    const renamedSlug = await slugRedirect(db, nextOwner, base);
-    if (nextOwner === owner && (renamedSlug === null || renamedSlug === base)) return null;
+    const renamedSlug =
+      (await slugRedirect(db, nextOwner, base)) ?? (await slugRedirect(db, nextOwner, wanted));
+    const changedOwner = nextOwner !== owner;
+    const changedSlug = renamedSlug !== null && renamedSlug !== wanted;
+    if (!changedOwner && !changedSlug) return null;
     owner = nextOwner;
-    base = renamedSlug ?? base;
-    suffix = splitLinkSuffix(base).suffix ?? suffix;
+    wanted = renamedSlug ?? wanted;
   }
   return null;
 }

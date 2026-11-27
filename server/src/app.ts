@@ -32,6 +32,7 @@ import { registerResetRoutes } from './auth/reset-routes.js';
 import { registerAdminRoutes } from './admin/routes.js';
 import { registerExportRoutes } from './export/routes.js';
 import { registerImportRoutes } from './import/routes.js';
+import { renderHtmlPage, robotsTxt, sitemapXml } from './public/pages.js';
 import type { Mailer } from './lib/mail.js';
 
 export type AppContext = {
@@ -42,6 +43,11 @@ export type AppContext = {
   hub?: Hub;
   /** Null when SMTP is unconfigured: the reset endpoint then fails closed. */
   mail?: Mailer | null;
+  /**
+   * Where the built SPA lives. The default is `web/dist`; the tests point this at
+   * a fixture so an HTML assertion does not depend on a prior web build.
+   */
+  webDir?: string;
 };
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
@@ -59,7 +65,9 @@ function resolveRequestId(header: string | string[] | undefined): string {
 export function buildApp(context: AppContext): FastifyInstance {
   const hops = context.env.KLUI_TRUSTED_PROXY_HOPS;
   const hub = context.hub ?? createHub();
-  const assets = loadStaticAssets(new URL('../../web/dist', import.meta.url).pathname);
+  const assets = loadStaticAssets(
+    context.webDir ?? new URL('../../web/dist', import.meta.url).pathname,
+  );
   const csp = contentSecurityPolicy(assets?.bootstrapHash ?? null);
 
   const app: FastifyInstance = Fastify({
@@ -101,6 +109,18 @@ export function buildApp(context: AppContext): FastifyInstance {
   if (assets) {
     registerStatic(app, assets);
   }
+
+  // The crawler files. They are not files in `web/dist`: the sitemap is a query
+  // and robots.txt has to name the public origin the instance actually has.
+  app.get('/robots.txt', async (_request, reply) => {
+    return reply.type('text/plain; charset=utf-8').send(robotsTxt(context.env.KLUI_PUBLIC_URL));
+  });
+  app.get('/sitemap.xml', async (_request, reply) => {
+    if (!context.db) return reply.code(404).send();
+    return reply
+      .type('application/xml; charset=utf-8')
+      .send(await sitemapXml(context.db, context.env.KLUI_PUBLIC_URL));
+  });
 
   // 7. Authentication: resolve the credential into an actor before any handler.
   app.addHook('onRequest', async (request, reply) => {
@@ -182,16 +202,31 @@ export function buildApp(context: AppContext): FastifyInstance {
     return reply.code(status).send(body);
   });
 
-  app.setNotFoundHandler((request, reply) => {
+  app.setNotFoundHandler(async (request, reply) => {
     if (
       assets &&
       request.method === 'GET' &&
       isSpaNavigation(request.url, request.headers.accept)
     ) {
-      return reply
+      // A public profile, a board's head and the plain shell differ only in what
+      // a crawler may see (K3-01, docs/features/links-and-anonymous.md §7).
+      const page = context.db
+        ? await renderHtmlPage({
+            db: context.db,
+            actor: request.actor ?? null,
+            indexHtml: assets.indexHtml,
+            path: request.url,
+            publicUrl: context.env.KLUI_PUBLIC_URL,
+          })
+        : null;
+      const html = page ? page.html : assets.indexHtml;
+      const noindex = page ? page.noindex : true;
+      const response = reply
+        .code(page?.status ?? 200)
         .header('cache-control', 'no-store')
-        .type('text/html; charset=utf-8')
-        .send(assets.indexHtml);
+        .type('text/html; charset=utf-8');
+      if (noindex) response.header('x-robots-tag', 'noindex');
+      return response.send(html);
     }
     const { status, body } = toWire(
       new AppError('not_found', { message: 'Not found.', hint: null, status: 404 }),
@@ -203,6 +238,10 @@ export function buildApp(context: AppContext): FastifyInstance {
 
   app.addHook('onSend', async (request, reply, payload) => {
     reply.header('x-request-id', String(request.id));
+    // An API response is never a document a search engine should hold on to.
+    if (request.url.startsWith('/api/') || request.url.startsWith('/mcp')) {
+      reply.header('x-robots-tag', 'noindex');
+    }
     return payload;
   });
 

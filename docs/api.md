@@ -158,11 +158,15 @@ next request is `401` and the next login answers `403 banned`.
 | `GET` | `/boards/:id/tag-colors` | `{ "api": "#8B5CF6", "web": "#2563EB" }` — the board-level defaults. |
 | `PUT` | `/boards/:id/tag-colors` | Replaces the map. Keys are normalised tag names; values are `#RRGGBB`. Owner/admin only (it is a board setting; an editor can still colour a tag on a card, which is a card write). |
 
-**URL semantics.** `private` and `public` boards answer on `/<username>/<slug>`; `link` boards on `/<username>/<slug>-<suffix>`. The API is id-based, so a URL never grants anything by itself.
+**URL semantics.** `private` and `public` boards answer on `/<username>/<slug>`; `link` boards on `/<username>/<slug>-<suffix>`. The API is id-based, so a URL never grants anything by itself. The segment is resolved **exact slug first, suffix second**: a board named "Board under test" keeps `board-under-test`, and its last four letters are not read as a suffix.
 
 | Method | Path | Contract |
 |---|---|---|
 | `GET` | `/users/:username/boards/:slug` | Resolves a public URL to the page. `301` to `/<owner>/<slug>` (or the suffixed URL for a `link` board) **only for an actor who can read the board**; anything else, including a bare slug on a link board, a suffix that does not match, and a credential-less request, answers the same `404` an unknown slug answers. Renames inside their 90-day reservation redirect too, but only after that readability check. |
+| `GET` | `/users/:username/boards/:segment/resolve` | What the SPA calls when a human opens `/<username>/<segment>`. `{board_id, url}` for an actor who can read the board, the same `404` otherwise. No cookie, no resolution: this is not a public read. |
+| `GET` | `/users/:username/boards` | `{owner:{username}, items:[{id,name,slug,url,updated_at}]}` — **public** boards of that account, newest first. `404` for an unknown username. Never lists a `link` or `private` board. |
+
+**HTML responses and crawlers.** `GET /<username>` is server-rendered inside `#root` (the SPA replaces it on mount): a crawler reads the public boards, a human gets the product page. `GET /<username>/<segment>` is the SPA shell with a computed `<head>`: `noindex` (meta **and** `X-Robots-Tag`) for a `link` board and for any board the caller cannot read, canonical URL and `og:*` for a `public` board. `/robots.txt` disallows `/api/`, `/l/` and `/mcp`, and names `/sitemap.xml`; the sitemap lists public boards and the profiles that own them, and nothing else. Every `/api/*` response carries `X-Robots-Tag: noindex`.
 
 ---
 

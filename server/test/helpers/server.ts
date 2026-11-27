@@ -15,7 +15,7 @@ export const TEST_SECRETS = {
 };
 
 export async function startServer(
-  options: { mail?: Mailer | null; env?: Partial<Env> } = {},
+  options: { mail?: Mailer | null; env?: Partial<Env>; webDir?: string } = {},
 ): Promise<{
   app: ReturnType<typeof buildApp>;
   db: Db;
@@ -36,6 +36,7 @@ export async function startServer(
     secrets: TEST_SECRETS,
     hub: createHub(),
     ...(options.mail === undefined ? {} : { mail: options.mail }),
+    ...(options.webDir === undefined ? {} : { webDir: options.webDir }),
   });
   await app.ready();
   return {

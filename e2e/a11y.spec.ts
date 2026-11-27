@@ -9,7 +9,7 @@
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { PASSWORD, openBoard, uniqueUsername } from './support';
+import { PASSWORD, openBoard, patch, uniqueUsername } from './support';
 
 const ROUTES = ['/login', '/signup', '/reset'];
 
@@ -33,8 +33,16 @@ for (const theme of ['light', 'dark'] as const) {
 test('axe is clean on the signed-in routes', async ({ page, request }) => {
   const username = uniqueUsername('axe-routes');
   const { boardId } = await openBoard(page, request, username, ['Alpha', 'Bravo']);
+  await patch(request, `/api/v1/boards/${boardId}`, { visibility: 'public' });
 
-  for (const route of ['/boards', `/boards/${boardId}`, '/settings', '/styleguide']) {
+  for (const route of [
+    '/boards',
+    `/boards/${boardId}`,
+    '/settings',
+    '/styleguide',
+    `/${username}`,
+    `/${username}/board-under-test`,
+  ]) {
     await page.goto(route, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('main')).toBeVisible();
     const results = await new AxeBuilder({ page }).analyze();

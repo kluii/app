@@ -37,6 +37,15 @@ export type Board = {
 
 export type Column = { id: string; name: string; position: string };
 
+/** A board anybody may read: the profile list, and never a link board. */
+export type PublicBoard = {
+  id: string;
+  name: string;
+  slug: string;
+  url: string;
+  updated_at: string;
+};
+
 export type Tag = { name: string; color: string | null };
 
 export type Card = {

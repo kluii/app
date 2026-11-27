@@ -20,6 +20,7 @@ const RESERVED = new Set([
   'settings',
   'account',
   'boards',
+  'styleguide',
   'board',
   'l',
   'u',

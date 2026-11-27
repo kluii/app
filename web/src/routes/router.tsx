@@ -6,6 +6,8 @@ import { boardSummaryRoute } from './board-summary';
 import { boardsRoute } from './boards';
 import { indexRoute } from './index';
 import { loginRoute } from './login';
+import { profileRoute } from './profile';
+import { publicBoardRoute } from './public-board';
 import { resetRoute } from './reset';
 import { settingsRoute } from './settings';
 import { styleguideRoute } from './styleguide';
@@ -18,6 +20,8 @@ const routeTree = rootRoute.addChildren([
   signupRoute,
   resetRoute,
   styleguideRoute,
+  profileRoute,
+  publicBoardRoute,
   authedRoute.addChildren([boardsRoute, boardRoute, boardSummaryRoute, settingsRoute]),
 ]);
 

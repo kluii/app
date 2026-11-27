@@ -74,6 +74,8 @@ Requirements: a display name, 2–32 characters, chosen client-side, stored per 
 - `link` boards, `/l/*`, RSS, OG images of link boards: `noindex` meta + `X-Robots-Tag: noindex`.
 - OG cards are generated server-side from the board's real name and counts; they contain no card titles (a preview must not leak content into a chat unfurl beyond what the board itself shows).
 - A bot that fetches `/b/<token>` style URLs must receive a real HTML document with OG tags, because unfurlers do not run JavaScript. That route is served by the server, not the SPA.
+- A URL segment is resolved **exact slug first, then `slug-suffix`**. Splitting four trailing characters first made `board-under-test` resolve as board `board-under` with suffix `test`, which hid a public board whose name ended in a word.
+- The owner profile (`/<username>`) is prerendered inside `#root` for crawlers and rendered by the SPA for humans; `/sitemap.xml` lists public boards and those profiles, `/robots.txt` disallows `/api/`, `/l/` and `/mcp`.
 - Guessed URLs answer the standard 404 page, with the same timing shape as a real 404.
 
 ## 8. Acceptance

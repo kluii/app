@@ -210,7 +210,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
 
 **Wave exit:** the authz matrix is complete and green; an anonymous visitor can add a card to an open board and cannot comment, delete or move; a moderated write is invisible until approved.
 
-- [ ] **K3-01 — Visibility and suffixes** `M` · dep: K1-07
+- [x] **K3-01 — Visibility and suffixes** `M` · dep: K1-07
   `private` | `link` | `public` enforced end to end; 4-char base32 suffix generated, stored, regenerable; old suffix `404`s after rotation; canonical URL per visibility; `noindex` on `link` and on every credentialed URL.
   **Exit:** a `link` board with the wrong suffix answers `404`; rotating the suffix invalidates the previous URL; a `public` board is listed on the owner profile and indexed.
 
