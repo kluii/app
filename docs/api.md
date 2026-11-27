@@ -151,6 +151,9 @@ never grants board content. An admin who is not a board member gets the same
 | `PATCH` | `/admin/oidc/providers/:slug` | Updates OIDC provider settings or toggles `enabled`. |
 | `DELETE` | `/admin/oidc/providers/:slug` | `204`; deletes the provider configuration. |
 | `POST` | `/admin/oidc/providers/:slug/test` | Performs live OIDC discovery (`/.well-known/openid-configuration`) and answers `200 {ok:true, issuer, authorization_endpoint, token_endpoint}` or `{ok:false, error}`. |
+| `GET` | `/branding` | Public instance branding (`{instance_name, tab_title, logo_url, favicon_url, accent_color, accent_foreground}`). Defaults flow through the same fields. |
+| `PATCH` | `/admin/branding` | Instance admin only. Updates `instance_name`, `tab_title`, `accent_color` (validated for WCAG AA contrast; fails with the measured ratio in the message) or clears `logo_url`/`favicon_url`. |
+| `POST` | `/admin/branding/logo` | Instance admin only. Multipart upload (`file`, PNG or SVG ≤ 256 KB and ≤ 512×512; `?kind=favicon` sets the favicon). |
 
 A user ban is enforced before authorization: the credential stops resolving, so
 the next request is `401` and the next login answers `403 banned`. An address
