@@ -182,6 +182,7 @@
   "common.action.retry": "Réessayer",
   "common.action.save": "Enregistrer",
   "common.action.signOut": "Se déconnecter",
+  "common.action.skipToContent": "Aller au contenu",
   "common.app.name": "Klui",
   "common.error.generic": "Une erreur est survenue. Réessayez.",
   "common.error.unknownCode": "La requête a échoué ({code}).",

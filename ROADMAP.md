@@ -198,7 +198,7 @@ K5 is not "the leftovers": the cut line below says which K5 items are 2.0 and wh
   Twelve-swatch palette plus a hex field in the tag editor; `CardTag.color` written by `PATCH /cards/:id`; board defaults via `PUT /boards/:id/tag-colors`; neutral fallback; "apply to all cards using this tag" as an explicit second action.
   **Exit:** a white tag in dark and a black tag in light both keep `--ink` ≥ 4.5:1 (the test recomputes the mix from the CSS values); a v1 import restores `tag_colors` as board defaults; the same tag renders consistently on every card until a card override is set.
 
-- [ ] **K2-15 — Accessibility close** `M` · dep: K2-13
+- [x] **K2-15 — Accessibility close** `M` · dep: K2-13
   Focus order, focus traps in modals, skip link, landmarks, `aria-live` for mutations, reduced motion, visible focus in both themes.
   **Exit:** axe reports zero violations on every route; a keyboard-only journey reaches and operates every control on the board.
 

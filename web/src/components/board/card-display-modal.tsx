@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Check } from 'lucide-react';
+import { useRef } from 'react';
 import { ApiError } from '../../api/client';
 import type { BoardState, Caller, Card } from '../../api/types';
 import { t } from '../../i18n';
@@ -29,6 +30,7 @@ export function CardDisplayModal({
   onClose: () => void;
 }) {
   const done = useToggleDone(boardId);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   const assignee = card.assignee?.username ?? card.assignee_label;
   const due = card.due_at ? formatDate(card.due_at) : null;
@@ -37,6 +39,7 @@ export function CardDisplayModal({
     <Dialog
       open
       onClose={onClose}
+      initialFocus={closeRef}
       title={card.title}
       description={due ? t('board.card.dueOn', { date: due }) : undefined}
       footer={
@@ -50,7 +53,9 @@ export function CardDisplayModal({
               {card.done ? t('board.card.reopen') : t('board.card.done')}
             </Button>
           ) : null}
-          <Button variant="ghost" onClick={onClose}>
+          {/* Read first: the panel opens on the way out, never in the comment
+              box, so a keyboard user is not dropped into a composer (K2-15). */}
+          <Button ref={closeRef} variant="ghost" onClick={onClose}>
             {t('common.action.close')}
           </Button>
           {caller.can_write ? (

@@ -182,6 +182,7 @@
   "common.action.retry": "Retry",
   "common.action.save": "Save",
   "common.action.signOut": "Sign out",
+  "common.action.skipToContent": "Skip to content",
   "common.app.name": "Klui",
   "common.error.generic": "Something went wrong. Try again.",
   "common.error.unknownCode": "The request failed ({code}).",
