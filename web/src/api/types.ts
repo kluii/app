@@ -19,6 +19,26 @@ export type Me = {
   created_at: string;
 };
 
+export type SessionDto = {
+  id: string;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+  last_seen_at: string;
+  current: boolean;
+};
+
+export type DigestPrefDto = {
+  enabled: boolean;
+  hour: number;
+  timezone: string;
+  channels: { webhook: boolean; email: boolean; rss: boolean };
+  last_sent_at: string | null;
+  last_result: 'sent' | 'empty' | null;
+  rss_url?: string;
+  unsubscribe_url?: string;
+};
+
 export type Board = {
   id: string;
   name: string;

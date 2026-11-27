@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createRoute } from '@tanstack/react-router';
 import { AgentsSettings } from '../components/settings/agents-settings';
+import { DangerSettings } from '../components/settings/danger-settings';
+import { DigestSettings } from '../components/settings/digest-settings';
+import { ProfileSettings } from '../components/settings/profile-settings';
 import { SecuritySettings } from '../components/settings/security-settings';
+import { SessionsSettings } from '../components/settings/sessions-settings';
 import { t } from '../i18n';
 import { authedRoute } from './authed';
 
@@ -16,8 +20,12 @@ function SettingsPage() {
     <div className="mx-auto w-full max-w-content px-6 py-8">
       <h1 className="text-h1">{t('settings.title')}</h1>
       <div className="mt-6 flex flex-col gap-10">
+        <ProfileSettings />
+        <SessionsSettings />
+        <DigestSettings />
         <AgentsSettings />
         <SecuritySettings />
+        <DangerSettings />
       </div>
     </div>
   );
