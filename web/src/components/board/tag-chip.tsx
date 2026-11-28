@@ -16,10 +16,9 @@ export function TagChip({ tag }: { tag: Tag }) {
   }
   return (
     <span
-      className="tag-chip inline-flex h-5 items-center gap-1 rounded-key px-2 font-mono text-mono-sm"
+      className="tag-chip inline-flex h-5 items-center rounded-key px-2 font-mono text-mono-sm"
       style={{ '--tag': tag.color } as CSSProperties}
     >
-      <span aria-hidden="true" className="tag-chip__bar inline-block h-2.5 w-0.5 rounded-xs" />
       {tag.name}
     </span>
   );

@@ -103,12 +103,7 @@ function buildDragPreview(container: HTMLElement, card: Card): void {
           'inline-flex h-5 items-center rounded-key border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted';
       } else {
         chip.className =
-          'tag-chip inline-flex h-5 items-center gap-1 rounded-key px-2 font-mono text-mono-sm';
-        const bar = document.createElement('span');
-        bar.setAttribute('aria-hidden', 'true');
-        bar.className = 'tag-chip__bar inline-block h-2.5 w-0.5 rounded-xs';
-        chip.appendChild(bar);
-        chip.appendChild(document.createTextNode(tag.name));
+          'tag-chip inline-flex h-5 items-center rounded-key px-2 font-mono text-mono-sm';
         chip.style.setProperty('--tag', tag.color);
       }
       row.appendChild(chip);

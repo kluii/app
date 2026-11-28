@@ -351,10 +351,6 @@
     color: var(--ink);
   }
 
-  .tag-chip__bar {
-    background-color: var(--tag);
-  }
-
   /* The plate scope (brief §8): a card being held — the drag ghost, the
      keyboard-lifted row — is printed on the plate, so its descendants read
      the plate's tokens. A tag chip (which mixes its hue into `--card`) and a
