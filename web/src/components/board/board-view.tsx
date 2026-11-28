@@ -467,7 +467,10 @@ function BoardFrame({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2">
+      <header
+        data-testid="board-bar"
+        className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border px-6"
+      >
         <div className="flex min-w-0 items-center gap-3">
           <BoardName board={board} canRename={caller.can_manage} />
           <span data-testid="caller-chip">
@@ -530,7 +533,7 @@ function BoardFrame({
           className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
           data-testid="board-scroll"
         >
-          <div className="board-rail flex items-start gap-4 px-4 py-4">
+          <div className="board-rail flex items-start gap-4 px-6 py-4">
             {columns.map((column) => (
               <ColumnSection
                 key={column.id}
@@ -738,7 +741,7 @@ function ColumnSection({
         <button
           type="button"
           onClick={() => onAddCard(column.id)}
-          className="flex h-8 items-center gap-1.5 rounded-sm px-1 text-label text-ink-subtle transition-colors hover:text-ink"
+          className="flex h-8 items-center gap-2 rounded-sm px-1 text-label text-ink-subtle transition-colors hover:text-ink"
         >
           <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
           {t('board.card.add')}
@@ -766,7 +769,7 @@ function AddColumn({ boardId }: { boardId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-column shrink-0 items-center gap-1.5 rounded-sm border border-dashed border-border px-2 text-label text-ink-subtle transition-colors hover:border-border-strong hover:text-ink"
+        className="flex h-8 w-column shrink-0 items-center gap-2 rounded-sm border border-dashed border-border px-2 text-label text-ink-subtle transition-colors hover:border-border-strong hover:text-ink"
       >
         <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
         {t('board.column.add')}
@@ -792,7 +795,7 @@ function AddColumn({ boardId }: { boardId: string }) {
           if (event.key === 'Escape') setOpen(false);
         }}
       />
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <Button type="submit" size="sm" variant="primary" loading={create.isPending}>
           {t('common.action.create')}
         </Button>
@@ -955,7 +958,7 @@ function BoardSettingsMenu({
           {...wiring}
           title={t('board.settings.label')}
           data-testid="open-board-settings"
-          className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2 text-label text-ink transition-colors duration-[var(--dur-fast)] hover:bg-surface-muted"
+          className="inline-flex h-7 items-center gap-2 rounded-full border border-border bg-surface-2 px-2 text-label text-ink transition-colors duration-[var(--dur-fast)] hover:bg-surface-muted"
         >
           <span className="relative inline-flex">
             <Settings2 aria-hidden className="h-4 w-4" strokeWidth={1.75} />

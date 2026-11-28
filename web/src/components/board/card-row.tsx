@@ -77,11 +77,11 @@ export function CardRow({
     >
       <div
         className={cn(
-          'flex w-full flex-col gap-2 rounded-sm border border-border bg-card px-3 py-2.5',
+          'flex w-full flex-col gap-2 rounded-sm border border-border bg-card p-3',
           'transition-colors duration-[var(--dur-fast)] group-hover:border-border-strong',
         )}
       >
-        <span className="flex items-start gap-1.5">
+        <span className="flex items-start gap-2">
           {card.done ? (
             <span
               aria-hidden
@@ -103,7 +103,7 @@ export function CardRow({
         </span>
 
         {card.tags.length > 0 || due || card.assignee || card.assignee_label ? (
-          <span className="flex flex-wrap items-center gap-1.5">
+          <span className="flex flex-wrap items-center gap-1">
             {card.tags.map((tag) => (
               <TagChip key={tag.name} tag={tag} />
             ))}

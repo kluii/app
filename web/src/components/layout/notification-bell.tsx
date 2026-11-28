@@ -137,7 +137,7 @@ export function NotificationBell() {
               items.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex items-start justify-between gap-2 px-3 py-2.5 text-body-sm ${
+                  className={`flex items-start justify-between gap-2 px-3 py-2 text-body-sm ${
                     item.read_at === null ? 'bg-surface-2' : ''
                   }`}
                 >

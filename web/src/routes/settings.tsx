@@ -154,7 +154,7 @@ function SettingsPage() {
             aria-orientation="vertical"
             data-testid="settings-rail"
             onKeyDown={onKeyDown}
-            className="flex snap-x snap-mandatory gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0"
+            className="flex snap-x snap-mandatory gap-0.5 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0"
           >
             {visible.map((id) => {
               const selected = id === active;

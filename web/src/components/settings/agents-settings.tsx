@@ -347,7 +347,7 @@ function AgentKeyRow({
         <Chip>{t(`settings.agents.status.${status}`)}</Chip>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1">
         <Chip>{t(`settings.agents.scope.${agentKey.scope}Short`)}</Chip>
         {agentKey.board_name === null ? null : (
           <Chip className="min-w-0 max-w-full">

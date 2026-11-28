@@ -70,7 +70,7 @@ export function CardDisplayModal({
     >
       <div className="flex flex-col gap-4">
         {card.done ? (
-          <p className="flex items-center gap-1.5 text-body-sm text-ink-muted">
+          <p className="flex items-center gap-2 text-body-sm text-ink-muted">
             <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-ink text-primary-foreground">
               <Check aria-hidden className="h-3 w-3" strokeWidth={2} />
             </span>
@@ -91,7 +91,7 @@ export function CardDisplayModal({
         )}
 
         {card.tags.length > 0 ? (
-          <ul className="flex flex-wrap gap-1.5">
+          <ul className="flex flex-wrap gap-1">
             {card.tags.map((tag) => (
               <li key={tag.name}>
                 <TagChip tag={tag} />
@@ -100,7 +100,7 @@ export function CardDisplayModal({
           </ul>
         ) : null}
 
-        <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5 text-body-sm">
+        <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 text-body-sm">
           <dt className="text-ink-muted">{t('board.card.assignee')}</dt>
           <dd className={assignee ? 'text-ink' : 'text-ink-subtle'}>
             {assignee ?? t('board.card.unassigned')}

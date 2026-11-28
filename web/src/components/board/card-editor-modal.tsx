@@ -170,7 +170,7 @@ export function CardEditorModal({
         </Field>
 
         {conflict ? (
-          <div role="alert" className="flex flex-col gap-2 rounded-sm border border-danger p-2.5">
+          <div role="alert" className="flex flex-col gap-2 rounded-sm border border-danger p-3">
             <p className="text-body-sm text-ink">{t('board.card.conflict')}</p>
             <div className="flex gap-2">
               <Button

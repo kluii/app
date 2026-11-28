@@ -125,7 +125,7 @@ export function BoardFilters({
             {tagOptions.length === 0 ? (
               <p className="text-body-sm text-ink-subtle">{t('board.filter.none')}</p>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1">
                 {tagOptions.map((tag) => {
                   const selected = filters.tags.includes(tag);
                   return (
@@ -136,8 +136,8 @@ export function BoardFilters({
                       onClick={() => onChange({ ...filters, tags: toggle(filters.tags, tag) })}
                       className={
                         selected
-                          ? 'inline-flex h-6 items-center rounded-sm border border-ink bg-surface-muted px-1.5 font-mono text-mono-sm text-ink'
-                          : 'inline-flex h-6 items-center rounded-sm border border-border bg-surface-2 px-1.5 font-mono text-mono-sm text-ink-muted'
+                          ? 'inline-flex h-6 items-center rounded-sm border border-ink bg-surface-muted px-2 font-mono text-mono-sm text-ink'
+                          : 'inline-flex h-6 items-center rounded-sm border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted'
                       }
                     >
                       {tag}
@@ -152,7 +152,7 @@ export function BoardFilters({
             <legend className="text-label font-medium text-ink-muted">
               {t('board.filter.assignees')}
             </legend>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {assigneeOptions.map((assignee) => {
                 const selected = filters.assignees.includes(assignee);
                 return (
@@ -165,8 +165,8 @@ export function BoardFilters({
                     }
                     className={
                       selected
-                        ? 'inline-flex h-6 items-center rounded-sm border border-ink bg-surface-muted px-1.5 font-mono text-mono-sm text-ink'
-                        : 'inline-flex h-6 items-center rounded-sm border border-border bg-surface-2 px-1.5 font-mono text-mono-sm text-ink-muted'
+                        ? 'inline-flex h-6 items-center rounded-sm border border-ink bg-surface-muted px-2 font-mono text-mono-sm text-ink'
+                        : 'inline-flex h-6 items-center rounded-sm border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted'
                     }
                   >
                     {assignee}
@@ -225,14 +225,14 @@ export function ActiveFilters({
 
   return (
     <div
-      className="flex flex-wrap items-center gap-1.5 px-4 pb-2"
+      className="flex flex-wrap items-center gap-1 px-4 pb-2"
       aria-label={t('board.filter.active')}
     >
       {chips.map((chip) => (
         <span
           key={chip.key}
           data-testid="active-filter"
-          className="inline-flex h-6 items-center gap-1 rounded-sm border border-border bg-surface-2 pl-1.5 pr-1 font-mono text-mono-sm text-ink"
+          className="inline-flex h-6 items-center gap-1 rounded-sm border border-border bg-surface-2 pl-2 pr-1 font-mono text-mono-sm text-ink"
         >
           {chip.label}
           <button

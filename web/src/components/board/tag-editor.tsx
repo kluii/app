@@ -42,11 +42,7 @@ export function TagEditor({
       ) : (
         <ul className="flex flex-col gap-3">
           {tags.map((tag, index) => (
-            <li
-              key={tag.name}
-              className="flex flex-col gap-1.5"
-              data-testid={`tag-row-${tag.name}`}
-            >
+            <li key={tag.name} className="flex flex-col gap-1" data-testid={`tag-row-${tag.name}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-mono-sm text-ink">{tag.name}</span>
                 <Button
@@ -59,7 +55,7 @@ export function TagEditor({
                 </Button>
               </div>
               <div
-                className="flex flex-wrap items-center gap-1.5"
+                className="flex flex-wrap items-center gap-1"
                 role="group"
                 aria-label={t('board.tags.color')}
               >

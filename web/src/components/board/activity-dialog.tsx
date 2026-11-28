@@ -60,7 +60,7 @@ export function ActivityDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t('board.activity.title')}>
       <div
-        className="mb-3 flex flex-wrap gap-1.5"
+        className="mb-3 flex flex-wrap gap-1"
         role="group"
         aria-label={t('board.activity.filter.all')}
       >

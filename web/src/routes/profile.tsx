@@ -44,7 +44,7 @@ function ProfilePage() {
         ) : (
           <ul className="flex flex-col divide-y divide-border border-y border-border">
             {profile.data.items.map((board) => (
-              <li key={board.id} className="flex items-center justify-between gap-4 py-2.5">
+              <li key={board.id} className="flex items-center justify-between gap-4 py-2">
                 <Link
                   to="/$username/$slug"
                   params={{ username, slug: board.slug }}

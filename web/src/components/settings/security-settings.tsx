@@ -143,7 +143,7 @@ export function SecuritySettings() {
             <span className="text-label font-medium text-ink-muted">
               {t('settings.security.secret')}
             </span>
-            <code className="break-all rounded-sm bg-surface-2 px-2 py-1.5 font-mono text-mono">
+            <code className="break-all rounded-sm bg-surface-2 px-2 py-2 font-mono text-mono">
               {enrollment.secret}
             </code>
           </div>
@@ -151,7 +151,7 @@ export function SecuritySettings() {
             <span className="text-label font-medium text-ink-muted">
               {t('settings.security.uri')}
             </span>
-            <code className="break-all rounded-sm bg-surface-2 px-2 py-1.5 font-mono text-mono">
+            <code className="break-all rounded-sm bg-surface-2 px-2 py-2 font-mono text-mono">
               {enrollment.otpauth_url}
             </code>
           </div>
@@ -197,7 +197,7 @@ export function SecuritySettings() {
 
 function CodeList({ title, hint, codes }: { title: string; hint: string; codes: string[] }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-border bg-surface-2 p-3">
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3">
       <span className="text-label font-medium text-ink-muted">{title}</span>
       <ul className="grid grid-cols-2 gap-1 font-mono text-mono text-ink">
         {codes.map((code) => (

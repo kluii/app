@@ -81,7 +81,7 @@ export function isBelowHalf(element: Element, clientY: number): boolean {
 function buildDragPreview(container: HTMLElement, card: Card): void {
   const ghost = document.createElement('div');
   ghost.className =
-    'w-card rounded-sm border border-border-strong bg-card p-[18px] text-ink shadow-[var(--shadow-overlay)] rotate-[1.5deg]';
+    'w-card rounded-sm border border-border-strong bg-card p-3 text-ink shadow-[var(--shadow-overlay)] rotate-[1.5deg]';
 
   const title = document.createElement('p');
   title.className = 'line-clamp-3 text-body text-ink';
@@ -91,7 +91,7 @@ function buildDragPreview(container: HTMLElement, card: Card): void {
   const tags = card.tags.slice(0, 2);
   if (tags.length > 0) {
     const row = document.createElement('div');
-    row.className = 'mt-2 flex flex-wrap items-center gap-1.5';
+    row.className = 'mt-2 flex flex-wrap items-center gap-1';
     for (const tag of tags) {
       const chip = document.createElement('span');
       chip.textContent = tag.name;

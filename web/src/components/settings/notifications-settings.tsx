@@ -97,7 +97,7 @@ export function NotificationsSettings() {
           ))}
         </fieldset>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1">
           <label htmlFor="notif-webhook-url" className="text-label font-medium text-ink">
             {t('notifications.prefs.webhookLabel')}
           </label>

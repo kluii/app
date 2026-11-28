@@ -51,7 +51,7 @@ function BoardsPage() {
           <p className="max-w-80 text-body-sm text-ink-muted">{t('boards.empty.body')}</p>
         </div>
       ) : (
-        <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {boards.data.items.map((board) => (
             <li key={board.id}>
               <BoardTile board={board} />
@@ -86,7 +86,7 @@ function BoardTile({ board }: { board: Board }) {
         <span className="text-h3 text-ink">{board.name}</span>
         {board.closed_at ? <Chip>{t('boards.meta.closed')}</Chip> : null}
       </span>
-      <span className="flex flex-wrap items-center gap-1.5">
+      <span className="flex flex-wrap items-center gap-1">
         <Chip>{visibility}</Chip>
         {role ? <Chip>{role}</Chip> : null}
       </span>

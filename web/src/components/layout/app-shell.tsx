@@ -53,7 +53,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
       {/* The first Tab stop is a way past the header, every page (K2-15). */}
       <a
         href="#main-content"
-        className="sr-only rounded-sm border border-border bg-surface px-3 py-1.5 text-body-sm text-ink focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50"
+        className="sr-only rounded-sm border border-border bg-surface px-3 py-2 text-body-sm text-ink focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50"
       >
         {t('common.action.skipToContent')}
       </a>
@@ -76,7 +76,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
           </Link>
           {actions}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {me.data ? (
             <>
               <NotificationBell />
