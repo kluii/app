@@ -5,6 +5,7 @@ import type { Card, Column } from '../../api/types';
 import { t } from '../../i18n';
 import { cn } from '../../lib/cn';
 import { formatDate } from '../../lib/format';
+import { atUsername } from '../../lib/username';
 import { Button } from '../ui/button';
 import { CardMenu } from './card-menu';
 import { TagChip } from './tag-chip';
@@ -67,7 +68,10 @@ export function CardRow({
   onSettle: (cardId: string) => void;
 }) {
   const due = card.due_at ? formatDate(card.due_at) : null;
-  const assignee = card.assignee?.username ?? card.assignee_label ?? null;
+  // A member is an identity, so it carries its at sign; `assignee_label` is
+  // whatever an anonymous author typed, and keeps saying exactly that.
+  const assignee =
+    card.assignee === null ? (card.assignee_label ?? null) : atUsername(card.assignee.username);
   const { ref, dragging, consumeDragClick } = useCardDnd({
     card,
     cards,

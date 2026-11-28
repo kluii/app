@@ -11,6 +11,7 @@ import type { Me } from '../../api/types';
 import { getLocale, setLocale, t } from '../../i18n';
 import { minidenticon } from '../../lib/identicon';
 import { useTheme, type Theme } from '../../lib/theme';
+import { atUsername } from '../../lib/username';
 import {
   DropdownCheckItem,
   DropdownGroup,
@@ -49,7 +50,7 @@ export function AccountMenu({ me }: { me: Me }) {
           type="button"
           {...wiring}
           aria-label={t('nav.account')}
-          title={me.display_name ?? me.username}
+          title={me.display_name ?? atUsername(me.username)}
           data-testid="account-avatar"
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-strong transition-colors duration-[var(--dur-fast)] hover:border-ink-subtle"
         >
@@ -64,7 +65,9 @@ export function AccountMenu({ me }: { me: Me }) {
       )}
     >
       <DropdownHeader>
-        <span className="truncate text-label text-ink">{me.display_name ?? me.username}</span>
+        <span className="truncate text-label text-ink">
+          {me.display_name ?? atUsername(me.username)}
+        </span>
         <span className="truncate font-mono text-mono-sm text-ink-subtle">{me.email}</span>
       </DropdownHeader>
       <DropdownItem

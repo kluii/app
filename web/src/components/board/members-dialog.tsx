@@ -11,6 +11,7 @@ import { failureMessage } from '../../lib/api-error';
 import type { BoardState, Member, MemberRole } from '../../api/types';
 import { t } from '../../i18n';
 import { queryKeys } from '../../lib/query-client';
+import { atUsername } from '../../lib/username';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
 import { Input, Select } from '../ui/input';
@@ -86,10 +87,14 @@ export function MembersDialog({
           <ul className="flex flex-col divide-y divide-border">
             {items.map((member) => (
               <li key={member.user_id} className="flex flex-wrap items-center gap-2 py-2">
-                <span className="font-mono text-body-sm text-ink">{member.username}</span>
+                <span className="font-mono text-body-sm text-ink">
+                  {atUsername(member.username)}
+                </span>
                 {canManage && member.role !== 'owner' ? (
                   <Select
-                    aria-label={t('board.members.roleFor', { username: member.username })}
+                    aria-label={t('board.members.roleFor', {
+                      username: atUsername(member.username),
+                    })}
                     value={member.role}
                     disabled={busy}
                     onChange={(event) =>

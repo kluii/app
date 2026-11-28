@@ -7,6 +7,7 @@ import { AppShell } from '../components/layout/app-shell';
 import { cn } from '../lib/cn';
 import { useArrival } from '../lib/entrance';
 import { queryKeys } from '../lib/query-client';
+import { atUsername } from '../lib/username';
 import { t } from '../i18n';
 import { rootRoute } from './root';
 
@@ -34,7 +35,7 @@ function ProfilePage() {
     <AppShell>
       <div className="mx-auto flex w-full max-w-content flex-col gap-6 px-6 py-8">
         <header className="flex flex-col gap-1">
-          <h1 className="font-display text-h1">@{username}</h1>
+          <h1 className="font-display text-h1">{atUsername(username)}</h1>
           <p className="text-body-sm text-ink-muted">{t('profile.intro')}</p>
         </header>
 

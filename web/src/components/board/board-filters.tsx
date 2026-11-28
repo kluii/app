@@ -3,6 +3,7 @@ import { ListFilter } from 'lucide-react';
 import { useId, useMemo, useRef, useState } from 'react';
 import type { Card, Member } from '../../api/types';
 import { t } from '../../i18n';
+import { atUsername } from '../../lib/username';
 import { Button } from '../ui/button';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
@@ -64,12 +65,18 @@ export function BoardFilters({
     () => [...new Set(cards.flatMap((card) => card.tags.map((tag) => tag.name)))].sort(),
     [cards],
   );
+  // One option per assignee key. The key is what the filter matches (a member's
+  // username, or the free label an anonymous author typed); the label is what a
+  // person reads, so only the member's side carries an at sign.
   const assigneeOptions = useMemo(() => {
     const fromMembers = members.map((member) => member.username);
     const fromLabels = cards
       .map((card) => card.assignee_label)
       .filter((label): label is string => label !== null);
-    return [...new Set([...fromMembers, ...fromLabels])].sort();
+    return [...new Set([...fromMembers, ...fromLabels])].sort().map((key) => ({
+      key,
+      label: fromMembers.includes(key) ? atUsername(key) : key,
+    }));
   }, [cards, members]);
 
   const toggle = (list: string[], value: string): string[] =>
@@ -150,14 +157,14 @@ export function BoardFilters({
             </legend>
             <div className="flex flex-wrap gap-1">
               {assigneeOptions.map((assignee) => {
-                const selected = filters.assignees.includes(assignee);
+                const selected = filters.assignees.includes(assignee.key);
                 return (
                   <button
-                    key={assignee}
+                    key={assignee.key}
                     type="button"
                     aria-pressed={selected}
                     onClick={() =>
-                      onChange({ ...filters, assignees: toggle(filters.assignees, assignee) })
+                      onChange({ ...filters, assignees: toggle(filters.assignees, assignee.key) })
                     }
                     className={
                       selected
@@ -165,7 +172,7 @@ export function BoardFilters({
                         : 'inline-flex h-6 items-center rounded-key border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted'
                     }
                   >
-                    {assignee}
+                    {assignee.label}
                   </button>
                 );
               })}

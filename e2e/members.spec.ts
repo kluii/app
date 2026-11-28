@@ -22,7 +22,8 @@ test('invite, change role, remove and transfer', async ({ page, request }) => {
   await openBoardMenu(page);
   await page.getByTestId('open-members').click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText(`${username}`)).toBeVisible();
+  // A username is an identity, so the member list prints it with its at sign.
+  await expect(dialog.getByText(`@${username}`)).toBeVisible();
 
   // Invite as editor.
   await dialog.getByLabel('Invite by username').fill(guest);

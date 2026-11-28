@@ -6,6 +6,7 @@ import { failureMessage } from '../../lib/api-error';
 import type { BoardState, Caller, Card } from '../../api/types';
 import { t } from '../../i18n';
 import { formatDate } from '../../lib/format';
+import { atUsername } from '../../lib/username';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
 import { TagChip } from './tag-chip';
@@ -33,7 +34,9 @@ export function CardDisplayModal({
   const done = useToggleDone(boardId);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const assignee = card.assignee?.username ?? card.assignee_label;
+  const assignee = card.assignee
+    ? atUsername(card.assignee.username)
+    : (card.assignee_label ?? null);
   const due = card.due_at ? formatDate(card.due_at) : null;
 
   return (
