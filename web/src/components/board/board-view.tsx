@@ -24,6 +24,7 @@ import { ActiveFilters, BoardFilters, NO_FILTERS, matches, type Filters } from '
 import { CardCreateModal } from './card-create-modal';
 import { CardDisplayModal, cardFromState } from './card-display-modal';
 import { CardEditorModal } from './card-editor-modal';
+import { boardTagNames } from './tag-editor';
 import { CardRow } from './card-row';
 import { MembersDialog } from './members-dialog';
 import { ShareDialog } from './share-dialog';
@@ -253,6 +254,7 @@ export function BoardView({ boardId }: { boardId: string }) {
             boardId={boardId}
             card={composerCard}
             members={state.data.members}
+            boardTags={boardTagNames(state.data.cards)}
             onSaved={() => setComposer({ kind: 'read', cardId: composerCard.id })}
             onClose={() => setComposer({ kind: 'read', cardId: composerCard.id })}
           />

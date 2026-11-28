@@ -28,12 +28,15 @@ export function CardEditorModal({
   boardId,
   card,
   members,
+  boardTags,
   onClose,
   onSaved,
 }: {
   boardId: string;
   card: Card;
   members: Member[];
+  /** Every tag name the board already uses, for the editor's datalist. */
+  boardTags: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -191,7 +194,7 @@ export function CardEditorModal({
 
         <Field label={t('board.tags.title')} htmlFor={ids.tags}>
           <div id={ids.tags}>
-            <TagEditor tags={tags} onChange={setTags} disabled={update.isPending} />
+            <TagEditor tags={tags} boardTags={boardTags} onChange={setTags} disabled={update.isPending} />
           </div>
         </Field>
 

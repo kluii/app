@@ -10,7 +10,7 @@ import { Dialog } from '../ui/dialog';
 import { Field } from '../ui/field';
 import { Input, Select, Textarea } from '../ui/input';
 import { errorMessage } from './card-display-modal';
-import { TagEditor, draftToTags, type TagDraft } from './tag-editor';
+import { TagEditor, boardTagNames, draftToTags, type TagDraft } from './tag-editor';
 
 /**
  * Creation is its own modal (docs/features/board-interaction.md §2): the title
@@ -61,7 +61,11 @@ export function CardCreateModal({
     const defaults = tagColors.data ?? {};
     setTags(
       next.map((tag) =>
-        tag.color === null && defaults[tag.name] !== undefined
+        // The board default fills a tag the card did not have yet; a tag the
+        // actor explicitly cleared ("None") keeps its `color: null`.
+        tag.color === null &&
+        defaults[tag.name] !== undefined &&
+        !tags.some((existing) => existing.name === tag.name)
           ? { ...tag, color: defaults[tag.name] ?? null }
           : tag,
       ),
@@ -186,7 +190,12 @@ export function CardCreateModal({
 
         <Field label={t('board.tags.title')} htmlFor={ids.tags}>
           <div id={ids.tags}>
-            <TagEditor tags={tags} onChange={changeTags} disabled={create.isPending} />
+            <TagEditor
+              tags={tags}
+              boardTags={boardTagNames(boardState.cards)}
+              onChange={changeTags}
+              disabled={create.isPending}
+            />
           </div>
         </Field>
 
