@@ -13,7 +13,7 @@ import { useCardDnd, type MoveRequest } from './use-card-dnd';
 
 /**
  * The first 120 characters of a description, nothing more: the card is a fiche,
- * and the description is one line of it. A long one is cut before the ellipsis
+ * and the description is a short passage of it. A long one is cut before the ellipsis
  * so `word …` never reads as two spaces.
  */
 export function snippet(description: string): string {
@@ -126,10 +126,13 @@ export function CardRow({
           </span>
         </span>
 
-        {/* The description's opening line, in the mono voice: content, so it is
-            read, not hidden. One line, whatever the description does. */}
+        {/* The description's opening passage, in the mono voice: content, so it
+            is read, not hidden. Three lines at 12 px mono in a 270 px card is
+            about what 120 characters need, so the cut is the visible end and
+            not a clamp one line in. The clamp only caps: a short description
+            stays one line tall. */}
         {card.description ? (
-          <p className="line-clamp-1 text-mono-sm text-ink-subtle">{snippet(card.description)}</p>
+          <p className="line-clamp-3 text-mono-sm text-ink-subtle">{snippet(card.description)}</p>
         ) : null}
 
         {card.tags.length > 0 ? (
