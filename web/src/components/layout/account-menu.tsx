@@ -31,8 +31,6 @@ export function AccountMenu({ me }: { me: Me }) {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const locale = getLocale();
-  // The avatar is grey: saturation 0, lightness 50, so no hue leaves the
-  // palette. The identicon's own defaults are untouched (DESIGN.md §10).
 
   const signOut = async (): Promise<void> => {
     setOpen(false);
@@ -55,6 +53,8 @@ export function AccountMenu({ me }: { me: Me }) {
           data-testid="account-avatar"
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-strong transition-colors duration-[var(--dur-fast)] hover:border-ink-subtle"
         >
+          {/* Grey: saturation 0, so no hue leaves the palette. The identicon's
+              own defaults are untouched; only this call turns the hue off. */}
           <span
             aria-hidden="true"
             className="block h-full w-full"
