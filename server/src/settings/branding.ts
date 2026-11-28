@@ -22,17 +22,17 @@ import { AppError, fromZod } from '../lib/errors.js';
 type Rgb = readonly [number, number, number];
 
 // The four surfaces an accent can land on, copied from web/src/styles/tokens.css
-// (dark: --canvas #121110, --surface #1a1817; light: --canvas #f7f5f0,
-// --surface #fcfbf7). DESIGN.md §2. A gate that measures a palette the app no
+// (dark: --canvas #0b0b0c, --surface #121213; light: --canvas #f5f5f4,
+// --surface #f8f8f7). DESIGN.md §2. A gate that measures a palette the app no
 // longer ships is measuring nothing.
 const INK_DARK: Rgb = [12, 12, 12];
 const INK_LIGHT: Rgb = [255, 255, 255];
 
 const SURFACES: readonly { name: string; rgb: Rgb }[] = [
-  { name: 'dark canvas', rgb: [18, 17, 16] },
-  { name: 'dark surface', rgb: [26, 24, 23] },
-  { name: 'light canvas', rgb: [247, 245, 240] },
-  { name: 'light surface', rgb: [252, 251, 247] },
+  { name: 'dark canvas', rgb: [11, 11, 12] },
+  { name: 'dark surface', rgb: [18, 18, 19] },
+  { name: 'light canvas', rgb: [245, 245, 244] },
+  { name: 'light surface', rgb: [248, 248, 247] },
 ];
 
 const HEX_PATTERN = /^#[0-9A-Fa-f]{6}$/u;
