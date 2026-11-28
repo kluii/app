@@ -72,6 +72,9 @@ export function CardDisplayModal({
         {card.done ? (
           <p className="flex items-center gap-2 text-body-sm text-ink-muted">
             <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-ink text-primary-foreground">
+              {/* The filled tick is the one icon that keeps a 2 stroke: at 12 px
+                  inside a filled pastille, 1.5 disappears (card-row.tsx says
+                  the same of the card's tick). */}
               <Check aria-hidden className="h-3 w-3" strokeWidth={2} />
             </span>
             {t('board.card.done')}

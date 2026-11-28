@@ -180,7 +180,7 @@ function SettingsPage() {
                       : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
                   )}
                 >
-                  <Icon aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  <Icon aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                   <span className="whitespace-nowrap">{t(`settings.section.${id}`)}</span>
                 </button>
               );

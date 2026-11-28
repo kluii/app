@@ -260,7 +260,7 @@ function BlockCard({
           aria-label={t('settings.agents.copyFor', { client: block.name })}
           data-testid={block.testId}
         >
-          <Copy aria-hidden className="h-4 w-4" strokeWidth={1.75} />
+          <Copy aria-hidden className="h-4 w-4" strokeWidth={1.5} />
           {t('settings.agents.copy')}
         </Button>
       </div>

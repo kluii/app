@@ -262,12 +262,17 @@ describe('the palette', () => {
     }
   });
 
-  it('uses only the two radii the system allows', () => {
+  // Three radii, and no more: 4 px for a key (badge, label, card), 8 px for a
+  // surface or a control, a pill for the avatar alone. The badge's 4 px lands in
+  // the icon phase; the rest of the scale moves with brief §8 Phase 7, which
+  // names this assertion as the one contract that moves on purpose.
+  it('uses only the three radii the system allows', () => {
+    expect(CSS).toContain('--radius-key: 4px');
     expect(CSS).toContain('--radius-sm: 8px');
     expect(CSS).toContain('--radius-full: 9999px');
     const radii = [...CSS.matchAll(/--radius-[a-z]+:\s*([^;]+);/g)].map((match) =>
       match[1]?.trim(),
     );
-    expect(new Set(radii)).toEqual(new Set(['8px', '9999px']));
+    expect(new Set(radii)).toEqual(new Set(['4px', '8px', '9999px']));
   });
 });

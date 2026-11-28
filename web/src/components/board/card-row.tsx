@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Check } from 'lucide-react';
+import { Check, Undo2 } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import type { Card, Column } from '../../api/types';
 import { t } from '../../i18n';
@@ -87,7 +87,10 @@ export function CardRow({
               aria-hidden
               className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-ink text-primary-foreground"
             >
-              <Check size={12} strokeWidth={2.5} />
+              {/* The one glyph allowed a heavier stroke: a 12 px tick inside a
+                  16 px filled pastille disappears at 1.5, and it is the only
+                  filled icon in the app (DESIGN.md §10). */}
+              <Check size={12} strokeWidth={2} />
             </span>
           ) : null}
           <span
@@ -149,6 +152,8 @@ export function CardRow({
       </button>
 
       <div className="absolute right-1 top-1 z-10 flex items-center gap-0.5">
+        {/* One glyph, one meaning: the done card carries the filled tick at the
+            left of its title, so reopening is an arrow, never a second check. */}
         {card.done && canTick ? (
           <Button
             variant="ghost"
@@ -159,7 +164,7 @@ export function CardRow({
             onPointerDown={(event) => event.stopPropagation()}
             onClick={onToggleDone}
           >
-            <Check aria-hidden className="h-4 w-4" strokeWidth={1.75} />
+            <Undo2 aria-hidden className="h-4 w-4" strokeWidth={1.5} />
           </Button>
         ) : null}
         <CardMenu

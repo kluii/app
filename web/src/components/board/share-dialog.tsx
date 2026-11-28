@@ -134,7 +134,7 @@ export function ShareDialog({
                   onClick={() => void copy(board.url ?? '')}
                   aria-label={t('board.share.copy')}
                 >
-                  <Copy aria-hidden className="h-4 w-4" strokeWidth={1.75} />
+                  <Copy aria-hidden className="h-4 w-4" strokeWidth={1.5} />
                 </Button>
               </div>
               {board.visibility === 'link' ? (

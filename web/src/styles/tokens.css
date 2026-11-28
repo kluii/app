@@ -194,7 +194,9 @@
      as 52.5. In px, `p-3` is 12 and `h-14` is 56 at any root size. */
   --spacing: 4px;
 
-  /* 8 px for surfaces and inputs, a pill for controls; the 4 px step is gone. */
+  /* 8 px for surfaces and inputs, a pill for controls; the 4 px step is the
+     key: a badge, a label, a card inside a column (brief §5.2). */
+  --radius-key: 4px;
   --radius-sm: 8px;
   --radius-md: 8px;
   --radius-full: 9999px;

@@ -52,7 +52,7 @@ export function CardMenu({
         onClick={() => setOpen(!open)}
         data-testid={`card-menu-${card.id}`}
       >
-        <MoreHorizontal aria-hidden className="h-4 w-4" strokeWidth={1.75} />
+        <MoreHorizontal aria-hidden className="h-4 w-4" strokeWidth={1.5} />
       </Button>
 
       <Popover

@@ -743,7 +743,7 @@ function ColumnSection({
           onClick={() => onAddCard(column.id)}
           className="flex h-8 items-center gap-2 rounded-sm px-1 text-label text-ink-subtle transition-colors hover:text-ink"
         >
-          <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
+          <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
           {t('board.card.add')}
         </button>
       ) : null}
@@ -771,7 +771,7 @@ function AddColumn({ boardId }: { boardId: string }) {
         onClick={() => setOpen(true)}
         className="flex h-8 w-column shrink-0 items-center gap-2 rounded-sm border border-dashed border-border px-2 text-label text-ink-subtle transition-colors hover:border-border-strong hover:text-ink"
       >
-        <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
+        <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
         {t('board.column.add')}
       </button>
     );
@@ -961,7 +961,7 @@ function BoardSettingsMenu({
           className="inline-flex h-7 items-center gap-2 rounded-full border border-border bg-surface-2 px-2 text-label text-ink transition-colors duration-[var(--dur-fast)] hover:bg-surface-muted"
         >
           <span className="relative inline-flex">
-            <Settings2 aria-hidden className="h-4 w-4" strokeWidth={1.75} />
+            <Settings2 aria-hidden className="h-4 w-4" strokeWidth={1.5} />
             {caller.can_moderate && pending_count > 0 ? (
               <span
                 aria-hidden
@@ -977,7 +977,7 @@ function BoardSettingsMenu({
       )}
     >
       <DropdownItem
-        icon={<Copy aria-hidden className="h-4 w-4" strokeWidth={1.75} />}
+        icon={<Copy aria-hidden className="h-4 w-4" strokeWidth={1.5} />}
         onSelect={() => void copyLink()}
         testId="copy-board-link"
       >

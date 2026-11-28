@@ -252,7 +252,7 @@ export function AgentsSettings() {
               onClick={() => void copy(created.key)}
               data-testid="agent-key-copy"
             >
-              <Copy aria-hidden className="h-4 w-4" strokeWidth={1.75} />
+              <Copy aria-hidden className="h-4 w-4" strokeWidth={1.5} />
               {t('settings.agents.copy')}
             </Button>
           </div>

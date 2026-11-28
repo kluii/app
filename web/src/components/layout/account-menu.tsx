@@ -31,6 +31,8 @@ export function AccountMenu({ me }: { me: Me }) {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const locale = getLocale();
+  // The avatar is grey: saturation 0, lightness 50, so no hue leaves the
+  // palette. The identicon's own defaults are untouched (DESIGN.md §10).
 
   const signOut = async (): Promise<void> => {
     setOpen(false);
@@ -56,7 +58,7 @@ export function AccountMenu({ me }: { me: Me }) {
           <span
             aria-hidden="true"
             className="block h-full w-full"
-            dangerouslySetInnerHTML={{ __html: minidenticon(me.username) }}
+            dangerouslySetInnerHTML={{ __html: minidenticon(me.username, 0, 50) }}
           />
         </button>
       )}

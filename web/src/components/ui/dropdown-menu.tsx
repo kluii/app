@@ -207,7 +207,7 @@ export function DropdownCheckItem({
         className={cn(ITEM, checked ? 'text-ink' : 'text-ink-muted')}
       >
         <span className="flex-1 truncate">{children}</span>
-        {checked ? <Check aria-hidden className="h-4 w-4" strokeWidth={1.75} /> : null}
+        {checked ? <Check aria-hidden className="h-4 w-4" strokeWidth={1.5} /> : null}
       </button>
     </li>
   );

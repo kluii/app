@@ -102,7 +102,7 @@ export function NotificationBell() {
         {unread > 0 ? (
           <span
             data-testid="notification-unread-badge"
-            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-accent px-1 text-center font-mono text-[10px] leading-4 text-accent-ink"
+            className="absolute -right-0.5 -top-0.5 h-4 min-w-4 rounded-key bg-primary px-1 text-center font-mono text-mono-sm leading-4 tabular-nums text-primary-foreground"
           >
             {unread > 99 ? '99+' : String(unread)}
           </span>
