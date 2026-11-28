@@ -167,6 +167,10 @@ test.describe('the band above the board bar', () => {
  * 1187 in a 900 px viewport and `col.scrollTop = 400` read back 0. The column now
  * caps at the rail's height (`.board-column { max-height: 100% }` plus `h-full`
  * on the rail) and owns its own overflow.
+ *
+ * The header is what tells you which column you are reading, so it does not
+ * travel with the cards: it pins to the column's scrollport at every width, and
+ * at rest it is in the flow, inside the column's own padding.
  */
 test.describe('a board column scrolls its own cards', () => {
   const twelve = Array.from({ length: 12 }, (_, index) => `Card number ${index + 1}`);
@@ -193,8 +197,9 @@ test.describe('a board column scrolls its own cards', () => {
         snippet,
       );
       const [toDo] = columns;
+      const [first] = cards;
       const [last] = cards.slice(-1);
-      if (!toDo || !last) throw new Error('seed failed');
+      if (!toDo || !first || !last) throw new Error('seed failed');
 
       const column = page.getByTestId(`column-${toDo.id}`);
       await expect(column.getByTestId('card-title')).toHaveCount(12);
@@ -209,6 +214,27 @@ test.describe('a board column scrolls its own cards', () => {
         measured.scroll,
       );
 
+      // The header is in the flow at rest: 1 px of column border plus the
+      // column's own padding below the column's top edge, not above its border.
+      const rest = await column.evaluate((element) => {
+        const header = element.querySelector('header');
+        if (!header) throw new Error('the column has no header');
+        const style = getComputedStyle(element);
+        return {
+          column: element.getBoundingClientRect().top,
+          border: parseFloat(style.borderTopWidth),
+          padding: parseFloat(style.paddingTop),
+          header: header.getBoundingClientRect().top,
+        };
+      });
+      expect(rest.border, 'the column keeps its 1 px border').toBe(1);
+      expect(rest.header, 'the header sits inside the column padding').toBeCloseTo(
+        rest.column + rest.border + rest.padding,
+        0,
+      );
+      const firstCard = page.getByTestId(`card-${first.id}`);
+      const cardAtRest = (await box(firstCard)).y;
+
       // A 400 px scroll moves the column by 400 px — or by its whole range, when
       // the list is shorter than that. It used to read back 0.
       const moved = await column.evaluate((element) => {
@@ -217,6 +243,21 @@ test.describe('a board column scrolls its own cards', () => {
       });
       expect(moved, 'the column scrolls its own cards').toBe(
         Math.min(400, measured.scroll - measured.client),
+      );
+
+      // The header does not go with them: 400 px of scroll leaves its top where
+      // it was, and the first card has left the top of the column's box.
+      const headerTop = await column.evaluate((element) => {
+        const header = element.querySelector('header');
+        if (!header) throw new Error('the column has no header');
+        return header.getBoundingClientRect().top;
+      });
+      expect(
+        Math.abs(headerTop - rest.header),
+        'the header stays pinned while its cards scroll',
+      ).toBeLessThanOrEqual(1);
+      expect((await box(firstCard)).y, 'the first card moved up under the header').toBeLessThan(
+        cardAtRest,
       );
 
       // At the bottom of the list, the last card sits inside the viewport.

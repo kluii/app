@@ -40,11 +40,25 @@
 }
 
 /*
- * 390 px (K2-13). The rail scrolls sideways and snaps; a column stops at the top
- * of the viewport with its header pinned, because a list you can only scroll
- * blindly is worse than a shorter list. The bar stacks on two rows: the name
- * and the gear on 48, the meta and the filters on 40, one hairline under both.
- * Colours stay in tokens.css.
+ * The header stays put while its cards pass under it, at every width. A long
+ * list scrolled to the middle used to take its own title away, and with three
+ * columns on a desktop you then cannot tell which one you are reading. It pins
+ * to the column's own scrollport and paints the column surface, so the cards
+ * leave a clean edge instead of showing through the title.
+ */
+.board-column > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--column);
+}
+
+/*
+ * 390 px (K2-13). The rail scrolls sideways and snaps, so a column stops at the
+ * top of the viewport; the pinned header a list you can only scroll blindly
+ * needs is the base rule above, at every width. The bar stacks on two rows: the
+ * name and the gear on 48, the meta and the filters on 40, one hairline under
+ * both. Colours stay in tokens.css.
  */
 @media (max-width: 640px) {
   .board-bar {
@@ -100,13 +114,6 @@
 
   .board-column {
     scroll-snap-align: start;
-  }
-
-  .board-column > header {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: var(--column);
   }
 
   /* A modal on a phone is a sheet: it comes from the bottom, full width, and
