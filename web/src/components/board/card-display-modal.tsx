@@ -8,7 +8,6 @@ import { t } from '../../i18n';
 import { formatDate } from '../../lib/format';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
-import { CardThread } from './card-thread';
 import { TagChip } from './tag-chip';
 import { useToggleDone } from './use-toggle-done';
 
@@ -55,8 +54,8 @@ export function CardDisplayModal({
               {card.done ? t('board.card.reopen') : t('board.card.done')}
             </Button>
           ) : null}
-          {/* Read first: the panel opens on the way out, never in the comment
-              box, so a keyboard user is not dropped into a composer (K2-15). */}
+          {/* Read first: the panel opens on the way out, so a keyboard user
+              lands on the action that closes it, never mid-content. */}
           <Button ref={closeRef} variant="ghost" onClick={onClose}>
             {t('common.action.close')}
           </Button>
@@ -120,8 +119,6 @@ export function CardDisplayModal({
             {errorMessage(done.error)}
           </p>
         ) : null}
-
-        <CardThread cardId={card.id} caller={caller} />
       </div>
     </Dialog>
   );
