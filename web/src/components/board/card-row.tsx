@@ -12,15 +12,6 @@ import { TagChip } from './tag-chip';
 import { useCardDnd, type MoveRequest } from './use-card-dnd';
 
 /**
- * `--card`, 1 px `--border`, radius 4, padding 12 (DESIGN.md §7). The done tick
- * renders only on a done card — never an empty checkbox on every card — and it
- * is a real control only on a board the actor can write to; a reader sees the
- * static mark.
- *
- * The row itself is a button covering the card, because a card cannot nest
- * buttons: the tick and the menu sit above it instead of inside it.
- */
-/**
  * The first 20 characters of a description, nothing more: the card is a fiche,
  * and the description is one line of it. A long one is cut before the ellipsis
  * so `word …` never reads as two spaces.
@@ -30,6 +21,15 @@ export function snippet(description: string): string {
   return description.length > 20 ? `${head.trimEnd()}…` : head;
 }
 
+/**
+ * `--card`, 1 px `--border`, radius 4, padding 12 (DESIGN.md §7). The done tick
+ * renders only on a done card — never an empty checkbox on every card — and it
+ * is a real control only on a board the actor can write to; a reader sees the
+ * static mark.
+ *
+ * The row itself is a button covering the card, because a card cannot nest
+ * buttons: the tick and the menu sit above it instead of inside it.
+ */
 export function CardRow({
   card,
   cards,
