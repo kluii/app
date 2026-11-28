@@ -100,13 +100,17 @@
   /* A modal on a phone is a sheet: it comes from the bottom, full width, and
      scrolls inside itself instead of the page behind it. The landing's one
      shadow lifts it off the page, and the bottom padding keeps the last
-     control clear of the home indicator. */
+     control clear of the home indicator. The sheet's surface, radius and slide
+     belong to the body inside the frame (tokens.css), which is what animates. */
   dialog.dialog-panel {
     width: 100%;
     max-width: 100%;
     max-height: 90dvh;
     margin: auto 0 0;
-    overflow-y: auto;
+  }
+
+  dialog.dialog-panel .dialog-body {
+    max-height: 90dvh;
     border-radius: 8px 8px 0 0;
     border-bottom: 0;
     box-shadow: var(--shadow-sheet);

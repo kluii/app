@@ -11,6 +11,8 @@ import { EmptySlot } from '../components/ui/empty-slot';
 import { Field } from '../components/ui/field';
 import { Input, Select } from '../components/ui/input';
 import { t } from '../i18n';
+import { cn } from '../lib/cn';
+import { useArrival } from '../lib/entrance';
 import { useShortcuts } from '../lib/hotkeys';
 import { queryClient, queryKeys } from '../lib/query-client';
 import { authedRoute } from './authed';
@@ -23,6 +25,7 @@ export const boardsRoute = createRoute({
 
 function BoardsPage() {
   const navigate = useNavigate();
+  const arrived = useArrival();
   const [creating, setCreating] = useState(false);
   const boards = useQuery({ queryKey: queryKeys.boards, queryFn: api.boards });
 
@@ -53,7 +56,12 @@ function BoardsPage() {
           body={t('boards.empty.body')}
         />
       ) : (
-        <ul className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul
+          className={cn(
+            'mt-6 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+            arrived && 'enter-stagger',
+          )}
+        >
           {boards.data.items.map((board) => (
             <li key={board.id}>
               <BoardTile board={board} />

@@ -379,14 +379,108 @@
     }
   }
 
+  /* The top-layer box is a frame, not a surface: the platform places it, it owns
+     the scrim, and it carries no paint of its own. The surface and its 180 ms
+     entrance live on the body inside (see the motion rules below), because a
+     transition on a top-layer element only runs with `@starting-style` or a
+     second rendered frame, where an animation on the body restarts by itself
+     each time the dialog is displayed. */
   .dialog-panel {
     width: var(--size-dialog);
     max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 4rem);
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: visible;
+  }
+
+  .dialog-body {
+    max-height: calc(100dvh - 4rem);
+    overflow-y: auto;
     box-shadow: var(--shadow-overlay);
   }
 
   .dialog-panel::backdrop {
     background-color: var(--scrim);
+  }
+
+  /* ── One entrance, one reveal ─────────────────────────────────────────────
+   * `enter`: what arrives once — a screen the app navigated to, never the screen
+   * a document load painted (`lib/entrance.ts` says which, and why that one
+   * stands still). `enter-stagger` gives the same 8 px rise to up to six
+   * siblings, 40 ms apart, then stops counting: a seventh column is not 280 ms
+   * late.
+   *
+   * `reveal-menu` is a menu or a popover (6 px, from its anchor), `reveal-panel`
+   * a dialog or a phone sheet (8 px), both at --dur-base, and the scrim fades
+   * with the panel. Nothing else animates on load.
+   *
+   * These are animations rather than transitions on purpose: a popover, a
+   * `<dialog>` and a sheet are `display: none` until they open, and an animation
+   * declared on an element that is rendered again restarts, where a transition
+   * would need a starting-style frame. `backwards` holds the first frame through
+   * the stagger, and releases the element once it lands, so a finished entrance
+   * never overrides a hover or a press later.
+   */
+  .enter {
+    animation: rise-8 var(--dur-enter) var(--ease) backwards;
+  }
+
+  .enter-stagger > * {
+    animation: rise-8 var(--dur-enter) var(--ease) backwards;
+  }
+
+  .enter-stagger > *:nth-child(2) {
+    animation-delay: calc(var(--stagger) * 1);
+  }
+
+  .enter-stagger > *:nth-child(3) {
+    animation-delay: calc(var(--stagger) * 2);
+  }
+
+  .enter-stagger > *:nth-child(4) {
+    animation-delay: calc(var(--stagger) * 3);
+  }
+
+  .enter-stagger > *:nth-child(5) {
+    animation-delay: calc(var(--stagger) * 4);
+  }
+
+  .enter-stagger > *:nth-child(n + 6) {
+    animation-delay: calc(var(--stagger) * 5);
+  }
+
+  .reveal-menu {
+    animation: rise-6 var(--dur-base) var(--ease) backwards;
+  }
+
+  .reveal-panel {
+    animation: rise-8 var(--dur-base) var(--ease) backwards;
+  }
+
+  dialog.dialog-panel[open]::backdrop {
+    animation: fade-in var(--dur-base) var(--ease) backwards;
+  }
+
+  @keyframes rise-8 {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  @keyframes rise-6 {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
   }
 
   /* Ten frames stacked in one cell; each is visible for one step of the cycle.

@@ -62,18 +62,26 @@ export function Dialog({
       onClick={(event) => {
         if (event.target === ref.current) onClose();
       }}
-      className={cn(
-        'dialog-panel m-auto rounded-sm border border-border-strong bg-surface-raised p-6 text-ink',
-        className,
-      )}
+      className="dialog-panel"
       aria-labelledby={titleId}
     >
-      <h2 id={titleId} className="font-display text-h2">
-        {title}
-      </h2>
-      {description ? <p className="mt-1 text-body-sm text-ink-muted">{description}</p> : null}
-      <div className="mt-4">{children}</div>
-      {footer ? <div className="mt-5 flex justify-end gap-2">{footer}</div> : null}
+      {/* The frame above is top-layer plumbing: placed by the platform, painted
+          by nothing. The surface, and the 180 ms fade with its 8 px rise, sit
+          inside — a top-layer element cannot be transitioned reliably, and an
+          animation on this body restarts each time the dialog is displayed. */}
+      <div
+        className={cn(
+          'dialog-body reveal-panel rounded-sm border border-border-strong bg-surface-raised p-6 text-ink',
+          className,
+        )}
+      >
+        <h2 id={titleId} className="font-display text-h2">
+          {title}
+        </h2>
+        {description ? <p className="mt-1 text-body-sm text-ink-muted">{description}</p> : null}
+        <div className="mt-4">{children}</div>
+        {footer ? <div className="mt-5 flex justify-end gap-2">{footer}</div> : null}
+      </div>
     </dialog>
   );
 }

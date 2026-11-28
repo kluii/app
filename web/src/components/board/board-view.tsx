@@ -6,6 +6,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
 import { failureMessage } from '../../lib/api-error';
 import { cn } from '../../lib/cn';
+import { useArrival } from '../../lib/entrance';
 import type { Board, BoardState, Caller, Card, Column } from '../../api/types';
 import { t } from '../../i18n';
 import { applyCardFrame, cardIdOf, envelopeOf, dropCard, isCardEvent } from '../../data/boards';
@@ -43,6 +44,7 @@ type Composer =
  * page does not.
  */
 export function BoardView({ boardId }: { boardId: string }) {
+  const arrived = useArrival();
   const [composer, setComposer] = useState<Composer>({ kind: 'closed' });
   const [activityOpen, setActivityOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
@@ -213,6 +215,7 @@ export function BoardView({ boardId }: { boardId: string }) {
 
   return (
     <BoardFrame
+      arrived={arrived}
       boardState={state.data}
       filters={filters}
       onFiltersChange={setFilters}
@@ -415,6 +418,7 @@ function Unreadable() {
 }
 
 function BoardFrame({
+  arrived,
   boardState,
   filters,
   onFiltersChange,
@@ -437,6 +441,7 @@ function BoardFrame({
   announcement,
   children,
 }: {
+  arrived: boolean;
   boardState: BoardState;
   filters: Filters;
   onFiltersChange: (next: Filters) => void;
@@ -555,7 +560,12 @@ function BoardFrame({
           className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
           data-testid="board-scroll"
         >
-          <div className="board-rail flex items-start gap-4 px-6 py-4">
+          <div
+            className={cn(
+              'board-rail flex items-start gap-4 px-6 py-4',
+              arrived && 'enter-stagger',
+            )}
+          >
             {columns.map((column) => (
               <ColumnSection
                 key={column.id}

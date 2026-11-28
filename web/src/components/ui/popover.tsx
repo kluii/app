@@ -94,6 +94,11 @@ export function Popover({
   }, [open, align, anchor]);
 
   return (
+    // The popover IS the top-layer element, so it stays a bare frame: no paint,
+    // no padding, no shadow — only the position the layout effect writes. The
+    // panel inside carries the surface and the 180 ms rise from the anchor, and
+    // an animation there restarts every time the popover is displayed again
+    // (brief §4.9, R4).
     <div
       ref={ref}
       popover="auto"
@@ -101,13 +106,17 @@ export function Popover({
       onToggle={(event) => {
         if ((event as unknown as { newState?: string }).newState === 'closed') onClose();
       }}
-      className={cn(
-        'rounded-sm border border-border-strong bg-surface-raised p-1 text-ink',
-        'shadow-[var(--shadow-overlay)]',
-        className,
-      )}
+      className="m-0 overflow-visible border-0 bg-transparent p-0"
     >
-      {children}
+      <div
+        className={cn(
+          'reveal-menu rounded-sm border border-border-strong bg-surface-raised p-1 text-ink',
+          'shadow-[var(--shadow-overlay)]',
+          className,
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }

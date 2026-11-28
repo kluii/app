@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { PublicBoardTile } from '../components/boards/board-tile';
 import { AppShell } from '../components/layout/app-shell';
+import { cn } from '../lib/cn';
+import { useArrival } from '../lib/entrance';
 import { queryKeys } from '../lib/query-client';
 import { t } from '../i18n';
 import { rootRoute } from './root';
@@ -21,6 +23,7 @@ export const profileRoute = createRoute({
 
 function ProfilePage() {
   const { username } = profileRoute.useParams();
+  const arrived = useArrival();
   const profile = useQuery({
     queryKey: queryKeys.profile(username),
     queryFn: () => api.userBoards(username),
@@ -42,7 +45,12 @@ function ProfilePage() {
         ) : profile.data.items.length === 0 ? (
           <p className="text-body-sm text-ink-muted">{t('profile.empty')}</p>
         ) : (
-          <ul className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <ul
+            className={cn(
+              'grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+              arrived && 'enter-stagger',
+            )}
+          >
             {profile.data.items.map((board) => (
               <li key={board.id}>
                 <PublicBoardTile username={username} board={board} />

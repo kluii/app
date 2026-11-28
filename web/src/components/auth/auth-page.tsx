@@ -2,6 +2,8 @@
 import { Moon, Sun } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { t } from '../../i18n';
+import { cn } from '../../lib/cn';
+import { useArrival } from '../../lib/entrance';
 import { useTheme } from '../../lib/theme';
 import whiteLogo from '../../assets/klui-logo-white.png';
 import blackLogo from '../../assets/klui-logo-black.png';
@@ -19,6 +21,7 @@ import { AuthPlate } from './auth-plate';
  */
 export function AuthPage({ children }: { children: ReactNode }) {
   const { theme, toggle } = useTheme();
+  const arrived = useArrival();
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
       <header className="flex h-14 items-center justify-between px-6">
@@ -44,7 +47,10 @@ export function AuthPage({ children }: { children: ReactNode }) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="w-full max-w-90 justify-self-center focus:outline-none lg:flex lg:flex-col lg:justify-center"
+          className={cn(
+            'w-full max-w-90 justify-self-center focus:outline-none lg:flex lg:flex-col lg:justify-center',
+            arrived && 'enter',
+          )}
         >
           {children}
         </main>
