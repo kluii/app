@@ -194,7 +194,12 @@ export function CardEditorModal({
 
         <Field label={t('board.tags.title')} htmlFor={ids.tags}>
           <div id={ids.tags}>
-            <TagEditor tags={tags} boardTags={boardTags} onChange={setTags} disabled={update.isPending} />
+            <TagEditor
+              tags={tags}
+              boardTags={boardTags}
+              onChange={setTags}
+              disabled={update.isPending}
+            />
           </div>
         </Field>
 
