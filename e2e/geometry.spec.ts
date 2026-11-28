@@ -367,4 +367,72 @@ test.describe('phase 8 — the plate', () => {
     await expect(page.getByTestId('auth-plate'), 'no plate below 1024 px').toBeHidden();
     expect(await plateCount(page), 'plate-painted elements on /login at 1023').toBe(0);
   });
+
+  /**
+   * Fix pass — the plate is a mat around a board crop, not a full-height panel:
+   * the mat hugs its content and the aside centres it, the wordmark keeps its
+   * 808:490 ratio instead of stretching across the mat, the frame is a 16:10
+   * crop whose mock columns are anchored at the top left, and the caption sits
+   * in normal flow under the mat.
+   */
+  test.describe('fix pass — a mat around a board crop', () => {
+    test.use({ viewport: { width: 1440, height: 900 } });
+
+    for (const theme of ['dark', 'light'] as const) {
+      test(`in ${theme}, the mat, the wordmark and the 16:10 frame measure right at 1440 × 900 and 1280 × 800`, async ({
+        page,
+      }) => {
+        await page.addInitScript((value) => {
+          localStorage.setItem('klui-theme', value);
+        }, theme);
+        await page.goto('/login', { waitUntil: 'domcontentloaded' });
+        const plate = page.getByTestId('auth-plate');
+        await expect(plate, 'the plate is rendered from 1024 px').toBeVisible();
+
+        for (const viewport of [
+          { width: 1440, height: 900 },
+          { width: 1280, height: 800 },
+        ]) {
+          await page.setViewportSize(viewport);
+          const mat = await box(plate);
+          const logo = await box(plate.locator('img'));
+          const frame = await box(plate.locator('div').first());
+          const caption = await box(page.locator('aside p'));
+
+          expect(
+            await plate.evaluate((element) => getComputedStyle(element).backgroundColor),
+            `the mat is the plate colour in ${theme} at ${viewport.width} × ${viewport.height}`,
+          ).toBe(theme === 'dark' ? 'rgb(233, 229, 221)' : 'rgb(20, 18, 15)');
+          expect(
+            mat.height < viewport.height - 56,
+            'the mat hugs its content instead of filling the column',
+          ).toBe(true);
+          // The wordmark is 24 tall and keeps its 808:490 ratio (1.649), not
+          // stretched across the mat.
+          expect(logo.height, 'wordmark height').toBe(24);
+          expect(
+            Math.abs(logo.width / logo.height - 808 / 490),
+            'wordmark keeps the 808:490 ratio',
+          ).toBeLessThanOrEqual(0.05);
+          // The frame is a 16:10 crop of the board.
+          expect(
+            Math.abs(frame.width / frame.height - 16 / 10),
+            'the frame is 16:10',
+          ).toBeLessThanOrEqual(0.02);
+          // The caption sits in normal flow under the mat, inside the viewport.
+          expect(caption.y >= mat.bottom - 1, 'the caption is under the mat').toBe(true);
+          expect(caption.bottom <= viewport.height, 'the caption is inside the viewport').toBe(
+            true,
+          );
+        }
+
+        if (theme === 'dark') {
+          // In the light theme the plate is the inverted ink and collides with
+          // `--primary` (the submit button) by design, so the count only holds
+          // in the dark theme.
+          expect(await plateCount(page), 'exactly one plate on /login').toBe(1);
+        }
+      });
+    }
+  });
 });

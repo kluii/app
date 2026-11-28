@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { t } from '../../i18n';
 import { useTheme } from '../../lib/theme';
@@ -9,15 +10,16 @@ import { TagChip } from '../board/tag-chip';
 
 /**
  * The auth plate (brief §4.6): the landing's hero inside the app — a mat of
- * `--plate` holding a mock of the board, printed flat, no shadow, no tilt.
- * It is decorative: `aria-hidden`, no focusable element inside, and the caption
- * under it in `auth-page.tsx` carries the meaning for screen readers. One plate
- * per screen: the mat is the only one on the auth page, and the mock holds no
- * held card.
+ * `--plate` holding a 16:10 crop of the board, printed flat, no shadow, no
+ * tilt. It is decorative: `aria-hidden`, no focusable element inside, and the
+ * caption under it in `auth-page.tsx` carries the meaning for screen readers.
+ * One plate per screen: the mat is the only one on the auth page, and the mock
+ * holds no held card.
  *
- * The mat keeps its own padding of 16 px; the frame inside it keeps the app's
- * surfaces (`--canvas`, `--column`, `--card`), separated from the mat by a
- * 1 px rule at 20 % of `--plate-muted`.
+ * The mat hugs its content — the aside centres it vertically — and keeps its
+ * own padding of 16 px; the frame inside it keeps the app's surfaces
+ * (`--canvas`, `--column`, `--card`), separated from the mat by a 1 px rule at
+ * 20 % of `--plate-muted`.
  */
 export function AuthPlate() {
   // The plate inverts in the light theme, so the wordmark printed on it
@@ -27,14 +29,22 @@ export function AuthPlate() {
     <div
       aria-hidden="true"
       data-testid="auth-plate"
-      className="flex h-[calc(100dvh-56px-24px)] flex-col overflow-hidden rounded-sm bg-plate p-4"
+      className="flex w-full flex-col items-start gap-4 rounded-sm bg-plate p-4"
     >
-      <img src={theme === 'dark' ? blackLogo : whiteLogo} alt="" className="h-6 w-auto" />
-      <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-key border border-plate-rule bg-canvas">
-        {/* Two columns rise from the bottom of the frame; the frame clips the
-            second one at its right edge, like a board wider than the mat. */}
+      {/* `items-start` on the mat (and `self-start` here) keeps the wordmark at
+          its own 808:490 ratio: as a stretched flex child it would fill the
+          mat's width. */}
+      <img
+        src={theme === 'dark' ? blackLogo : whiteLogo}
+        alt=""
+        className="h-6 w-auto self-start"
+      />
+      {/* A 16:10 crop of the board, not a frame stretched to fill the page: the
+          mock inside is anchored at the top left and clipped by the frame's
+          edges, like a board wider than the mat. */}
+      <div className="aspect-[16/10] w-full overflow-hidden rounded-key border border-plate-rule bg-canvas">
         <div className="relative h-full">
-          <div className="absolute bottom-0 left-6 flex items-start gap-4">
+          <div className="absolute left-6 top-4 flex items-start gap-4">
             <MockColumn title={t('auth.preview.column.todo')}>
               <MockCard title={t('auth.preview.card.copy')} />
               <MockCard title={t('auth.preview.card.legal')} />
@@ -66,6 +76,13 @@ function MockColumn({ title, children }: { title: string; children: ReactNode })
         <span className="font-mono text-mono-sm tabular-nums text-ink-subtle">2</span>
       </div>
       <ul className="flex flex-col gap-2">{children}</ul>
+      {/* The real column footer (board-view.tsx): a Plus 14 and Add card — but
+          a plain div, because the plate is aria-hidden and holds nothing
+          focusable. */}
+      <div className="flex h-8 w-full items-center gap-2 px-2 text-label text-ink-subtle">
+        <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
+        {t('board.card.add')}
+      </div>
     </div>
   );
 }

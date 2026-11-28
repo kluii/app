@@ -42,7 +42,7 @@ export function AuthPage({ children }: { children: ReactNode }) {
       {/* Under 1024 px: one column, not vertically centred — a page that starts
           at a fixed 64 below the top row, rather than one that jumps when an
           error message changes the form's height. From 1024 px the grid starts
-          right under the top row, so the plate's height fills the page exactly. */}
+          right under the top row, and the aside centres the plate vertically. */}
       <div className="mt-16 grid flex-1 grid-cols-1 gap-6 px-6 pb-6 lg:mt-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <main
           id="main-content"
@@ -56,14 +56,16 @@ export function AuthPage({ children }: { children: ReactNode }) {
         </main>
         {/* The right column exists only from 1024 px: the plate, and under it
             the caption that carries the mock's meaning to screen readers. The
-            caption sits in the grid's 24 px bottom padding, so the page does
-            not scroll for it. An aside, so the caption stays inside a
-            landmark. */}
-        <aside className="relative hidden lg:block">
-          <AuthPlate />
-          <p className="absolute inset-x-0 -bottom-6 text-center font-mono text-mono-sm text-ink-subtle">
-            {t('auth.preview.caption')}
-          </p>
+            aside centres the mat vertically; the caption sits in normal flow
+            under the mat, centred on its width. An aside, so the caption stays
+            inside a landmark. */}
+        <aside className="hidden lg:flex lg:items-center">
+          <div className="w-full">
+            <AuthPlate />
+            <p className="mt-3 text-center font-mono text-mono-sm text-ink-subtle">
+              {t('auth.preview.caption')}
+            </p>
+          </div>
         </aside>
       </div>
     </div>
