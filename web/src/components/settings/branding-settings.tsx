@@ -91,7 +91,10 @@ export function BrandingSettings() {
         </p>
       ) : null}
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-md border border-border p-4">
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col gap-4 rounded-sm border border-border bg-surface p-4"
+      >
         <Field label={t('settings.branding.instanceName')} htmlFor="branding-name">
           <Input
             id="branding-name"
@@ -136,7 +139,7 @@ export function BrandingSettings() {
         </div>
       </form>
 
-      <div className="flex flex-col gap-3 rounded-md border border-border p-4">
+      <div className="flex flex-col gap-3 rounded-sm border border-border bg-surface p-4">
         <Field label={t('settings.branding.logo')} htmlFor="branding-logo">
           <input
             id="branding-logo"

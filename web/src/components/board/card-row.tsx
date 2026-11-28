@@ -73,13 +73,13 @@ export function CardRow({
       data-dragging={dragging ? 'true' : undefined}
       data-settling={settling ? 'true' : undefined}
       className={cn(
-        'group relative rounded-sm',
-        lifted && 'rounded-sm outline-2 outline-dashed outline-focus outline-offset-2',
+        'group relative rounded-key',
+        lifted && 'rounded-key outline-2 outline-dashed outline-focus outline-offset-2',
       )}
     >
       <div
         className={cn(
-          'flex w-full flex-col gap-2 rounded-sm border border-border bg-card p-3',
+          'flex w-full flex-col gap-2 rounded-key border border-border bg-card p-3',
           'transition-colors duration-[var(--dur-fast)] group-hover:border-border-strong',
         )}
       >
@@ -87,7 +87,7 @@ export function CardRow({
           {card.done ? (
             <span
               aria-hidden
-              className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-ink text-primary-foreground"
+              className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-key bg-ink text-primary-foreground"
             >
               {/* The one glyph allowed a heavier stroke: a 12 px tick inside a
                   16 px filled pastille disappears at 1.5, and it is the only
@@ -153,7 +153,7 @@ export function CardRow({
         data-testid={`card-${card.id}`}
         aria-label={t('board.card.openNamed', { title: card.title })}
         aria-describedby={canMove ? `card-move-hint-${card.id}` : undefined}
-        className="absolute inset-0 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="absolute inset-0 cursor-pointer rounded-key focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         {canMove ? (
           <span id={`card-move-hint-${card.id}`} className="sr-only">

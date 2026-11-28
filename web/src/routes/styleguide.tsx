@@ -44,7 +44,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function Cell({ state, children }: { state: State; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+    <div className="flex flex-col gap-2 rounded-sm border border-border p-3">
       <span className="font-mono text-mono-sm text-ink-subtle">{stateLabel(state)}</span>
       <div className="flex min-h-9 items-center">{children}</div>
     </div>

@@ -95,7 +95,7 @@ export function ProfileSettings() {
 
         <form
           onSubmit={onProfileSubmit}
-          className="flex flex-col gap-4 rounded-md border border-border p-4"
+          className="flex flex-col gap-4 rounded-sm border border-border p-4"
         >
           <Field label={t('settings.profile.username')} htmlFor="profile-username">
             <Input
@@ -149,7 +149,7 @@ export function ProfileSettings() {
 
         <form
           onSubmit={onPasswordSubmit}
-          className="flex flex-col gap-4 rounded-md border border-border p-4"
+          className="flex flex-col gap-4 rounded-sm border border-border p-4"
         >
           <Field label={t('settings.password.current')} htmlFor="current-password">
             <Input

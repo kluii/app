@@ -698,7 +698,7 @@ function ColumnSection({
   return (
     <section
       ref={droppable.ref}
-      className="board-column flex w-column shrink-0 flex-col gap-2 rounded-md border border-border bg-column p-2"
+      className="board-column flex w-column shrink-0 flex-col gap-2 rounded-sm border border-border bg-column p-2"
       data-testid={`column-${column.id}`}
       data-drop-active={active ? 'true' : undefined}
     >
@@ -750,7 +750,7 @@ function ColumnSection({
         <button
           type="button"
           onClick={() => onAddCard(column.id)}
-          className="flex h-8 w-full items-center gap-2 rounded-sm px-2 text-label text-ink-subtle transition-colors duration-[var(--dur-fast)] hover:bg-surface-muted hover:text-ink"
+          className="flex h-8 w-full items-center gap-2 rounded-key px-2 text-label text-ink-subtle transition-colors duration-[var(--dur-fast)] hover:bg-surface-muted hover:text-ink"
         >
           <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
           {t('board.card.add')}
@@ -792,7 +792,7 @@ function AddColumn({ boardId, className }: { boardId: string; className?: string
   return (
     <form
       className={cn(
-        'flex w-column shrink-0 flex-col gap-2 rounded-md border border-border bg-column p-2',
+        'flex w-column shrink-0 flex-col gap-2 rounded-sm border border-border bg-column p-2',
         className,
       )}
       onSubmit={(event) => {
@@ -981,7 +981,7 @@ function BoardSettingsMenu({
               <span
                 aria-hidden
                 data-testid="moderation-badge"
-                className="absolute -right-2 -top-2 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-danger px-0.5 font-mono text-mono-sm leading-none text-primary-foreground"
+                className="absolute -right-2 -top-2 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-key bg-danger px-0.5 font-mono text-mono-sm leading-none text-primary-foreground"
               >
                 {pending_count}
               </span>

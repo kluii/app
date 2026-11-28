@@ -19,7 +19,7 @@ export function Checkbox({
         id={id}
         type="checkbox"
         className={cn(
-          'peer size-4 shrink-0 appearance-none rounded-xs border border-control-border bg-surface-2 checked:border-ink checked:bg-ink',
+          'peer size-4 shrink-0 appearance-none rounded-key border border-control-border bg-surface-2 checked:border-ink checked:bg-ink',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
           'disabled:cursor-not-allowed disabled:opacity-40',
           className,

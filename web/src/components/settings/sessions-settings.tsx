@@ -68,7 +68,7 @@ export function SessionsSettings() {
         </p>
       ) : null}
 
-      <ul className="divide-y divide-border rounded-md border border-border">
+      <ul className="divide-y divide-border rounded-sm border border-border">
         {items.map((session) => (
           <li
             key={session.id}

@@ -91,7 +91,7 @@ export function DigestSettings() {
         </p>
       ) : null}
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-md border border-border p-4">
+      <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-sm border border-border p-4">
         <Checkbox
           id="digest-enabled"
           label={t('settings.digest.enabled')}
@@ -174,7 +174,7 @@ export function DigestSettings() {
         </div>
 
         {rssUrl ? (
-          <div className="flex flex-col gap-1 rounded-sm bg-surface-2 p-3">
+          <div className="flex flex-col gap-1 rounded-key bg-surface-2 p-3">
             <span className="text-label text-ink-muted">{t('settings.digest.rssOnce')}</span>
             <code className="break-all font-mono text-mono text-ink">{rssUrl}</code>
           </div>

@@ -262,10 +262,11 @@ describe('the palette', () => {
     }
   });
 
-  // Three radii, and no more: 4 px for a key (badge, label, card), 8 px for a
-  // surface or a control, a pill for the avatar alone. The badge's 4 px lands in
-  // the icon phase; the rest of the scale moves with brief §8 Phase 7, which
-  // names this assertion as the one contract that moves on purpose.
+  // Three radii, and no more: 4 px for a key (badge, label, card, menu item),
+  // 8 px for a surface or a control, a pill for the avatar alone. Phase 7
+  // deleted `--radius-md`, so this set is exactly {4px, 8px, 9999px}: the
+  // contract moved on purpose (unslop's nested-radius rule + the landing's
+  // "pills on the site only"), and the assertion moved with it.
   it('uses only the three radii the system allows', () => {
     expect(CSS).toContain('--radius-key: 4px');
     expect(CSS).toContain('--radius-sm: 8px');

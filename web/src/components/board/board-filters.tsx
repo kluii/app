@@ -101,7 +101,7 @@ export function BoardFilters({
         onClose={() => setOpen(false)}
         labelledBy={panelId}
         anchor={trigger}
-        className="w-96 max-w-[calc(100vw-2rem)]"
+        className="w-96 max-w-[calc(100vw-2rem)] p-3"
       >
         <div className="flex flex-col gap-4">
           <h2 id={panelId} className="text-h3">
@@ -138,8 +138,8 @@ export function BoardFilters({
                       onClick={() => onChange({ ...filters, tags: toggle(filters.tags, tag) })}
                       className={
                         selected
-                          ? 'inline-flex h-6 items-center rounded-sm border border-ink bg-surface-muted px-2 font-mono text-mono-sm text-ink'
-                          : 'inline-flex h-6 items-center rounded-sm border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted'
+                          ? 'inline-flex h-6 items-center rounded-key border border-ink bg-surface-muted px-2 font-mono text-mono-sm text-ink'
+                          : 'inline-flex h-6 items-center rounded-key border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted'
                       }
                     >
                       {tag}
@@ -167,8 +167,8 @@ export function BoardFilters({
                     }
                     className={
                       selected
-                        ? 'inline-flex h-6 items-center rounded-sm border border-ink bg-surface-muted px-2 font-mono text-mono-sm text-ink'
-                        : 'inline-flex h-6 items-center rounded-sm border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted'
+                        ? 'inline-flex h-6 items-center rounded-key border border-ink bg-surface-muted px-2 font-mono text-mono-sm text-ink'
+                        : 'inline-flex h-6 items-center rounded-key border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted'
                     }
                   >
                     {assignee}
@@ -234,7 +234,7 @@ export function ActiveFilters({
         <span
           key={chip.key}
           data-testid="active-filter"
-          className="inline-flex h-6 items-center gap-1 rounded-sm border border-border bg-surface-2 pl-2 pr-1 font-mono text-mono-sm text-ink"
+          className="inline-flex h-6 items-center gap-1 rounded-key border border-border bg-surface-2 pl-2 pr-1 font-mono text-mono-sm text-ink"
         >
           {chip.label}
           <button

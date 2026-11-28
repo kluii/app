@@ -75,13 +75,13 @@ export function isBelowHalf(element: Element, clientY: number): boolean {
  * It is built with `createElement`, not rendered through React: the native drag
  * image has to exist synchronously inside `onGenerateDragPreview`, and a portal
  * is not ready then. Classes come from tokens.css, so the ghost is the same
- * card the reader picked up: 270 px, 8 px radius, one hairline, the overlay
+ * card the reader picked up: 270 px, 4 px radius, one hairline, the overlay
  * shadow, and 1.5° of tilt so it reads as lifted rather than duplicated.
  */
 function buildDragPreview(container: HTMLElement, card: Card): void {
   const ghost = document.createElement('div');
   ghost.className =
-    'w-card rounded-sm border border-border-strong bg-card p-3 text-ink shadow-[var(--shadow-overlay)] rotate-[1.5deg]';
+    'w-card rounded-key border border-border-strong bg-card p-3 text-ink shadow-[var(--shadow-overlay)] rotate-[1.5deg]';
 
   const title = document.createElement('p');
   title.className = 'line-clamp-3 text-body text-ink';
@@ -97,10 +97,10 @@ function buildDragPreview(container: HTMLElement, card: Card): void {
       chip.textContent = tag.name;
       if (tag.color === null) {
         chip.className =
-          'inline-flex h-5 items-center rounded-full border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted';
+          'inline-flex h-5 items-center rounded-key border border-border bg-surface-2 px-2 font-mono text-mono-sm text-ink-muted';
       } else {
         chip.className =
-          'tag-chip inline-flex h-5 items-center gap-1 rounded-full px-2 font-mono text-mono-sm';
+          'tag-chip inline-flex h-5 items-center gap-1 rounded-key px-2 font-mono text-mono-sm';
         chip.style.setProperty('--tag', tag.color);
       }
       row.appendChild(chip);

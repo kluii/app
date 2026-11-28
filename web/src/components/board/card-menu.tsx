@@ -36,7 +36,7 @@ export function CardMenu({
   const otherColumns = columns.filter((column) => column.id !== card.column_id);
 
   const item =
-    'flex h-8 w-full items-center rounded-sm px-2 text-left text-body-sm hover:bg-surface-2';
+    'flex h-8 w-full items-center rounded-key px-2 text-left text-body-sm hover:bg-surface-muted';
 
   return (
     <>
@@ -61,7 +61,7 @@ export function CardMenu({
         labelledBy={menuId}
         anchor={trigger}
         align="end"
-        className="w-52 p-1"
+        className="w-52"
       >
         <ul role="menu" id={menuId} aria-label={t('board.card.menu')}>
           <li role="none">

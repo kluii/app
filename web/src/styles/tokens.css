@@ -100,8 +100,10 @@
   --size-dialog-wide: 640px;
   --size-content: 1440px;
 
-  /* one shadow, overlays only */
+  /* one shadow, overlays only; the active row and the dark primary button
+     get a 1 px inset highlight instead (brief §5.2) */
   --shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-active: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --scrim: rgba(0, 0, 0, 0.64);
 }
 
@@ -152,6 +154,7 @@
   --tag-pink: #db2777;
 
   --shadow-overlay: 0 10px 30px rgba(20, 18, 15, 0.12);
+  --shadow-active: none;
   --scrim: rgba(20, 18, 15, 0.32);
 }
 
@@ -195,11 +198,12 @@
      In px, `p-3` is 12 and `h-14` is 56 at any root size. */
   --spacing: 4px;
 
-  /* 8 px for surfaces and inputs, a pill for controls; the 4 px step is the
-     key: a badge, a label, a card inside a column (brief §5.2). */
+  /* One radius scale, nested so the radii add up (unslop §7, brief §5.2):
+     4 px is the key — a badge, a label, a card inside a column, an item
+     inside a menu; 8 px is a surface or a control; the pill is the avatar
+     alone, because pills are a site-only device on the landing. */
   --radius-key: 4px;
   --radius-sm: 8px;
-  --radius-md: 8px;
   --radius-full: 9999px;
 
   --width-column: var(--size-column);
