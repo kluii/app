@@ -18,8 +18,9 @@ import { NotificationBell } from './notification-bell';
  */
 export function AppShell({ children, actions }: { children?: ReactNode; actions?: ReactNode }) {
   const { theme } = useTheme();
-  // A board is a fixed frame: its rail scrolls, the page does not. Every other
-  // screen is a document and keeps scrolling normally.
+  // Only the header's hairline depends on the route: on a board the bar carries
+  // the page's one rule under itself, so the shell drops its own there. Every
+  // page — the board included — is a document: the content scrolls the page.
   const onBoard = useRouterState({
     select: (state) => /^\/boards\/[^/]+$/.test(state.location.pathname),
   });
@@ -44,12 +45,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
   }, [branding.data]);
 
   return (
-    <div
-      className={cn(
-        'flex flex-col bg-canvas text-ink',
-        onBoard ? 'h-dvh overflow-hidden' : 'min-h-dvh',
-      )}
-    >
+    <div className="flex min-h-dvh flex-col bg-canvas text-ink">
       {/* The first Tab stop is a way past the header, every page (K2-15). */}
       <a
         href="#main-content"
@@ -60,7 +56,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
 
       {/* 56 px, 24 of padding, canvas ground. The board carries its own
           hairline under its bar, so the shell drops its own there: one rule,
-          not two, and the board's frame stays a single 56 + 56 column. */}
+          not two. The header is in the flow, so it scrolls away with the page. */}
       <header
         data-app-chrome="true"
         className={cn(
@@ -92,17 +88,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
         </div>
       </header>
 
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className={cn(
-          'min-h-0 flex-1 focus:outline-none',
-          // A board fills what the header leaves, including the 12 px band the
-          // board bar puts above itself: the frame is a flex child, so it can
-          // be one, and the page never scrolls.
-          onBoard ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
-        )}
-      >
+      <main id="main-content" tabIndex={-1} className="focus:outline-none">
         {children ?? <Outlet />}
       </main>
     </div>

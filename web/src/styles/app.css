@@ -25,47 +25,20 @@
 }
 
 /*
- * The board is a frame: the rail scrolls sideways, each column scrolls its own
- * cards, and the page does not scroll at all. `.board-rail` carries `h-full`, so
- * `100%` is the height the frame leaves — the column is capped there at every
- * width, and a short one still hugs its content because the rail is
- * `items-start`. The footer `Add card` lives inside the column, so it scrolls
- * with the list instead of floating over it.
+ * The board scrolls as one page, not per column. The document is the only
+ * vertical scrollport: the board grows to its tallest column and scrolling
+ * moves the columns together, header and bar included. The rail keeps its
+ * horizontal scroll for columns that overflow to the right, and a column is
+ * its content — `items-start` on the rail keeps a short one from stretching —
+ * so a card list is never its own scrollport and a column header is a normal
+ * header in the flow.
  */
-.board-column {
-  max-height: 100%;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-/*
- * The header stays put while its cards pass under it, at every width. A long
- * list scrolled to the middle used to take its own title away, and with three
- * columns on a desktop you then cannot tell which one you are reading. It pins
- * to the column's own scrollport and paints the column surface, so the cards
- * leave a clean edge instead of showing through the title.
- *
- * The column carries no top padding: a sticky element pins to its parent's
- * content box, so those 8 px stayed a window, and a scrolled card painted its
- * tail in the band above the pinned title. The header owns that 8 px itself
- * (`min-h-10` on it in the markup keeps the title where it was), so scrolling
- * the column paints nothing above it.
- */
-.board-column > header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding-top: 8px;
-  background: var(--column);
-}
 
 /*
  * 390 px (K2-13). The rail scrolls sideways and snaps, so a column stops at the
- * top of the viewport; the pinned header a list you can only scroll blindly
- * needs is the base rule above, at every width. The bar stacks on two rows: the
- * name and the gear on 48, the meta and the filters on 40, one hairline under
- * both. Colours stay in tokens.css.
+ * top of the viewport while the page scrolls vertically as one. The bar stacks
+ * on two rows: the name and the gear on 48, the meta and the filters on 40,
+ * one hairline under both. Colours stay in tokens.css.
  */
 @media (max-width: 640px) {
   .board-bar {

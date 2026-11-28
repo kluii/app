@@ -126,10 +126,11 @@ test('the card dialog is centred in the viewport and 640 wide', async ({ page, r
 });
 
 /**
- * The band between the header and the bar (fix pass). The board is a fixed
- * frame: a rail that scrolls inside a page that does not. 12 px of canvas sit
- * above the bar and under the 56 px header, at both widths, and the document
- * never grows past the viewport.
+ * The band between the header and the bar. The board is a normal page: 12 px of
+ * canvas sit above the bar and under the 56 px header, at both widths. A short
+ * board leaves the document exactly as tall as the viewport — the page only
+ * scrolls when a column is taller than what the viewport leaves — and it never
+ * scrolls sideways; only the rail does.
  */
 test.describe('the band above the board bar', () => {
   for (const viewport of [
@@ -148,41 +149,39 @@ test.describe('the band above the board bar', () => {
       expect(header.height, 'header height').toBe(56);
       expect(bar.y - header.bottom, 'band between the header and the bar').toBe(12);
 
-      // The frame is the page: no vertical overflow, no document scroll.
-      const height = await page.evaluate(() => ({
-        scroll: document.documentElement.scrollHeight,
-        inner: window.innerHeight,
+      // A short board does not overflow the document, and the page itself
+      // never grows wider than the viewport.
+      const measured = await page.evaluate(() => ({
+        scrollHeight: document.documentElement.scrollHeight,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerHeight: window.innerHeight,
+        innerWidth: window.innerWidth,
       }));
-      expect(height.scroll, 'the board does not scroll the document').toBe(height.inner);
+      expect(measured.scrollHeight, 'a short board does not scroll the page').toBe(
+        measured.innerHeight,
+      );
+      expect(measured.scrollWidth, 'the page never scrolls sideways').toBeLessThanOrEqual(
+        measured.innerWidth,
+      );
     });
   }
 });
 
 /**
- * Fix pass — a board column scrolls its own cards, at every width.
+ * The board scrolls as one page, not per column.
  *
- * The frame is `h-dvh overflow-hidden` and the rail's scroll container hides
- * vertical overflow, so a column that cannot scroll puts everything past the
- * viewport out of reach: with 12 cards in one column, `col.clientHeight` was
- * 1187 in a 900 px viewport and `col.scrollTop = 400` read back 0. The column now
- * caps at the rail's height (`.board-column { max-height: 100% }` plus `h-full`
- * on the rail) and owns its own overflow.
- *
- * The header is what tells you which column you are reading, so it does not
- * travel with the cards: it pins to the column's scrollport at every width, and
- * at rest it is in the flow, inside the column's own padding.
- *
- * A sticky element pins to its parent's **content** box, so the 8 px of padding
- * the column used to carry at the top stayed a window: scrolled 400 px, the tail
- * of a card painted in the band above the pinned title. The column now has no
- * top padding and the header carries that 8 px itself, so the header's own top
- * edge is the column's.
+ * The shell is a document again — no `h-dvh` frame, no per-column scrollport —
+ * so with 12 cards in one column the document is taller than the viewport and
+ * `window.scrollTo` moves the page, columns together. The column itself is not
+ * a scrollport: it neither owns the overflow nor has anything to scroll, and
+ * its header is a normal header in the flow. The rail keeps the horizontal
+ * scroll, and the page never scrolls sideways.
  */
-test.describe('a board column scrolls its own cards', () => {
+test.describe('the board page scrolls as one, not per column', () => {
   const twelve = Array.from({ length: 12 }, (_, index) => `Card number ${index + 1}`);
   // A card's height is its title plus its snippet: a title-only card is 47 px,
-  // and twelve of those still fit the rail at 1440 × 900. The 120-character
-  // description is what the defect was measured with.
+  // and twelve of those would fit a 900 px viewport. The 120-character
+  // description is what makes the column taller than the page.
   const snippet =
     'Ask the owner whether the digest ships this week or next, then move the two open questions from the standup into the retro notes before Friday.';
 
@@ -190,7 +189,7 @@ test.describe('a board column scrolls its own cards', () => {
     { width: 1440, height: 900 },
     { width: 390, height: 844 },
   ]) {
-    test(`the twelfth card is reachable at ${viewport.width} × ${viewport.height}`, async ({
+    test(`the twelfth card is reached by scrolling the page at ${viewport.width} × ${viewport.height}`, async ({
       page,
       request,
     }) => {
@@ -198,107 +197,67 @@ test.describe('a board column scrolls its own cards', () => {
       const { cards, columns } = await openBoard(
         page,
         request,
-        uniqueUsername(`column-scroll-${viewport.width}`),
+        uniqueUsername(`page-scroll-${viewport.width}`),
         twelve,
         snippet,
       );
       const [toDo] = columns;
-      const [first] = cards;
       const [last] = cards.slice(-1);
-      if (!toDo || !first || !last) throw new Error('seed failed');
+      if (!toDo || !last) throw new Error('seed failed');
 
       const column = page.getByTestId(`column-${toDo.id}`);
       await expect(column.getByTestId('card-title')).toHaveCount(12);
 
+      // One scrollbar for the whole board: the document is taller than the
+      // viewport, and it never grows wider than it.
+      const frame = await page.evaluate(() => ({
+        scrollHeight: document.documentElement.scrollHeight,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerHeight: window.innerHeight,
+        innerWidth: window.innerWidth,
+      }));
+      expect(frame.scrollHeight, 'the board grows past the viewport').toBeGreaterThan(
+        frame.innerHeight,
+      );
+      expect(frame.scrollWidth, 'the page never scrolls sideways').toBeLessThanOrEqual(
+        frame.innerWidth,
+      );
+
+      // A 400 px scroll moves the page itself by 400 px: the columns travel
+      // with it, there is no per-column scroll to race against.
+      const moved = await page.evaluate(() => {
+        window.scrollTo(0, 400);
+        return window.scrollY;
+      });
+      expect(moved, 'window.scrollTo moves the page').toBeCloseTo(400, 0);
+
+      // The column is not a scrollport: it does not own the vertical overflow,
+      // and its content height is its box height.
       const measured = await column.evaluate((element) => ({
         client: element.clientHeight,
         scroll: element.scrollHeight,
         overflowY: getComputedStyle(element).overflowY,
       }));
-      expect(measured.overflowY, 'the column owns the vertical overflow').toBe('auto');
-      expect(measured.client, 'the column stops at the height the frame leaves').toBeLessThan(
-        measured.scroll,
-      );
+      expect(measured.overflowY, 'the column does not scroll itself').not.toBe('auto');
+      expect(measured.scroll, 'the column has nothing of its own to scroll').toBe(measured.client);
 
-      // The header is in the flow at rest: 1 px of column border and no column
-      // padding, so it starts at the column's own top edge.
-      const rest = await column.evaluate((element) => {
-        const header = element.querySelector('header');
-        if (!header) throw new Error('the column has no header');
-        const style = getComputedStyle(element);
-        return {
-          column: element.getBoundingClientRect().top,
-          border: parseFloat(style.borderTopWidth),
-          padding: parseFloat(style.paddingTop),
-          header: header.getBoundingClientRect().top,
-        };
-      });
-      expect(rest.border, 'the column keeps its 1 px border').toBe(1);
-      expect(rest.padding, 'the column leaves no band above its header').toBe(0);
-      expect(rest.header, 'the header sits inside the column padding').toBeCloseTo(
-        rest.column + rest.border + rest.padding,
-        0,
-      );
-      const firstCard = page.getByTestId(`card-${first.id}`);
-      const cardAtRest = (await box(firstCard)).y;
-
-      // A 400 px scroll moves the column by 400 px — or by its whole range, when
-      // the list is shorter than that. It used to read back 0.
-      const moved = await column.evaluate((element) => {
-        element.scrollTop = 400;
-        return element.scrollTop;
-      });
-      expect(moved, 'the column scrolls its own cards').toBe(
-        Math.min(400, measured.scroll - measured.client),
-      );
-
-      // The header does not go with them: 400 px of scroll leaves its top where
-      // it was, and the first card has left the top of the column's box.
-      const stuck = await column.evaluate((element) => {
-        const header = element.querySelector('header');
-        if (!header) throw new Error('the column has no header');
-        return {
-          column: element.getBoundingClientRect().top,
-          header: header.getBoundingClientRect().top,
-        };
-      });
-      expect(
-        Math.abs(stuck.header - rest.header),
-        'the header stays pinned while its cards scroll',
-      ).toBeLessThanOrEqual(1);
-      // And no band is left above it: the pinned header's top is the column's
-      // own outer edge, so nothing of a card can paint over the title.
-      expect(
-        Math.abs(stuck.header - stuck.column),
-        'the pinned header covers the column top edge',
-      ).toBeLessThanOrEqual(1);
-      expect((await box(firstCard)).y, 'the first card moved up under the header').toBeLessThan(
-        cardAtRest,
-      );
-
-      // At the bottom of the list, the last card sits inside the viewport.
-      await column.evaluate((element) => {
-        element.scrollTop = element.scrollHeight;
+      // At the bottom of the page, the last card sits inside the viewport.
+      await page.evaluate(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
       });
       const lastCard = await box(page.getByTestId(`card-${last.id}`));
-      expect(lastCard.bottom, 'the last card is inside the viewport').toBeLessThanOrEqual(
-        viewport.height,
-      );
-
-      // The board is still a frame: scrolling a column never scrolls the page.
-      const frame = await page.evaluate(() => ({
-        scroll: document.documentElement.scrollHeight,
-        inner: window.innerHeight,
-      }));
-      expect(frame.scroll, 'the board does not scroll the document').toBe(frame.inner);
+      expect(
+        lastCard.bottom,
+        'the last card is inside the viewport at the page bottom',
+      ).toBeLessThanOrEqual(viewport.height);
     });
   }
 
-  test('a short column hugs its content instead of stretching to the rail', async ({
+  test('a short board leaves the page as tall as the viewport, and a column hugs its content', async ({
     page,
     request,
   }) => {
-    const { cards, columns } = await openBoard(page, request, uniqueUsername('column-short'), [
+    const { cards, columns } = await openBoard(page, request, uniqueUsername('page-short'), [
       'Alpha',
       'Bravo',
     ]);
@@ -306,15 +265,22 @@ test.describe('a board column scrolls its own cards', () => {
     if (!toDo || cards.length !== 2) throw new Error('seed failed');
 
     const column = page.getByTestId(`column-${toDo.id}`);
-    const [columnHeight, columnScroll, railHeight] = await Promise.all([
+    const [columnHeight, columnScroll, railHeight, frame] = await Promise.all([
       column.evaluate((element) => element.clientHeight),
       column.evaluate((element) => element.scrollHeight),
       page.locator('.board-rail').evaluate((element) => element.clientHeight),
+      page.evaluate(() => ({
+        scroll: document.documentElement.scrollHeight,
+        inner: window.innerHeight,
+      })),
     ]);
-    // Nothing is padded or stretched: the column is its content, shorter than the
-    // rail, and has nothing to scroll.
+    // Nothing is padded or stretched: the column is its content, shorter than
+    // the rail, and has nothing to scroll.
     expect(columnHeight, 'a short column is shorter than the rail').toBeLessThan(railHeight);
     expect(columnScroll, 'a short column has nothing to scroll').toBe(columnHeight);
+    // Two cards do not make the document taller than the viewport: the page
+    // only scrolls when the board is.
+    expect(frame.scroll, 'two cards do not scroll the page').toBe(frame.inner);
   });
 });
 

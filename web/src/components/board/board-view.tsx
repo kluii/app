@@ -41,8 +41,8 @@ type Composer =
 
 /**
  * Board > column > card, nothing else (DESIGN.md §5). Columns size to their
- * content up to the height of the rail and align to its top; each column scrolls
- * its own cards, the rail scrolls horizontally, the page does not.
+ * content and align to the rail's top; the page scrolls vertically as one, the
+ * rail scrolls horizontally.
  */
 export function BoardView({ boardId }: { boardId: string }) {
   const arrived = useArrival();
@@ -476,9 +476,10 @@ function BoardFrame({
 
   return (
     // 12 px of canvas between the shell's header and the bar: the board is a
-    // frame, not a continuation of the header. The band is above the bar, so
-    // the bar keeps the page's one hairline at its bottom.
-    <div className="mt-3 flex min-h-0 flex-1 flex-col">
+    // block in the document, not a frame — it grows with its tallest column
+    // and the page scrolls it as one. The band is above the bar, so the bar
+    // keeps the page's one hairline at its bottom.
+    <div className="mt-3">
       {/* One 56 px bar: the name, then the meta 12 px away, then the filters
           and the settings. On a phone the same children stack on two rows — the
           grid in app.css places them. */}
@@ -561,16 +562,12 @@ function BoardFrame({
           <ColumnRail boardId={board.id} canWrite={caller.can_manage_columns} />
         </div>
       ) : (
-        <div
-          className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
-          data-testid="board-scroll"
-        >
+        <div className="overflow-x-auto" data-testid="board-scroll">
           <div
             className={cn(
-              // `h-full` is what makes the column's `max-height: 100%` mean
-              // something: the parent is the `min-h-0 flex-1` scroll container,
-              // so the rail has a definite height and a column caps at it.
-              'board-rail flex h-full items-start gap-4 px-6 py-4',
+              // The rail is as tall as its tallest column: `items-start` keeps a
+              // short column hugging its content instead of stretching.
+              'board-rail flex items-start gap-4 px-6 py-4',
               arrived && 'enter-stagger',
             )}
           >

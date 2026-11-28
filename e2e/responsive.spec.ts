@@ -34,12 +34,13 @@ test('nothing but the rail scrolls sideways at 390 px', async ({ page, request }
   }));
   expect(rail.scroll).toBeGreaterThan(rail.client);
 
-  // The column header stays pinned while the column itself scrolls.
+  // A column header is a normal header in the flow: the page scrolls vertically
+  // as one, and the column is not a scrollport of its own.
   const firstColumn = page.getByTestId(`column-${columns[0]?.id ?? ''}`);
   const header = firstColumn.locator('header').first();
   await expect(header).toBeVisible();
   const position = await header.evaluate((element) => getComputedStyle(element).position);
-  expect(position).toBe('sticky');
+  expect(position).toBe('static');
 });
 
 test('a card dropped into the middle of a column stays there after a reload', async ({
