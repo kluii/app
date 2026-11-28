@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Upload } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { api } from '../../api/client';
 import { failureMessage } from '../../lib/api-error';
 import { applyBranding } from '../../lib/branding';
@@ -8,6 +9,11 @@ import { t } from '../../i18n';
 import { Button } from '../ui/button';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
+
+type AssetKind = 'logo' | 'favicon';
+
+/** The two formats `validateUploadedAsset` accepts (server/src/settings/branding.ts). */
+const ASSET_ACCEPT = 'image/png,image/svg+xml';
 
 /**
  * Instance branding admin controls (K5-01, DESIGN.md §2.4, §13).
@@ -21,6 +27,7 @@ export function BrandingSettings() {
   const [tabTitle, setTabTitle] = useState('');
   const [accentColor, setAccentColor] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<{ kind: AssetKind; message: string } | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
@@ -45,17 +52,18 @@ export function BrandingSettings() {
   });
 
   const upload = useMutation({
-    mutationFn: ({ file, kind }: { file: File; kind: 'logo' | 'favicon' }) =>
+    mutationFn: ({ file, kind }: { file: File; kind: AssetKind }) =>
       api.uploadBrandingAsset(file, kind),
     onSuccess: async (next) => {
       applyBranding(next);
-      setError(null);
+      setUploadError(null);
       setSavedNotice(true);
       await queryClient.invalidateQueries({ queryKey: ['branding'] });
     },
-    onError: (cause) => {
+    // The refusal belongs to the row that was refused, not to a toast.
+    onError: (cause, variables) => {
       setSavedNotice(false);
-      setError(failureMessage(cause));
+      setUploadError({ kind: variables.kind, message: failureMessage(cause) });
     },
   });
 
@@ -66,13 +74,6 @@ export function BrandingSettings() {
       tab_title: tabTitle.trim() === '' ? null : tabTitle.trim(),
       accent_color: accentColor.trim() === '' ? null : accentColor.trim(),
     });
-  };
-
-  const onFile = (kind: 'logo' | 'favicon') => (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    upload.mutate({ file, kind });
-    event.target.value = '';
   };
 
   return (
@@ -139,45 +140,130 @@ export function BrandingSettings() {
         </div>
       </form>
 
-      <div className="flex flex-col gap-3 rounded-sm border border-border bg-surface p-4">
-        <Field label={t('settings.branding.logo')} htmlFor="branding-logo">
-          <input
-            id="branding-logo"
-            type="file"
-            accept="image/png,image/svg+xml"
-            onChange={onFile('logo')}
-            className="text-body-sm text-ink-muted"
-          />
-        </Field>
-        {branding.data?.logo_url ? (
-          <div>
-            <Button type="button" variant="ghost" onClick={() => update.mutate({ logo_url: null })}>
-              {t('settings.branding.clearLogo')}
-            </Button>
-          </div>
-        ) : null}
-
-        <Field label={t('settings.branding.favicon')} htmlFor="branding-favicon">
-          <input
-            id="branding-favicon"
-            type="file"
-            accept="image/png,image/svg+xml"
-            onChange={onFile('favicon')}
-            className="text-body-sm text-ink-muted"
-          />
-        </Field>
-        {branding.data?.favicon_url ? (
-          <div>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => update.mutate({ favicon_url: null })}
-            >
-              {t('settings.branding.clearFavicon')}
-            </Button>
-          </div>
-        ) : null}
+      <div className="flex flex-col gap-4 rounded-sm border border-border bg-surface p-4">
+        <BrandAssetRow
+          kind="logo"
+          label={t('settings.branding.logo')}
+          hint={t('settings.branding.assetHint')}
+          url={branding.data?.logo_url ?? null}
+          pending={upload.isPending && upload.variables?.kind === 'logo'}
+          removing={update.isPending}
+          error={uploadError?.kind === 'logo' ? uploadError.message : null}
+          onFile={(file) => upload.mutate({ file, kind: 'logo' })}
+          onRemove={() => update.mutate({ logo_url: null })}
+        />
+        <BrandAssetRow
+          kind="favicon"
+          label={t('settings.branding.favicon')}
+          hint={t('settings.branding.assetHint')}
+          url={branding.data?.favicon_url ?? null}
+          pending={upload.isPending && upload.variables?.kind === 'favicon'}
+          removing={update.isPending}
+          error={uploadError?.kind === 'favicon' ? uploadError.message : null}
+          onFile={(file) => upload.mutate({ file, kind: 'favicon' })}
+          onRemove={() => update.mutate({ favicon_url: null })}
+        />
       </div>
     </section>
+  );
+}
+
+/**
+ * One instance asset: a 56 px preview, the label, the hint the server enforces,
+ * then a real Upload button that opens the picker. The file input stays in the
+ * DOM — a button cannot open a picker on its own — but it is out of the tab
+ * order: the button is the affordance, never the platform's "Choose file" text.
+ * The row carries its own pending state and its own error, inline.
+ */
+function BrandAssetRow({
+  kind,
+  label,
+  hint,
+  url,
+  pending,
+  removing,
+  error,
+  onFile,
+  onRemove,
+}: {
+  kind: AssetKind;
+  label: string;
+  hint: string;
+  url: string | null;
+  pending: boolean;
+  removing: boolean;
+  error: string | null;
+  onFile: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const inputId = `branding-${kind}`;
+  const hintId = `branding-${kind}-hint`;
+  const asset =
+    kind === 'logo' ? t('settings.branding.assetLogo') : t('settings.branding.assetFavicon');
+
+  const pick = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    // The same file twice in a row is a second upload, so the field is cleared.
+    event.target.value = '';
+    if (file) onFile(file);
+  };
+
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-surface">
+        {url === null ? (
+          <span className="font-mono text-mono-sm text-ink-subtle">{asset}</span>
+        ) : (
+          <img src={url} alt="" className="h-full w-full object-contain" />
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <label htmlFor={inputId} className="text-label font-medium text-ink">
+          {label}
+        </label>
+        <p id={hintId} className="text-body-sm text-ink-muted">
+          {hint}
+        </p>
+        {error === null ? null : (
+          <p role="alert" className="text-body-sm text-danger">
+            {error}
+          </p>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          variant="secondary"
+          loading={pending}
+          aria-label={t('settings.branding.uploadFor', { asset })}
+          onClick={() => input.current?.click()}
+        >
+          <Upload aria-hidden strokeWidth={1.5} className="h-4 w-4" />
+          {t('settings.branding.upload')}
+        </Button>
+        {url === null ? null : (
+          <Button
+            variant="ghost"
+            loading={removing}
+            aria-label={t('settings.branding.removeFor', { asset })}
+            onClick={onRemove}
+          >
+            {t('settings.branding.remove')}
+          </Button>
+        )}
+        <input
+          ref={input}
+          id={inputId}
+          type="file"
+          accept={ASSET_ACCEPT}
+          aria-describedby={hintId}
+          tabIndex={-1}
+          className="sr-only"
+          onChange={pick}
+        />
+      </div>
+    </div>
   );
 }
