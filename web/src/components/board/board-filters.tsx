@@ -194,10 +194,13 @@ export function BoardFilters({
 export function ActiveFilters({
   filters,
   onChange,
+  members,
 }: {
   filters: Filters;
   onChange: (next: Filters) => void;
+  members: Member[];
 }) {
+  const memberUsernames = members.map((member) => member.username);
   const chips: { key: string; label: string; remove: () => void }[] = [];
   if (filters.text.trim() !== '') {
     chips.push({
@@ -216,7 +219,9 @@ export function ActiveFilters({
   for (const assignee of filters.assignees) {
     chips.push({
       key: `assignee:${assignee}`,
-      label: assignee,
+      // The chip reads like the option that was picked: a member keeps its at
+      // sign, a free label stays the words somebody typed.
+      label: memberUsernames.includes(assignee) ? atUsername(assignee) : assignee,
       remove: () =>
         onChange({
           ...filters,

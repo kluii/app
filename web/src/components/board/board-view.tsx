@@ -552,7 +552,7 @@ function BoardFrame({
         </div>
       </header>
 
-      <ActiveFilters filters={filters} onChange={onFiltersChange} />
+      <ActiveFilters filters={filters} onChange={onFiltersChange} members={members} />
 
       {columns.length === 0 ? (
         <div className="px-6 py-6">
