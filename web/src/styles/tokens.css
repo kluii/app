@@ -181,6 +181,11 @@
   --color-selection: var(--selection);
   --color-insert-line: var(--insert-line);
 
+  /* The spacing step, in px rather than rem: the root font size is the body
+     type token (15 px), so a rem-derived step would render 12 as 11.25 and 56
+     as 52.5. In px, `p-3` is 12 and `h-14` is 56 at any root size. */
+  --spacing: 4px;
+
   /* 8 px for surfaces and inputs, a pill for controls; the 4 px step is gone. */
   --radius-sm: 8px;
   --radius-md: 8px;
