@@ -95,6 +95,23 @@
   --tag-violet: #a78bfa;
   --tag-pink: #f472b6;
 
+  /* agent marks: identification, not decoration. The seven marks a settings
+     dropdown shows are the vendors' own logos, so this is the one place a
+     brand hue is allowed to appear. The values are the publisher's, verbatim:
+     Anthropic terracotta, Mistral orange, Pi blue, and the Gemini gradient.
+     ChatGPT's knot and OpenCode's two paths carry no colour of their own —
+     they draw in `currentColor`. */
+  --mark-claude: #d97757;
+  --mark-mistral: #fa520f;
+  --mark-pi: #7ba1c0;
+  --mark-gemini-from: #4285f4;
+  --mark-gemini-mid: #9b72cb;
+  --mark-gemini-to: #d96570;
+  /* The Nous wing file is #0000f2, which sinks into the dark tile. It keeps its
+     own ink and is lightened under the dark theme only; in light it is the
+     blue the publisher drew. */
+  --mark-hermes-filter: brightness(1.9);
+
   /* geometry (DESIGN.md §4): the off-scale sizes the app needs */
   --size-column: 288px;
   /* 288 − 2 of column border − 16 of column padding: the card fills the well */
@@ -157,6 +174,9 @@
   --tag-blue: #2563eb;
   --tag-violet: #7c3aed;
   --tag-pink: #db2777;
+
+  /* the Nous wing is legible as drawn on the light tile */
+  --mark-hermes-filter: none;
 
   --shadow-overlay: 0 10px 30px rgba(20, 18, 15, 0.12);
   --shadow-sheet: 0 -8px 40px rgba(0, 0, 0, 0.55);
