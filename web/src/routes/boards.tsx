@@ -44,6 +44,8 @@ function BoardsPage() {
   useShortcuts([{ key: 'n', handler: () => setCreating(true) }]);
 
   const items = boards.data?.items ?? [];
+  // The overview counts the account, not the current filter.
+  const ownedCount = items.filter((board) => board.role === 'owner').length;
   const needle = query.trim().toLowerCase();
   const visible =
     needle === ''
@@ -99,54 +101,76 @@ function BoardsPage() {
             {t('common.action.retry')}
           </Button>
         </div>
-      ) : boards.data.items.length === 0 ? (
-        <EmptySlot
-          className="mt-6 w-column min-h-36"
-          title={t('boards.empty.title')}
-          body={t('boards.empty.body')}
-        />
-      ) : visible.length === 0 ? (
-        <p className="mt-6 text-body-sm text-ink-muted">{t('boards.search.empty')}</p>
       ) : (
         <>
-          {owned.length > 0 ? (
-            <section className="mt-8">
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-h3">{t('boards.section.mine')}</h2>
-                <span className="font-mono text-mono-sm text-ink-subtle">{owned.length}</span>
-              </div>
-              <ul className={cn(GRID, arrived && 'enter-stagger')}>
-                {owned.map((board) => (
-                  <li key={board.id}>
-                    <BoardTile
-                      board={board}
-                      onEdit={() => setEditing(board)}
-                      onDelete={() => setDeleting(board)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-          {shared.length > 0 ? (
-            <section className="mt-8">
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-h3">{t('boards.section.shared')}</h2>
-                <span className="font-mono text-mono-sm text-ink-subtle">{shared.length}</span>
-              </div>
-              <ul className={cn(GRID, arrived && 'enter-stagger')}>
-                {shared.map((board) => (
-                  <li key={board.id}>
-                    <BoardTile
-                      board={board}
-                      onEdit={() => setEditing(board)}
-                      onDelete={() => setDeleting(board)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+          {/* The overview is a sentence made of numbers, not a dashboard: three
+              figures, counted from the whole list, no cards and no icons. */}
+          <dl className="mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+            <div className="flex items-baseline gap-2">
+              <dt className="order-2 text-mono-sm text-ink-subtle">{t('boards.overview.total')}</dt>
+              <dd className="order-1 font-display text-h2">{items.length}</dd>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <dt className="order-2 text-mono-sm text-ink-subtle">{t('boards.overview.mine')}</dt>
+              <dd className="order-1 font-display text-h2">{ownedCount}</dd>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <dt className="order-2 text-mono-sm text-ink-subtle">
+                {t('boards.overview.shared')}
+              </dt>
+              <dd className="order-1 font-display text-h2">{items.length - ownedCount}</dd>
+            </div>
+          </dl>
+          {boards.data.items.length === 0 ? (
+            <EmptySlot
+              className="mt-6 w-column min-h-36"
+              title={t('boards.empty.title')}
+              body={t('boards.empty.body')}
+            />
+          ) : visible.length === 0 ? (
+            <p className="mt-6 text-body-sm text-ink-muted">{t('boards.search.empty')}</p>
+          ) : (
+            <>
+              {owned.length > 0 ? (
+                <section className="mt-8">
+                  <div className="flex items-baseline gap-2">
+                    <h2 className="text-h3">{t('boards.section.mine')}</h2>
+                    <span className="font-mono text-mono-sm text-ink-subtle">{owned.length}</span>
+                  </div>
+                  <ul className={cn(GRID, arrived && 'enter-stagger')}>
+                    {owned.map((board) => (
+                      <li key={board.id}>
+                        <BoardTile
+                          board={board}
+                          onEdit={() => setEditing(board)}
+                          onDelete={() => setDeleting(board)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+              {shared.length > 0 ? (
+                <section className="mt-8">
+                  <div className="flex items-baseline gap-2">
+                    <h2 className="text-h3">{t('boards.section.shared')}</h2>
+                    <span className="font-mono text-mono-sm text-ink-subtle">{shared.length}</span>
+                  </div>
+                  <ul className={cn(GRID, arrived && 'enter-stagger')}>
+                    {shared.map((board) => (
+                      <li key={board.id}>
+                        <BoardTile
+                          board={board}
+                          onEdit={() => setEditing(board)}
+                          onDelete={() => setDeleting(board)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+            </>
+          )}
         </>
       )}
 
