@@ -472,7 +472,10 @@ function BoardFrame({
   const filtering = visible.length !== cards.length;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    // 12 px of canvas between the shell's header and the bar: the board is a
+    // frame, not a continuation of the header. The band is above the bar, so
+    // the bar keeps the page's one hairline at its bottom.
+    <div className="mt-3 flex min-h-0 flex-1 flex-col">
       {/* One 56 px bar: the name, then the meta 12 px away, then the filters
           and the settings. On a phone the same children stack on two rows — the
           grid in app.css places them. */}

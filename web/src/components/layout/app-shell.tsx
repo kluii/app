@@ -97,7 +97,10 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
         tabIndex={-1}
         className={cn(
           'min-h-0 flex-1 focus:outline-none',
-          onBoard ? 'overflow-hidden' : 'overflow-y-auto',
+          // A board fills what the header leaves, including the 12 px band the
+          // board bar puts above itself: the frame is a flex child, so it can
+          // be one, and the page never scrolls.
+          onBoard ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
         )}
       >
         {children ?? <Outlet />}

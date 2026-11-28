@@ -125,6 +125,39 @@ test('the card dialog is centred in the viewport and 640 wide', async ({ page, r
   );
 });
 
+/**
+ * The band between the header and the bar (fix pass). The board is a fixed
+ * frame: a rail that scrolls inside a page that does not. 12 px of canvas sit
+ * above the bar and under the 56 px header, at both widths, and the document
+ * never grows past the viewport.
+ */
+test.describe('the band above the board bar', () => {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`is 12 px of canvas at ${viewport.width} × ${viewport.height}`, async ({
+      page,
+      request,
+    }) => {
+      await page.setViewportSize(viewport);
+      await openBoard(page, request, uniqueUsername(`band-${viewport.width}`));
+
+      const header = await box(page.locator('header[data-app-chrome="true"]'));
+      const bar = await box(page.getByTestId('board-bar'));
+      expect(header.height, 'header height').toBe(56);
+      expect(bar.y - header.bottom, 'band between the header and the bar').toBe(12);
+
+      // The frame is the page: no vertical overflow, no document scroll.
+      const height = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollHeight,
+        inner: window.innerHeight,
+      }));
+      expect(height.scroll, 'the board does not scroll the document').toBe(height.inner);
+    });
+  }
+});
+
 test.describe('at 390 × 844', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

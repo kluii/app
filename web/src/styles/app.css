@@ -85,7 +85,9 @@
 
   .board-column {
     scroll-snap-align: start;
-    max-height: calc(100dvh - 11rem);
+    /* The viewport minus the header (56), the band above the bar (12), the two
+       bar rows (48 + 40) and the rail's own vertical padding (16 + 16). */
+    max-height: calc(100dvh - 11.75rem);
     overflow-y: auto;
     overscroll-behavior: contain;
   }
