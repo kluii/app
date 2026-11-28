@@ -68,13 +68,7 @@ function RequestForm() {
             onChange={(event) => setEmail(event.target.value)}
           />
         </Field>
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          loading={request.isPending}
-          className="w-full"
-        >
+        <Button type="submit" variant="primary" loading={request.isPending} className="h-10 w-full">
           {t('auth.reset.submit')}
         </Button>
       </form>
@@ -86,7 +80,7 @@ function RequestForm() {
       ) : null}
 
       <p className="mt-6 text-center text-body-sm text-ink-muted">
-        <Link to="/login" className="text-ink underline-offset-4 hover:underline">
+        <Link to="/login" className="text-ink underline underline-offset-4">
           {t('auth.reset.toSignIn')}
         </Link>
       </p>
@@ -120,7 +114,7 @@ function ConfirmForm({ token }: { token: string }) {
           <p className="text-body-sm text-ink-muted" role="status">
             {t('auth.reset.done')}
           </p>
-          <Link to="/login" className="text-body-sm text-ink underline-offset-4 hover:underline">
+          <Link to="/login" className="text-body-sm text-ink underline underline-offset-4">
             {t('auth.reset.toSignIn')}
           </Link>
         </div>
@@ -148,9 +142,8 @@ function ConfirmForm({ token }: { token: string }) {
           <Button
             type="submit"
             variant="primary"
-            size="lg"
             loading={confirm.isPending}
-            className="w-full"
+            className="h-10 w-full"
           >
             {t('auth.reset.confirm')}
           </Button>

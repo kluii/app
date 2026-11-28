@@ -105,13 +105,13 @@ function SignupPage() {
             onChange={(event) => setPassword(event.target.value)}
           />
         </Field>
-        <Button type="submit" variant="primary" size="lg" loading={pending} className="mt-2 w-full">
+        <Button type="submit" variant="primary" loading={pending} className="mt-2 h-10 w-full">
           {t('auth.signUp.submit')}
         </Button>
       </form>
 
       <p className="mt-6 text-center text-body-sm text-ink-muted">
-        <Link to="/login" className="text-ink underline-offset-4 hover:underline">
+        <Link to="/login" className="text-ink underline underline-offset-4">
           {t('auth.signUp.toSignIn')}
         </Link>
       </p>

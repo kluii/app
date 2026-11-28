@@ -148,7 +148,7 @@ function LoginPage() {
           </Field>
         ) : null}
 
-        <Button type="submit" variant="primary" size="lg" loading={pending} className="mt-2 w-full">
+        <Button type="submit" variant="primary" loading={pending} className="mt-2 h-10 w-full">
           {t('auth.signIn.submit')}
         </Button>
       </form>
@@ -176,7 +176,7 @@ function LoginPage() {
         <p className="mt-4 text-center text-body-sm">
           <button
             type="button"
-            className="text-ink-muted underline-offset-4 hover:text-ink hover:underline"
+            className="text-ink underline underline-offset-4"
             onClick={() => {
               setUseRecovery(!useRecovery);
               setFactor({ kind: useRecovery ? 'totp' : 'recovery', value: '' });
@@ -189,15 +189,12 @@ function LoginPage() {
       ) : (
         <>
           <p className="mt-6 text-center text-body-sm text-ink-muted">
-            <Link to="/signup" className="text-ink underline-offset-4 hover:underline">
+            <Link to="/signup" className="text-ink underline underline-offset-4">
               {t('auth.signIn.toSignUp')}
             </Link>
           </p>
           <p className="mt-2 text-center text-body-sm">
-            <Link
-              to="/reset"
-              className="text-ink-subtle underline-offset-4 hover:text-ink hover:underline"
-            >
+            <Link to="/reset" className="text-ink underline underline-offset-4">
               {t('auth.signIn.forgot')}
             </Link>
           </p>
