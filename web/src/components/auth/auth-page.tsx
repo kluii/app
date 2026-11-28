@@ -20,7 +20,7 @@ export function AuthPage({ children }: { children: ReactNode }) {
   const { theme, toggle } = useTheme();
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
-      <div className="flex h-14 items-center justify-between px-6">
+      <header className="flex h-14 items-center justify-between px-6">
         <img
           src={theme === 'dark' ? whiteLogo : blackLogo}
           alt={t('common.app.name')}
@@ -33,7 +33,7 @@ export function AuthPage({ children }: { children: ReactNode }) {
             <Moon aria-hidden="true" size={16} strokeWidth={1.5} />
           )}
         </Button>
-      </div>
+      </header>
 
       {/* Under 1024 px: one column, not vertically centred — a page that starts
           at a fixed 64 below the top row, rather than one that jumps when an

@@ -26,7 +26,7 @@ export function EmptySlot({
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 rounded-sm border border-dashed border-border-strong p-6',
+        'flex flex-col items-start gap-2 rounded-sm border border-dashed border-border-strong p-6',
         className,
       )}
     >
