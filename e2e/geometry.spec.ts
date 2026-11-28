@@ -19,9 +19,13 @@
  *
  * Phase 6 (board layout) adds the board half of that plan: first column at
  * x = 24, column width 288, card width 270 on top of the phase 1 measurements.
+ *
+ * Phase 6b (the other screens) adds the shell — 56 px, a 24 px wordmark, no
+ * hairline of its own on a board route — and the boards grid: four tiles on one
+ * row, equal heights.
  */
-import { expect, test, type Locator } from '@playwright/test';
-import { openBoard, uniqueUsername } from './support';
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { PASSWORD, openBoard, post, uniqueUsername } from './support';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -33,6 +37,14 @@ async function box(locator: Locator): Promise<Box> {
     const { x, y, width, height, right, bottom } = rect;
     return { x, y, width, height, right, bottom };
   });
+}
+
+/** A signed-in browser whose session lives in the API context's cookies. */
+async function signedIn(page: Page, request: APIRequestContext, username: string): Promise<void> {
+  await request.post('/api/v1/auth/signup', {
+    data: { email: `${username}@klui.test`, username, password: PASSWORD },
+  });
+  await page.context().addCookies((await request.storageState()).cookies);
 }
 
 test('the board is drawn on the 4 px grid', async ({ page, request }) => {
@@ -100,4 +112,62 @@ test.describe('at 390 × 844', () => {
     expect((await box(page.getByTestId('board-bar-row1'))).height, 'bar row 1 height').toBe(48);
     expect((await box(page.getByTestId('board-bar-row2'))).height, 'bar row 2 height').toBe(40);
   });
+});
+
+test.describe('the shell', () => {
+  test('is 56 px tall with a 24 px wordmark, and rules itself once', async ({ page, request }) => {
+    await signedIn(page, request, uniqueUsername('geometry-shell'));
+    await page.goto('/boards', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
+
+    const header = page.locator('header[data-app-chrome="true"]');
+    expect((await box(header)).height, 'header height').toBe(56);
+    expect((await box(header.locator('img'))).height, 'wordmark height').toBe(24);
+    const geometry = await header.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { left: style.paddingLeft, right: style.paddingRight, rule: style.borderBottomWidth };
+    });
+    expect(geometry.left, 'header padding left').toBe('24px');
+    expect(geometry.right, 'header padding right').toBe('24px');
+    expect(geometry.rule, 'header hairline off the board').toBe('1px');
+  });
+
+  test('leaves the hairline to the board bar on a board route', async ({ page, request }) => {
+    await openBoard(page, request, uniqueUsername('geometry-shell-board'), ['Alpha']);
+
+    const rule = await page
+      .locator('header[data-app-chrome="true"]')
+      .evaluate((element) => getComputedStyle(element).borderBottomWidth);
+    expect(rule, 'no second hairline above the board bar').toBe('0px');
+    // The one rule on the page is the bar's own.
+    expect(
+      await page
+        .getByTestId('board-bar')
+        .evaluate((element) => getComputedStyle(element).borderBottomWidth),
+    ).toBe('1px');
+  });
+});
+
+test('four boards are four tiles on one row, all the same height', async ({ page, request }) => {
+  await signedIn(page, request, uniqueUsername('geometry-grid'));
+  for (const name of ['Alpha', 'Bravo', 'Charlie', 'Delta']) {
+    await post(request, '/api/v1/boards', { name });
+  }
+
+  await page.goto('/boards', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
+
+  const tiles = page.locator('[data-testid^="board-"]');
+  await expect(tiles).toHaveCount(4);
+  const boxes = await Promise.all(Array.from({ length: 4 }, (_, index) => box(tiles.nth(index))));
+
+  const [first, second, , last] = boxes;
+  if (!first || !second || !last) throw new Error('expected four tiles');
+
+  // One row: one y, one height, and 16 between two neighbours.
+  expect(new Set(boxes.map((tile) => tile.y)).size, 'tiles share one row').toBe(1);
+  expect(new Set(boxes.map((tile) => tile.height)).size, 'tiles share one height').toBe(1);
+  expect(first.height, 'tile height').toBe(96);
+  expect(second.x - first.right, 'gap between two tiles').toBe(16);
+  expect(last.right - first.x, 'four tiles fit the content width').toBe(1392);
 });

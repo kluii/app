@@ -55,7 +55,7 @@ function BoardsPage() {
       ) : (
         <ul className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {boards.data.items.map((board) => (
-            <li key={board.id} className="flex">
+            <li key={board.id}>
               <BoardTile board={board} />
             </li>
           ))}

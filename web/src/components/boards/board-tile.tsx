@@ -12,7 +12,7 @@ import { formatDate } from '../../lib/format';
  * profile so the two lists cannot drift, and each supplies its own address.
  */
 const TILE =
-  'flex h-full min-h-24 flex-col justify-between gap-4 rounded-sm border border-border bg-card p-4 transition-colors duration-[var(--dur-fast)] hover:border-border-strong';
+  'flex h-full w-full min-h-24 flex-col justify-between gap-4 rounded-sm border border-border bg-card p-4 transition-colors duration-[var(--dur-fast)] hover:border-border-strong';
 
 export function BoardTile({ board }: { board: Board }) {
   return (
