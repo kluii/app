@@ -75,7 +75,7 @@ export function isBelowHalf(element: Element, clientY: number): boolean {
  * It is built with `createElement`, not rendered through React: the native drag
  * image has to exist synchronously inside `onGenerateDragPreview`, and a portal
  * is not ready then. Classes come from tokens.css, so the ghost is the same
- * card the reader picked up: 272 px, 8 px radius, one hairline, the overlay
+ * card the reader picked up: 270 px, 8 px radius, one hairline, the overlay
  * shadow, and 1.5° of tilt so it reads as lifted rather than duplicated.
  */
 function buildDragPreview(container: HTMLElement, card: Card): void {

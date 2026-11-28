@@ -44,7 +44,7 @@ export function CardMenu({
         ref={trigger}
         variant="ghost"
         size="icon"
-        className="h-7 w-7 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+        className="h-7 w-7 shrink-0"
         aria-label={t('board.card.menu')}
         aria-haspopup="menu"
         aria-expanded={open}

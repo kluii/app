@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Check, Undo2 } from 'lucide-react';
+import { Calendar, Check, Undo2 } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import type { Card, Column } from '../../api/types';
 import { t } from '../../i18n';
@@ -57,6 +57,7 @@ export function CardRow({
   onSettle: (cardId: string) => void;
 }) {
   const due = card.due_at ? formatDate(card.due_at) : null;
+  const assignee = card.assignee?.username ?? card.assignee_label ?? null;
   const { ref, dragging, consumeDragClick } = useCardDnd({
     card,
     cards,
@@ -106,25 +107,29 @@ export function CardRow({
           </span>
         </span>
 
-        {card.tags.length > 0 || due || card.assignee || card.assignee_label ? (
-          <span className="flex flex-wrap items-center gap-1">
+        {card.tags.length > 0 ? (
+          <span className="flex flex-wrap gap-1">
             {card.tags.map((tag) => (
               <TagChip key={tag.name} tag={tag} />
             ))}
+          </span>
+        ) : null}
+
+        {due || assignee ? (
+          <span className="flex h-4 items-center justify-between gap-2">
             {due ? (
               <span
-                className="font-mono text-mono-sm text-ink-subtle tabular-nums"
+                className="flex items-center gap-1 font-mono text-mono-sm tabular-nums text-ink-muted"
                 title={card.due_at ?? ''}
               >
+                <Calendar aria-hidden size={12} strokeWidth={1.5} />
                 {due}
               </span>
             ) : null}
-            {card.assignee ? (
-              <span className="font-mono text-mono-sm text-ink-subtle">
-                {card.assignee.username}
+            {assignee ? (
+              <span className="ml-auto max-w-24 truncate font-mono text-mono-sm text-ink-subtle">
+                {assignee}
               </span>
-            ) : card.assignee_label ? (
-              <span className="font-mono text-mono-sm text-ink-subtle">{card.assignee_label}</span>
             ) : null}
           </span>
         ) : null}
@@ -132,7 +137,9 @@ export function CardRow({
 
       {/* The card opens from anywhere on the row; the tick and the menu stop
           propagation on pointerdown so they never arm a drag
-          (docs/features/board-interaction.md §1.6). */}
+          (docs/features/board-interaction.md §1.6). The two controls sit in the
+          top-right corner and appear on hover, on keyboard focus inside the
+          card, and on a touch screen, where there is no hover. */}
       <button
         ref={ref}
         type="button"
@@ -155,7 +162,7 @@ export function CardRow({
         ) : null}
       </button>
 
-      <div className="absolute right-1 top-1 z-10 flex items-center gap-0.5">
+      <div className="absolute right-1 top-1 z-10 flex items-center gap-0.5 opacity-100 [@media(pointer:coarse)]:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
         {/* One glyph, one meaning: the done card carries the filled tick at the
             left of its title, so reopening is an arrow, never a second check. */}
         {card.done && canTick ? (

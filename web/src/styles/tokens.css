@@ -94,7 +94,8 @@
 
   /* geometry (DESIGN.md §4): the off-scale sizes the app needs */
   --size-column: 288px;
-  --size-card: 272px;
+  /* 288 − 2 of column border − 16 of column padding: the card fills the well */
+  --size-card: 270px;
   --size-dialog: 560px;
   --size-dialog-wide: 640px;
   --size-content: 1440px;

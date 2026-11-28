@@ -716,13 +716,13 @@ function ColumnSection({
       data-testid={`column-${column.id}`}
       data-drop-active={active ? 'true' : undefined}
     >
-      <header className="flex items-center justify-between px-1 py-1">
-        <h2 className="line-clamp-2 text-label text-ink-muted">{column.name}</h2>
-        <span className="font-mono text-mono-sm text-ink-subtle">{cards.length}</span>
+      <header className="flex min-h-8 items-center justify-between px-2">
+        <h2 className="line-clamp-2 text-label text-ink">{column.name}</h2>
+        <span className="font-mono text-mono-sm tabular-nums text-ink-subtle">{cards.length}</span>
       </header>
 
       {cards.length === 0 && hint === null ? (
-        <p className="px-1 pb-1 text-body-sm text-ink-subtle">
+        <p className="px-2 pb-2 text-body-sm text-ink-subtle">
           {filtering
             ? t('board.column.emptyFiltered')
             : caller.can_write
@@ -764,7 +764,7 @@ function ColumnSection({
         <button
           type="button"
           onClick={() => onAddCard(column.id)}
-          className="flex h-8 items-center gap-2 rounded-sm px-1 text-label text-ink-subtle transition-colors hover:text-ink"
+          className="flex h-8 w-full items-center gap-2 rounded-sm px-2 text-label text-ink-subtle transition-colors duration-[var(--dur-fast)] hover:bg-surface-muted hover:text-ink"
         >
           <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
           {t('board.card.add')}
@@ -792,7 +792,7 @@ function AddColumn({ boardId }: { boardId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-column shrink-0 items-center gap-2 rounded-sm border border-dashed border-border px-2 text-label text-ink-subtle transition-colors hover:border-border-strong hover:text-ink"
+        className="flex h-10 w-column shrink-0 items-center gap-2 rounded-sm border border-dashed border-border-strong px-2 text-label text-ink-subtle transition-colors duration-[var(--dur-fast)] hover:border-ink-subtle hover:text-ink"
       >
         <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
         {t('board.column.add')}
@@ -802,7 +802,7 @@ function AddColumn({ boardId }: { boardId: string }) {
 
   return (
     <form
-      className="flex w-column shrink-0 flex-col gap-2 rounded-md bg-column p-2"
+      className="flex w-column shrink-0 flex-col gap-2 rounded-md border border-border bg-column p-2"
       onSubmit={(event) => {
         event.preventDefault();
         if (name.trim() !== '' && !create.isPending) create.mutate();
