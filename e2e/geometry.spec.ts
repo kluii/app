@@ -84,6 +84,47 @@ test('the board is drawn on the 4 px grid', async ({ page, request }) => {
   expect(rightColumn.x - leftColumn.right, 'gap between two columns').toBe(16);
 });
 
+/**
+ * Fix pass — the dialog is centred, and the card panel is the wide one.
+ * Tailwind v4's preflight zeroes `margin` on every element, which overrode the
+ * UA's `margin: auto` on a modal `<dialog>`: with `inset: 0` and no auto
+ * margin the panel pinned to the top-left corner. Measured on the rect at
+ * 1440 × 900, not on a screenshot.
+ */
+test('the card dialog is centred in the viewport and 640 wide', async ({ page, request }) => {
+  const { cards, columns } = await openBoard(page, request, uniqueUsername('geometry-dialog'), [
+    'Centred',
+  ]);
+  const [card] = cards;
+  const [toDo] = columns;
+  if (!card || !toDo) throw new Error('seed failed');
+
+  await page.getByTestId(`card-${card.id}`).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+
+  const rect = await box(dialog);
+  // The viewport is 1440 × 900, so its centre is (720, 450).
+  expect(Math.abs(rect.x + rect.width / 2 - 720), 'dialog centre x').toBeLessThanOrEqual(1);
+  expect(Math.abs(rect.y + rect.height / 2 - 450), 'dialog centre y').toBeLessThanOrEqual(1);
+  expect(rect.width, 'the card panel is the wide one').toBe(640);
+  expect(rect.y, 'the dialog is not pinned to the top edge').toBeGreaterThan(0);
+  expect(await dialog.getAttribute('class'), 'the wide class is on the card dialog').toContain(
+    'dialog-wide',
+  );
+
+  // Every other dialog stays at 560 and carries no `dialog-wide`.
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await page.getByTestId(`column-${toDo.id}`).getByRole('button', { name: 'Add card' }).click();
+  const create = page.getByRole('dialog');
+  await expect(create).toBeVisible();
+  expect((await box(create)).width, 'the create dialog stays at 560').toBe(560);
+  expect(await create.getAttribute('class'), 'no wide class on the create dialog').not.toContain(
+    'dialog-wide',
+  );
+});
+
 test.describe('at 390 × 844', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -111,6 +152,34 @@ test.describe('at 390 × 844', () => {
     // and the filters — closed by a single hairline.
     expect((await box(page.getByTestId('board-bar-row1'))).height, 'bar row 1 height').toBe(48);
     expect((await box(page.getByTestId('board-bar-row2'))).height, 'bar row 2 height').toBe(40);
+  });
+
+  test('the card dialog is still a bottom sheet, not a centred panel', async ({
+    page,
+    request,
+  }) => {
+    const { cards } = await openBoard(page, request, uniqueUsername('geometry-dialog-mobile'), [
+      'On a phone',
+    ]);
+    const [card] = cards;
+    if (!card) throw new Error('seed failed');
+
+    await page.getByTestId(`card-${card.id}`).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    // The wide class is on the card dialog, but the phone media query in
+    // app.css still wins: full width, pinned to the bottom (`margin: auto 0 0`).
+    expect(await dialog.getAttribute('class')).toContain('dialog-wide');
+    const rect = await box(dialog);
+    expect(rect.width, 'the sheet spans the 390 px viewport').toBe(390);
+    expect(rect.x, 'the sheet starts at the left edge').toBe(0);
+    expect(rect.bottom, 'the sheet sits on the bottom edge').toBe(844);
+    const margin = await dialog.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { top: style.marginTop, bottom: style.marginBottom };
+    });
+    expect(margin.bottom, 'the bottom margin is zero, not auto').toBe('0px');
+    expect(Number.parseFloat(margin.top), 'the top margin is auto, resolved').toBeGreaterThan(0);
   });
 });
 

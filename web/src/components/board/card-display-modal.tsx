@@ -43,6 +43,7 @@ export function CardDisplayModal({
       onClose={onClose}
       initialFocus={closeRef}
       title={card.title}
+      wide
       footer={
         <>
           {caller.can_write && (caller.actor_kind !== 'anon' || card.mine) ? (

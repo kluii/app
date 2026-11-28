@@ -389,10 +389,21 @@
     width: var(--size-dialog);
     max-width: calc(100vw - 2rem);
     max-height: calc(100dvh - 4rem);
+    /* Tailwind v4's preflight zeroes `margin` on every element, which overrides
+       the UA's `margin: auto` on a modal <dialog>: with `inset: 0` and no auto
+       margin, the panel pins to the top-left corner. Auto margins are what
+       centre it on both axes; the phone sheet in app.css overrides this. */
+    margin: auto;
     padding: 0;
     border: 0;
     background: none;
     overflow: visible;
+  }
+
+  /* The card detail reads 640 wide; every other panel stays at 560. The class
+     lands on the <dialog> frame (dialog.tsx `wide`), never on the body. */
+  .dialog-panel.dialog-wide {
+    width: var(--size-dialog-wide);
   }
 
   .dialog-body {

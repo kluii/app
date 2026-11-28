@@ -16,6 +16,7 @@ export function Dialog({
   className,
   footer,
   initialFocus,
+  wide,
 }: {
   open: boolean;
   onClose: () => void;
@@ -30,6 +31,9 @@ export function Dialog({
    * text box (K2-15): the caller names the element instead.
    */
   initialFocus?: RefObject<HTMLElement | null>;
+  /** 640 px wide (`--size-dialog-wide`) instead of 560: the card detail. The
+      class goes on the `<dialog>` frame, not on the body. */
+  wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -62,7 +66,7 @@ export function Dialog({
       onClick={(event) => {
         if (event.target === ref.current) onClose();
       }}
-      className="dialog-panel"
+      className={cn('dialog-panel', wide && 'dialog-wide')}
       aria-labelledby={titleId}
     >
       {/* The frame above is top-layer plumbing: placed by the platform, painted
