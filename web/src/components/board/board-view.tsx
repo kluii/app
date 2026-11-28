@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Copy, Plus, Settings2 } from 'lucide-react';
+import { Copy, Lock, Plus, Settings2 } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
 import { failureMessage } from '../../lib/api-error';
+import { cn } from '../../lib/cn';
 import type { Board, BoardState, Caller, Card, Column } from '../../api/types';
 import { t } from '../../i18n';
 import { applyCardFrame, cardIdOf, envelopeOf, dropCard, isCardEvent } from '../../data/boards';
 import { connectBoardStream, type LiveStatus } from '../../data/live';
 import { queryKeys } from '../../lib/query-client';
-import { Button } from '../ui/button';
-import { Chip } from '../ui/chip';
+import { Button, buttonVariants } from '../ui/button';
 import { DropdownItem, DropdownMenu, DropdownSeparator } from '../ui/dropdown-menu';
 import { Input } from '../ui/input';
 import { useToast } from '../ui/toast';
@@ -467,65 +467,86 @@ function BoardFrame({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {/* One 56 px bar: the name, then the meta 12 px away, then the filters,
+          the card count and the settings. On a phone the same children stack
+          on two rows — the grid in app.css places them. */}
       <header
         data-testid="board-bar"
-        className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border px-6"
+        className="board-bar flex h-14 items-center justify-between gap-4 border-b border-border bg-canvas px-6"
       >
-        <div className="flex min-w-0 items-center gap-3">
-          <BoardName board={board} canRename={caller.can_manage} />
+        <div className="board-bar-left flex min-w-0 flex-1 items-center gap-3">
+          <div data-testid="board-bar-row1" className="board-bar-title min-w-0">
+            <BoardName board={board} canRename={caller.can_manage} />
+          </div>
           {/* Meta is a line of text, not a row of chips: mono, one `·`, the role
               first. `caller-chip` stays on the span that carries the role, which
               is what the shared-affordances test reads. */}
-          <p className="flex shrink-0 items-center gap-2 font-mono text-mono-sm text-ink-muted">
-            <span data-testid="caller-chip">{callerLabel(caller)}</span>
-            <span aria-hidden="true">·</span>
-            <span>{t(`board.visibility.${board.visibility}`)}</span>
-          </p>
-          {board.closed_at === null ? null : (
-            <span data-testid="board-closed-chip">
-              <Chip>{t('board.closed.chip')}</Chip>
-            </span>
-          )}
-          {live === 'closed' ? (
-            <span className="font-mono text-mono-sm text-ink-subtle" data-testid="board-live">
-              {t('common.label.reconnecting')}
-            </span>
-          ) : null}
-          {board.closed_at === null ? null : (
-            <Link
-              className="inline-flex h-7 items-center rounded-full border border-border bg-surface-2 px-3 text-label text-ink hover:bg-surface-muted"
-              to="/boards/$boardId/summary"
-              params={{ boardId: board.id }}
-              data-testid="open-board-summary"
-            >
-              {t('board.summary.open')}
-            </Link>
-          )}
+          <div
+            data-testid="board-bar-row2"
+            className="board-bar-meta flex min-w-0 items-center gap-3"
+          >
+            <p className="flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-mono-sm text-ink-muted">
+              <span data-testid="caller-chip">{callerLabel(caller)}</span>
+              <span aria-hidden="true">·</span>
+              <span>{t(`board.visibility.${board.visibility}`)}</span>
+            </p>
+            {board.closed_at === null ? null : (
+              <span
+                data-testid="board-closed-chip"
+                className="flex shrink-0 items-center gap-1 whitespace-nowrap font-mono text-mono-sm text-ink-muted"
+              >
+                <Lock aria-hidden size={12} strokeWidth={1.5} />
+                {t('board.closed.chip')}
+              </span>
+            )}
+            {live === 'closed' ? (
+              <span
+                className="shrink-0 whitespace-nowrap font-mono text-mono-sm text-ink-subtle"
+                data-testid="board-live"
+              >
+                {t('common.label.reconnecting')}
+              </span>
+            ) : null}
+            {board.closed_at === null ? null : (
+              <Link
+                to="/boards/$boardId/summary"
+                params={{ boardId: board.id }}
+                data-testid="open-board-summary"
+                className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
+              >
+                {t('board.summary.open')}
+              </Link>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <BoardFilters
-            filters={filters}
-            onChange={onFiltersChange}
-            cards={cards}
-            members={members}
-            shown={visible.length}
-          />
-          <BoardSettingsMenu
-            boardState={boardState}
-            onOpenShare={onOpenShare}
-            onOpenMembers={onOpenMembers}
-            onOpenActivity={onOpenActivity}
-            onOpenData={onOpenData}
-            onOpenModeration={onOpenModeration}
-            onOpenDelete={onOpenDelete}
-          />
+        <div className="board-bar-right flex items-center gap-2">
+          <div className="board-bar-filters flex items-center gap-2">
+            <BoardFilters
+              filters={filters}
+              onChange={onFiltersChange}
+              cards={cards}
+              members={members}
+              shown={visible.length}
+            />
+          </div>
+          <div className="board-bar-settings">
+            <BoardSettingsMenu
+              boardState={boardState}
+              onOpenShare={onOpenShare}
+              onOpenMembers={onOpenMembers}
+              onOpenActivity={onOpenActivity}
+              onOpenData={onOpenData}
+              onOpenModeration={onOpenModeration}
+              onOpenDelete={onOpenDelete}
+            />
+          </div>
         </div>
       </header>
 
       <ActiveFilters filters={filters} onChange={onFiltersChange} />
 
       {columns.length === 0 ? (
-        <div className="px-4 py-6">
+        <div className="px-6 py-6">
           <ColumnRail
             boardId={board.id}
             canWrite={caller.can_manage_columns}
@@ -955,12 +976,12 @@ function BoardSettingsMenu({
       onOpenChange={setOpen}
       align="end"
       trigger={(wiring) => (
-        <button
-          type="button"
+        <Button
           {...wiring}
+          variant="secondary"
+          size="md"
           title={t('board.settings.label')}
           data-testid="open-board-settings"
-          className="inline-flex h-7 items-center gap-2 rounded-full border border-border bg-surface-2 px-2 text-label text-ink transition-colors duration-[var(--dur-fast)] hover:bg-surface-muted"
         >
           <span className="relative inline-flex">
             <Settings2 aria-hidden className="h-4 w-4" strokeWidth={1.5} />
@@ -975,7 +996,7 @@ function BoardSettingsMenu({
             ) : null}
           </span>
           <span className="hidden sm:inline">{t('board.settings.label')}</span>
-        </button>
+        </Button>
       )}
     >
       <DropdownItem

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { ListFilter } from 'lucide-react';
 import { useId, useMemo, useRef, useState } from 'react';
 import type { Card, Member } from '../../api/types';
 import { t } from '../../i18n';
@@ -80,12 +81,13 @@ export function BoardFilters({
     <div className="flex flex-wrap items-center gap-2">
       <Button
         ref={trigger}
-        variant={active ? 'secondary' : 'ghost'}
-        size="sm"
+        variant="secondary"
+        size="md"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen(!open)}
       >
+        <ListFilter aria-hidden size={16} strokeWidth={1.5} />
         {t('board.filter.title')}
         {active ? <span className="font-mono text-mono-sm">{filterCount(filters)}</span> : null}
       </Button>
