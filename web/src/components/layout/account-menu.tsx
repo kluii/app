@@ -68,12 +68,12 @@ export function AccountMenu({ me }: { me: Me }) {
       )}
     >
       <DropdownHeader>
-        {/* Three lines, each allowed to be cut: the name, the handle, the
-            address. The handle always carries its at sign, even when the name
-            above it is the same string. */}
-        <span className="truncate text-label text-ink">
-          {me.display_name ?? atUsername(me.username)}
-        </span>
+        {/* Three lines when the account has a name, two when it does not: the
+            handle used to stand in for the missing name and then say itself
+            again. The handle always carries its at sign. */}
+        {me.display_name === null ? null : (
+          <span className="truncate text-label text-ink">{me.display_name}</span>
+        )}
         <span className="truncate font-mono text-mono-sm text-ink-subtle">
           {atUsername(me.username)}
         </span>
