@@ -1,20 +1,47 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Moon, Sun, type LucideIcon } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../../api/client';
 import { failureMessage } from '../../lib/api-error';
 import { queryKeys } from '../../lib/query-client';
-import { t } from '../../i18n';
+import { cn } from '../../lib/cn';
+import { useTheme, type Theme } from '../../lib/theme';
+import { getLocale, setLocale, t, type Locale } from '../../i18n';
 import { Button } from '../ui/button';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
 
+const THEMES: { id: Theme; icon: LucideIcon }[] = [
+  { id: 'light', icon: Sun },
+  { id: 'dark', icon: Moon },
+];
+
 /**
- * Profile edit and password change (K5-08, D-13, D-16).
+ * An endonym names its own language, so both catalogues carry the same word:
+ * `English` is `English` to a French reader. The key still goes through `t()`.
+ */
+const LOCALES: { id: Locale; label: string }[] = [
+  { id: 'en', label: 'settings.interface.english' },
+  { id: 'fr', label: 'settings.interface.french' },
+];
+
+/** The selected half of a two-way control: the active row, not a pressed pill. */
+const SELECTED = 'bg-surface-muted text-ink shadow-[var(--shadow-active)]';
+
+/**
+ * Profile edit, interface choices and password change (K5-08, D-13, D-16).
+ *
+ * The theme and the language are one choice each, made once and remembered by
+ * the browser: two icon buttons and two words, never a native select, and no
+ * third option that would mean "follow the system" without saying so.
  */
 export function ProfileSettings() {
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me, retry: false });
+  const { theme, setTheme } = useTheme();
+  // A language change remounts the tree (App.tsx), so reading it is enough.
+  const locale = getLocale();
 
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -130,6 +157,60 @@ export function ProfileSettings() {
             </Button>
           </div>
         </form>
+      </div>
+
+      <div className="flex flex-col gap-4 border-t border-border pt-8">
+        <h3 className="text-h3">{t('settings.interface.title')}</h3>
+        <p className="text-body-sm text-ink-muted">{t('settings.interface.hint')}</p>
+
+        <div className="flex flex-wrap gap-8 rounded-sm border border-border p-4">
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-label font-medium text-ink-muted">
+              {t('settings.interface.theme')}
+            </legend>
+            <div className="flex gap-2">
+              {THEMES.map((value) => {
+                const Icon = value.icon;
+                const selected = theme === value.id;
+                return (
+                  <Button
+                    key={value.id}
+                    size="icon"
+                    variant="ghost"
+                    aria-pressed={selected}
+                    aria-label={t(`theme.${value.id}`)}
+                    className={cn(selected && SELECTED)}
+                    onClick={() => setTheme(value.id)}
+                  >
+                    <Icon aria-hidden className="h-4 w-4" strokeWidth={1.5} />
+                  </Button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-label font-medium text-ink-muted">
+              {t('settings.interface.language')}
+            </legend>
+            <div className="flex gap-2">
+              {LOCALES.map((value) => {
+                const selected = locale === value.id;
+                return (
+                  <Button
+                    key={value.id}
+                    variant="ghost"
+                    aria-pressed={selected}
+                    className={cn(selected && SELECTED)}
+                    onClick={() => setLocale(value.id)}
+                  >
+                    {t(value.label)}
+                  </Button>
+                );
+              })}
+            </div>
+          </fieldset>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 border-t border-border pt-8">

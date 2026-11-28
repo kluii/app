@@ -50,3 +50,47 @@ test('with nothing stored, the OS preference decides', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   expect(await backgroundAtLoad(page)).toBe(`light:${LIGHT_CANVAS}`);
 });
+
+/**
+ * The interface block (fix pass). The theme and the language left the account
+ * menu for Settings, where a choice made once belongs: two icon buttons for the
+ * theme, two words for the language, no native select. Both are stored by the
+ * browser, so both survive a reload.
+ */
+test('the interface block in Settings switches the theme and the language', async ({ page }) => {
+  const run = Date.now().toString(36);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/signup', { waitUntil: 'domcontentloaded' });
+  await page.getByLabel('Email').fill(`interface-${run}@klui.test`);
+  await page.getByLabel('Username').fill(`interface-${run}`);
+  await page.getByLabel('Password').fill('a-long-passphrase-9');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
+
+  await page.getByTestId('account-avatar').click();
+  // The menu no longer offers a language: it states who you are and the theme.
+  await expect(page.getByRole('menuitemradio', { name: 'English' })).toHaveCount(0);
+  await page.getByRole('menuitem', { name: 'Account settings' }).click();
+  await expect(page.getByRole('heading', { level: 3, name: 'Interface' })).toBeVisible();
+
+  // The theme: the light button is pressed on a light OS, and dark is one click.
+  const light = page.getByRole('button', { name: 'Light' });
+  const dark = page.getByRole('button', { name: 'Dark' });
+  await expect(light).toHaveAttribute('aria-pressed', 'true');
+  await dark.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(
+    await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor),
+  ).toBe(DARK_CANVAS);
+  await expect(dark).toHaveAttribute('aria-pressed', 'true');
+  await expect(light).toHaveAttribute('aria-pressed', 'false');
+
+  // The language: French renames the screen and the document, and sticks.
+  await page.getByRole('button', { name: 'Français' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Paramètres');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
