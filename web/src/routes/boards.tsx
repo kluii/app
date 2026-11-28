@@ -18,6 +18,7 @@ import { cn } from '../lib/cn';
 import { useArrival } from '../lib/entrance';
 import { useShortcuts } from '../lib/hotkeys';
 import { queryClient, queryKeys } from '../lib/query-client';
+import { useToast } from '../components/ui/toast';
 import { authedRoute } from './authed';
 
 export const boardsRoute = createRoute({
@@ -36,6 +37,7 @@ function BoardsPage() {
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Board | null>(null);
+  const [deleting, setDeleting] = useState<Board | null>(null);
   const boards = useQuery({ queryKey: queryKeys.boards, queryFn: api.boards });
 
   useShortcuts([{ key: 'n', handler: () => setCreating(true) }]);
@@ -109,7 +111,11 @@ function BoardsPage() {
               <ul className={cn(GRID, arrived && 'enter-stagger')}>
                 {owned.map((board) => (
                   <li key={board.id}>
-                    <BoardTile board={board} onEdit={() => setEditing(board)} />
+                    <BoardTile
+                      board={board}
+                      onEdit={() => setEditing(board)}
+                      onDelete={() => setDeleting(board)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -124,7 +130,11 @@ function BoardsPage() {
               <ul className={cn(GRID, arrived && 'enter-stagger')}>
                 {shared.map((board) => (
                   <li key={board.id}>
-                    <BoardTile board={board} onEdit={() => setEditing(board)} />
+                    <BoardTile
+                      board={board}
+                      onEdit={() => setEditing(board)}
+                      onDelete={() => setDeleting(board)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -143,6 +153,12 @@ function BoardsPage() {
       />
 
       <EditBoardDialog board={editing} open={editing !== null} onClose={() => setEditing(null)} />
+
+      <DeleteBoardDialog
+        board={deleting}
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+      />
     </div>
   );
 }
@@ -353,6 +369,68 @@ function EditBoardDialog({
           </div>
         </div>
       </div>
+    </Dialog>
+  );
+}
+
+/**
+ * Delete a board from the list (brief §4.6): one confirmation naming the board,
+ * and a `danger` action, because the board, its columns, its cards and their
+ * comments go with it. The reader stays on `/boards`; only the list is
+ * invalidated.
+ */
+function DeleteBoardDialog({
+  board,
+  open,
+  onClose,
+}: {
+  board: Board | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { notify } = useToast();
+  const [error, setError] = useState<string | null>(null);
+
+  const remove = useMutation({
+    mutationFn: () => api.deleteBoard(board?.id ?? ''),
+    onSuccess: async () => {
+      if (board !== null) queryClient.removeQueries({ queryKey: queryKeys.board(board.id) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.boards });
+      notify(t('board.delete.done'));
+      onClose();
+    },
+    onError: (cause) => setError(failureMessage(cause)),
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={t('boards.delete.title')}
+      description={t('boards.delete.body', { board: board?.name ?? '' })}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.action.cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            loading={remove.isPending}
+            onClick={() => {
+              setError(null);
+              remove.mutate();
+            }}
+          >
+            {t('common.action.delete')}
+          </Button>
+        </>
+      }
+    >
+      {error === null ? null : (
+        <p role="alert" className="text-body-sm text-danger">
+          {error}
+        </p>
+      )}
     </Dialog>
   );
 }

@@ -228,6 +228,8 @@
   "board.visibility.private": "Private",
   "board.visibility.public": "Public",
   "boards.action.new": "New board",
+  "boards.delete.body": "{board} and everything in it are destroyed. This cannot be undone.",
+  "boards.delete.title": "Delete board",
   "boards.edit.conflict": "This board changed while you were editing. Reload the page rather than overwrite it.",
   "boards.edit.description": "Description",
   "boards.edit.icon": "Icon",

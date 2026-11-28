@@ -228,6 +228,8 @@
   "board.visibility.private": "Privé",
   "board.visibility.public": "Public",
   "boards.action.new": "Nouveau tableau",
+  "boards.delete.body": "« {board} » et tout ce qu’il contient sont détruits. Cette action est irréversible.",
+  "boards.delete.title": "Supprimer le tableau",
   "boards.edit.conflict": "Ce tableau a été modifié pendant votre modification. Rechargez la page plutôt que d’écraser.",
   "boards.edit.description": "Description",
   "boards.edit.icon": "Icône",
