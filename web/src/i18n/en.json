@@ -166,7 +166,7 @@
   "board.role.editor": "Editor",
   "board.role.linkEdit": "You can edit",
   "board.role.linkRead": "Read-only link",
-  "board.role.owner": "OP",
+  "board.role.owner": "Owner",
   "board.role.viewer": "Viewer",
   "board.settings.copyLink": "Copy link",
   "board.settings.label": "Board settings",

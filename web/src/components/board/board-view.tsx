@@ -473,10 +473,14 @@ function BoardFrame({
       >
         <div className="flex min-w-0 items-center gap-3">
           <BoardName board={board} canRename={caller.can_manage} />
-          <span data-testid="caller-chip">
-            <Chip>{callerLabel(caller)}</Chip>
-          </span>
-          <Chip>{t(`board.visibility.${board.visibility}`)}</Chip>
+          {/* Meta is a line of text, not a row of chips: mono, one `·`, the role
+              first. `caller-chip` stays on the span that carries the role, which
+              is what the shared-affordances test reads. */}
+          <p className="flex shrink-0 items-center gap-2 font-mono text-mono-sm text-ink-muted">
+            <span data-testid="caller-chip">{callerLabel(caller)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{t(`board.visibility.${board.visibility}`)}</span>
+          </p>
           {board.closed_at === null ? null : (
             <span data-testid="board-closed-chip">
               <Chip>{t('board.closed.chip')}</Chip>
