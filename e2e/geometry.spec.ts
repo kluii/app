@@ -158,6 +158,109 @@ test.describe('the band above the board bar', () => {
   }
 });
 
+/**
+ * Fix pass — a board column scrolls its own cards, at every width.
+ *
+ * The frame is `h-dvh overflow-hidden` and the rail's scroll container hides
+ * vertical overflow, so a column that cannot scroll puts everything past the
+ * viewport out of reach: with 12 cards in one column, `col.clientHeight` was
+ * 1187 in a 900 px viewport and `col.scrollTop = 400` read back 0. The column now
+ * caps at the rail's height (`.board-column { max-height: 100% }` plus `h-full`
+ * on the rail) and owns its own overflow.
+ */
+test.describe('a board column scrolls its own cards', () => {
+  const twelve = Array.from({ length: 12 }, (_, index) => `Card number ${index + 1}`);
+  // A card's height is its title plus its snippet: a title-only card is 47 px,
+  // and twelve of those still fit the rail at 1440 × 900. The 120-character
+  // description is what the defect was measured with.
+  const snippet =
+    'Ask the owner whether the digest ships this week or next, then move the two open questions from the standup into the retro notes before Friday.';
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`the twelfth card is reachable at ${viewport.width} × ${viewport.height}`, async ({
+      page,
+      request,
+    }) => {
+      await page.setViewportSize(viewport);
+      const { cards, columns } = await openBoard(
+        page,
+        request,
+        uniqueUsername(`column-scroll-${viewport.width}`),
+        twelve,
+        snippet,
+      );
+      const [toDo] = columns;
+      const [last] = cards.slice(-1);
+      if (!toDo || !last) throw new Error('seed failed');
+
+      const column = page.getByTestId(`column-${toDo.id}`);
+      await expect(column.getByTestId('card-title')).toHaveCount(12);
+
+      const measured = await column.evaluate((element) => ({
+        client: element.clientHeight,
+        scroll: element.scrollHeight,
+        overflowY: getComputedStyle(element).overflowY,
+      }));
+      expect(measured.overflowY, 'the column owns the vertical overflow').toBe('auto');
+      expect(measured.client, 'the column stops at the height the frame leaves').toBeLessThan(
+        measured.scroll,
+      );
+
+      // A 400 px scroll moves the column by 400 px — or by its whole range, when
+      // the list is shorter than that. It used to read back 0.
+      const moved = await column.evaluate((element) => {
+        element.scrollTop = 400;
+        return element.scrollTop;
+      });
+      expect(moved, 'the column scrolls its own cards').toBe(
+        Math.min(400, measured.scroll - measured.client),
+      );
+
+      // At the bottom of the list, the last card sits inside the viewport.
+      await column.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      const lastCard = await box(page.getByTestId(`card-${last.id}`));
+      expect(lastCard.bottom, 'the last card is inside the viewport').toBeLessThanOrEqual(
+        viewport.height,
+      );
+
+      // The board is still a frame: scrolling a column never scrolls the page.
+      const frame = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollHeight,
+        inner: window.innerHeight,
+      }));
+      expect(frame.scroll, 'the board does not scroll the document').toBe(frame.inner);
+    });
+  }
+
+  test('a short column hugs its content instead of stretching to the rail', async ({
+    page,
+    request,
+  }) => {
+    const { cards, columns } = await openBoard(page, request, uniqueUsername('column-short'), [
+      'Alpha',
+      'Bravo',
+    ]);
+    const [toDo] = columns;
+    if (!toDo || cards.length !== 2) throw new Error('seed failed');
+
+    const column = page.getByTestId(`column-${toDo.id}`);
+    const [columnHeight, columnScroll, railHeight] = await Promise.all([
+      column.evaluate((element) => element.clientHeight),
+      column.evaluate((element) => element.scrollHeight),
+      page.locator('.board-rail').evaluate((element) => element.clientHeight),
+    ]);
+    // Nothing is padded or stretched: the column is its content, shorter than the
+    // rail, and has nothing to scroll.
+    expect(columnHeight, 'a short column is shorter than the rail').toBeLessThan(railHeight);
+    expect(columnScroll, 'a short column has nothing to scroll').toBe(columnHeight);
+  });
+});
+
 test.describe('at 390 × 844', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

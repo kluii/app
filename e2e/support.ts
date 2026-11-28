@@ -50,6 +50,9 @@ export async function seedBoard(
   request: APIRequestContext,
   username: string,
   titles: string[] = ['Alpha', 'Bravo', 'Charlie'],
+  // A card's height is its title plus, when it has one, its 120-character
+  // snippet: a column-overflow test seeds descriptions, not just titles.
+  description?: string,
 ): Promise<{ boardId: string; columns: Column[]; cards: Card[] }> {
   await request.post('/api/v1/auth/signup', {
     data: { email: `${username}@klui.test`, username, password: PASSWORD },
@@ -67,6 +70,7 @@ export async function seedBoard(
       await post<Card>(request, `/api/v1/boards/${board.id}/cards`, {
         column: toDo.id,
         title,
+        ...(description === undefined ? {} : { description }),
       }),
     );
   }
@@ -78,8 +82,9 @@ export async function openBoard(
   request: APIRequestContext,
   username: string,
   titles?: string[],
+  description?: string,
 ): Promise<{ boardId: string; columns: Column[]; cards: Card[] }> {
-  const seeded = await seedBoard(request, username, titles);
+  const seeded = await seedBoard(request, username, titles, description);
   await page.context().addCookies((await request.storageState()).cookies);
   await page.goto(`/boards/${seeded.boardId}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { level: 1, name: BOARD_NAME })).toBeVisible();

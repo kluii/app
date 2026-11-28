@@ -25,6 +25,21 @@
 }
 
 /*
+ * The board is a frame: the rail scrolls sideways, each column scrolls its own
+ * cards, and the page does not scroll at all. `.board-rail` carries `h-full`, so
+ * `100%` is the height the frame leaves — the column is capped there at every
+ * width, and a short one still hugs its content because the rail is
+ * `items-start`. The footer `Add card` lives inside the column, so it scrolls
+ * with the list instead of floating over it.
+ */
+.board-column {
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/*
  * 390 px (K2-13). The rail scrolls sideways and snaps; a column stops at the top
  * of the viewport with its header pinned, because a list you can only scroll
  * blindly is worse than a shorter list. The bar stacks on two rows: the name
@@ -85,11 +100,6 @@
 
   .board-column {
     scroll-snap-align: start;
-    /* The viewport minus the header (56), the band above the bar (12), the two
-       bar rows (48 + 40) and the rail's own vertical padding (16 + 16). */
-    max-height: calc(100dvh - 11.75rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
   }
 
   .board-column > header {

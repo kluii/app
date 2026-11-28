@@ -41,8 +41,8 @@ type Composer =
 
 /**
  * Board > column > card, nothing else (DESIGN.md §5). Columns size to their
- * content and align to the top of the rail; the rail scrolls horizontally, the
- * page does not.
+ * content up to the height of the rail and align to its top; each column scrolls
+ * its own cards, the rail scrolls horizontally, the page does not.
  */
 export function BoardView({ boardId }: { boardId: string }) {
   const arrived = useArrival();
@@ -567,7 +567,10 @@ function BoardFrame({
         >
           <div
             className={cn(
-              'board-rail flex items-start gap-4 px-6 py-4',
+              // `h-full` is what makes the column's `max-height: 100%` mean
+              // something: the parent is the `min-h-0 flex-1` scroll container,
+              // so the rail has a definite height and a column caps at it.
+              'board-rail flex h-full items-start gap-4 px-6 py-4',
               arrived && 'enter-stagger',
             )}
           >
