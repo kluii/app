@@ -187,14 +187,19 @@ export function DropdownItem({
   );
 }
 
-/** One of a small set: `aria-checked`, a tick, and no radio group markup needed. */
+/**
+ * One of a small set: `aria-checked`, a tick, and no radio group markup needed.
+ * `icon` sits in a fixed 16 px column before the label, like an item's.
+ */
 export function DropdownCheckItem({
   checked,
   onSelect,
+  icon,
   children,
 }: {
   checked: boolean;
   onSelect: () => void;
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -206,6 +211,9 @@ export function DropdownCheckItem({
         onClick={onSelect}
         className={cn(ITEM, checked ? 'text-ink' : 'text-ink-muted')}
       >
+        {icon ? (
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">{icon}</span>
+        ) : null}
         <span className="flex-1 truncate">{children}</span>
         {checked ? <Check aria-hidden className="h-4 w-4" strokeWidth={1.5} /> : null}
       </button>

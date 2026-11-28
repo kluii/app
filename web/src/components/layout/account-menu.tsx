@@ -2,13 +2,17 @@
 /**
  * One identity, one control. The bar used to carry a theme toggle, an "Account"
  * link, the raw username and a logout icon — four controls for one person. The
- * avatar opens all of it: who you are, the theme, the language, and the way out.
+ * avatar opens all of it: who you are, the theme, and the way out. The language
+ * lives in Settings (it is a choice you make once, not a toggle), and the header
+ * states the three facts that identify the account: the name, the handle, the
+ * address.
  */
 import { useNavigate } from '@tanstack/react-router';
+import { Moon, Sun, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../api/client';
 import type { Me } from '../../api/types';
-import { getLocale, setLocale, t } from '../../i18n';
+import { t } from '../../i18n';
 import { minidenticon } from '../../lib/identicon';
 import { useTheme, type Theme } from '../../lib/theme';
 import { atUsername } from '../../lib/username';
@@ -21,17 +25,16 @@ import {
   DropdownSeparator,
 } from '../ui/dropdown-menu';
 
-const THEMES: Theme[] = ['light', 'dark'];
-const LOCALES = [
-  { id: 'en', label: 'English' },
-  { id: 'fr', label: 'Français' },
-] as const;
+/** The icon each theme wears in the menu: the target, not the current state. */
+const THEMES: { id: Theme; icon: LucideIcon }[] = [
+  { id: 'light', icon: Sun },
+  { id: 'dark', icon: Moon },
+];
 
 export function AccountMenu({ me }: { me: Me }) {
   const [open, setOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
-  const locale = getLocale();
 
   const signOut = async (): Promise<void> => {
     setOpen(false);
@@ -65,8 +68,14 @@ export function AccountMenu({ me }: { me: Me }) {
       )}
     >
       <DropdownHeader>
+        {/* Three lines, each allowed to be cut: the name, the handle, the
+            address. The handle always carries its at sign, even when the name
+            above it is the same string. */}
         <span className="truncate text-label text-ink">
           {me.display_name ?? atUsername(me.username)}
+        </span>
+        <span className="truncate font-mono text-mono-sm text-ink-subtle">
+          {atUsername(me.username)}
         </span>
         <span className="truncate font-mono text-mono-sm text-ink-subtle">{me.email}</span>
       </DropdownHeader>
@@ -80,32 +89,22 @@ export function AccountMenu({ me }: { me: Me }) {
       </DropdownItem>
       <DropdownSeparator />
       <DropdownGroup label={t('account.theme')}>
-        {THEMES.map((value) => (
-          <DropdownCheckItem
-            key={value}
-            checked={theme === value}
-            onSelect={() => {
-              setTheme(value);
-              setOpen(false);
-            }}
-          >
-            {t(`theme.${value}`)}
-          </DropdownCheckItem>
-        ))}
-      </DropdownGroup>
-      <DropdownGroup label={t('account.language')}>
-        {LOCALES.map((value) => (
-          <DropdownCheckItem
-            key={value.id}
-            checked={locale === value.id}
-            onSelect={() => {
-              setLocale(value.id);
-              setOpen(false);
-            }}
-          >
-            {value.label}
-          </DropdownCheckItem>
-        ))}
+        {THEMES.map((value) => {
+          const Icon = value.icon;
+          return (
+            <DropdownCheckItem
+              key={value.id}
+              checked={theme === value.id}
+              icon={<Icon aria-hidden className="h-4 w-4" strokeWidth={1.5} />}
+              onSelect={() => {
+                setTheme(value.id);
+                setOpen(false);
+              }}
+            >
+              {t(`theme.${value.id}`)}
+            </DropdownCheckItem>
+          );
+        })}
       </DropdownGroup>
       <DropdownSeparator />
       <DropdownItem tone="danger" onSelect={() => void signOut()}>
