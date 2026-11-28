@@ -43,7 +43,6 @@ export function CardDisplayModal({
       onClose={onClose}
       initialFocus={closeRef}
       title={card.title}
-      description={due ? t('board.card.dueOn', { date: due }) : undefined}
       footer={
         <>
           {caller.can_write && (caller.actor_kind !== 'anon' || card.mine) ? (
@@ -81,12 +80,6 @@ export function CardDisplayModal({
           </p>
         ) : null}
 
-        {card.actor_label ? (
-          <p className="text-body-sm text-ink-subtle">
-            {t('board.card.by', { label: card.actor_label })}
-          </p>
-        ) : null}
-
         {card.description ? (
           <p className="whitespace-pre-wrap text-body text-ink">{card.description}</p>
         ) : (
@@ -113,7 +106,12 @@ export function CardDisplayModal({
             {due ?? t('board.card.noDue')}
           </dd>
           <dt className="text-ink-muted">{t('board.card.created')}</dt>
-          <dd className="font-mono text-ink-subtle">{formatDate(card.created_at)}</dd>
+          <dd className="font-mono text-ink-subtle">
+            {/* The author rides the date it wrote: one fact, one line, no
+                separate paragraph saying it again (brief §4.3). */}
+            {formatDate(card.created_at)}
+            {card.actor_label ? ` · ${t('board.card.by', { label: card.actor_label })}` : null}
+          </dd>
         </dl>
 
         {done.isError ? (

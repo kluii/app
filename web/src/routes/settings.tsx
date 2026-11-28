@@ -141,9 +141,6 @@ function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-content px-6 py-8">
       <h1 className="font-display text-h1">{t('settings.title')}</h1>
-      <p className="mt-2 text-body-sm text-ink-muted">
-        {t('settings.subtitle', { section: t(`settings.section.${active}`) })}
-      </p>
 
       <div className="mt-6 flex flex-col gap-6 md:flex-row md:items-start md:gap-10">
         <nav aria-label={t('settings.rail.label')} className="min-w-0 md:w-56 md:shrink-0">

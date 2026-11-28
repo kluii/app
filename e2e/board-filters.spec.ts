@@ -97,7 +97,7 @@ test('two filters narrow the board, and removing one chip restores the count', a
   await expect(page.getByTestId('active-filter')).toHaveCount(2);
 
   // The column with no match explains itself instead of looking broken.
-  await expect(page.getByText('No cards match the filters.')).toHaveCount(1);
+  await expect(page.getByText('No cards match the filters')).toHaveCount(1);
 
   // The panel is light-dismiss: it has to be closed before the chips under it
   // can be reached, which is the same gesture a person makes.

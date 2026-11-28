@@ -70,7 +70,7 @@ test('a read-only link sees no edit affordance at all, not a disabled one', asyn
 
   // An empty column says so in the visitor's own terms.
   await expect(page.getByTestId(`column-${columns[1]?.id ?? ''}`)).toContainText(
-    'No cards in this column.',
+    'No cards in this column',
   );
   await expect(page).toHaveURL(new RegExp(`/boards/${boardId}$`, 'u'));
   await context.close();
