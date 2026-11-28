@@ -6,6 +6,30 @@
  */
 import type { Branding } from '../api/types';
 
+/**
+ * The href `index.html` ships, read before branding can overwrite it: clearing
+ * a `favicon_url` restores this rather than leaving the branded one in place.
+ * A module script runs after the head is parsed, so the first icon link is
+ * already in the document here.
+ */
+const DEFAULT_ICON_HREF =
+  document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.getAttribute('href') ??
+  '/favicon.ico';
+
+/**
+ * The first `rel="icon"` link — the `.ico` one — and never the
+ * `rel="apple-touch-icon"` beside it, which is the iOS home-screen tile and
+ * keeps the app's own icon.
+ */
+function iconLink(): HTMLLinkElement {
+  const existing = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (existing) return existing;
+  const link = document.createElement('link');
+  link.rel = 'icon';
+  document.head.appendChild(link);
+  return link;
+}
+
 export function applyBranding(branding: Branding): void {
   const root = document.documentElement;
   if (branding.accent_color && branding.accent_foreground) {
@@ -26,13 +50,5 @@ export function applyBranding(branding: Branding): void {
 
   document.title = branding.tab_title ?? branding.instance_name;
 
-  if (branding.favicon_url) {
-    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.head.appendChild(link);
-    }
-    link.href = branding.favicon_url;
-  }
+  iconLink().href = branding.favicon_url ?? DEFAULT_ICON_HREF;
 }

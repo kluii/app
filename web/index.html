@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark light" />
     <title>Klui</title>
+    <!-- The app's own icon, served from web/public. Instance branding replaces
+         the first icon link and leaves the apple-touch tile alone
+         (web/src/lib/branding.ts). -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <script>
       /* The only inline script (DESIGN.md §15): apply the theme before React mounts,
          or a light-theme user sees a dark flash on every load. The server computes
