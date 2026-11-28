@@ -8,8 +8,12 @@ export const visibilitySchema = z.enum(['private', 'link', 'public']);
 export const linkRoleSchema = z.enum(['read', 'edit', 'none']);
 export const anonWriteSchema = z.enum(['off', 'open', 'moderated']);
 
+/** Free text, trimmed, 1–280 characters. `null` clears it on PATCH. */
+export const boardDescriptionSchema = z.string().trim().min(1).max(280).nullable();
+
 export const createBoardSchema = z.object({
   name: boardNameSchema,
+  description: boardDescriptionSchema.optional(),
   visibility: visibilitySchema.optional(),
   template: z.enum(['classic', 'blank']).optional(),
 });
@@ -17,6 +21,7 @@ export const createBoardSchema = z.object({
 export const patchBoardSchema = z
   .object({
     name: boardNameSchema.optional(),
+    description: boardDescriptionSchema.optional(),
     slug: slugSchema.optional(),
     visibility: visibilitySchema.optional(),
     link_role: linkRoleSchema.optional(),

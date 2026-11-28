@@ -11,6 +11,7 @@ export type MemberRoleDto = 'owner' | 'admin' | 'editor' | 'viewer';
 export type BoardDto = {
   id: string;
   name: string;
+  description: string | null;
   slug: string;
   visibility: VisibilityDto;
   link_role: LinkRoleDto;

@@ -260,6 +260,7 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
       items: boards.map((board) => ({
         id: board.id,
         name: board.name,
+        description: board.description,
         slug: board.slug,
         url: boardUrl(context.env.KLUI_PUBLIC_URL, board),
         updated_at: board.updated_at.toISOString(),

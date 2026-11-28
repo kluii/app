@@ -170,6 +170,7 @@ export function toBoardDto(
   board: {
     id: string;
     name: string;
+    description: string | null;
     slug: string;
     visibility: string;
     link_role: string;
@@ -185,6 +186,7 @@ export function toBoardDto(
   return {
     id: board.id,
     name: board.name,
+    description: board.description,
     slug: board.slug,
     visibility: board.visibility as BoardDto['visibility'],
     link_role: board.link_role as BoardDto['link_role'],
@@ -336,6 +338,7 @@ export async function createBoard(context: BoardWrite, input: CreateBoardInput):
         id: newId('brd'),
         owner_id: userId,
         name: input.name,
+        description: input.description ?? null,
         slug,
         visibility,
         link_role: 'none',
@@ -442,6 +445,12 @@ export async function updateBoard(
   if (input.name !== undefined && input.name !== loaded.board.name) {
     changes.name = [loaded.board.name, input.name];
     data.name = input.name;
+  }
+  // `null` clears, an absent field leaves the stored value alone — the same
+  // rule as `name`, through the same `board.update` gate above.
+  if (input.description !== undefined && input.description !== loaded.board.description) {
+    changes.description = [loaded.board.description, input.description];
+    data.description = input.description;
   }
   if (input.slug !== undefined && input.slug !== loaded.board.slug) {
     changes.slug = [loaded.board.slug, input.slug];

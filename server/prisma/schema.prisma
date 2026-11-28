@@ -309,6 +309,8 @@ model Board {
   id            String     @id
   owner_id      String
   name          String
+  description   String?
+  icon          String?
   slug          String
   visibility    Visibility @default(private)
   link_role     LinkRole   @default(none)
