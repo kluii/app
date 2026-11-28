@@ -75,7 +75,7 @@ export function SecuritySettings() {
   return (
     <section className="flex max-w-140 flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-h2">{t('settings.security.title')}</h2>
+        <h2 className="font-display text-h2">{t('settings.security.title')}</h2>
         <Chip>
           {enabled ? t('settings.security.status.on') : t('settings.security.status.off')}
         </Chip>

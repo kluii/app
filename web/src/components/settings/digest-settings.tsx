@@ -73,7 +73,7 @@ export function DigestSettings() {
 
   return (
     <section className="flex max-w-140 flex-col gap-4">
-      <h2 className="text-h2">{t('settings.digest.title')}</h2>
+      <h2 className="font-display text-h2">{t('settings.digest.title')}</h2>
       <p className="text-body-sm text-ink-muted">{t('settings.digest.description')}</p>
 
       {digest.data?.last_result === 'empty' ? (

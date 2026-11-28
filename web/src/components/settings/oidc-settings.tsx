@@ -122,7 +122,7 @@ export function OidcSettings() {
 
   return (
     <section aria-labelledby="oidc-settings-heading" className="border-t border-border pt-6">
-      <h2 id="oidc-settings-heading" className="text-h2">
+      <h2 id="oidc-settings-heading" className="font-display text-h2">
         {t('oidc.settings.title')}
       </h2>
       <p className="mt-1 text-body-sm text-ink-muted">{t('oidc.settings.description')}</p>

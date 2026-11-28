@@ -77,9 +77,9 @@ export function ProfileSettings() {
   };
 
   return (
-    <section className="flex max-w-140 flex-col gap-6">
+    <section className="flex max-w-140 flex-col gap-8">
       <div className="flex flex-col gap-4">
-        <h2 className="text-h2">{t('settings.profile.title')}</h2>
+        <h2 className="font-display text-h2">{t('settings.profile.title')}</h2>
         <p className="text-body-sm text-ink-muted">{t('settings.profile.description')}</p>
 
         {profileError ? (
@@ -132,8 +132,8 @@ export function ProfileSettings() {
         </form>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <h2 className="text-h2">{t('settings.password.title')}</h2>
+      <div className="flex flex-col gap-4 border-t border-border pt-8">
+        <h3 className="text-h3">{t('settings.password.title')}</h3>
         <p className="text-body-sm text-ink-muted">{t('settings.password.description')}</p>
 
         {passwordError ? (

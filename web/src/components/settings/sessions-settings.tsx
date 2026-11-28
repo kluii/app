@@ -53,7 +53,7 @@ export function SessionsSettings() {
   return (
     <section className="flex max-w-140 flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-h2">{t('settings.sessions.title')}</h2>
+        <h2 className="font-display text-h2">{t('settings.sessions.title')}</h2>
         {items.length > 1 ? (
           <Button variant="ghost" loading={revokeAll.isPending} onClick={() => revokeAll.mutate()}>
             {t('settings.sessions.revokeAll')}

@@ -101,7 +101,7 @@ export function AgentsSettings() {
       data-testid="settings-agents"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="settings-agents-title" className="text-h2">
+        <h2 id="settings-agents-title" className="font-display text-h2">
           {t('settings.agents.title')}
         </h2>
         {created === null && !creating ? (

@@ -76,7 +76,7 @@ export function NotificationsSettings() {
       aria-labelledby="notifications-settings-heading"
       className="border-t border-border pt-6"
     >
-      <h2 id="notifications-settings-heading" className="text-h2">
+      <h2 id="notifications-settings-heading" className="font-display text-h2">
         {t('notifications.prefs.title')}
       </h2>
       <p className="mt-1 text-body-sm text-ink-muted">{t('notifications.prefs.description')}</p>

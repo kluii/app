@@ -77,7 +77,7 @@ export function BrandingSettings() {
 
   return (
     <section className="flex max-w-140 flex-col gap-4">
-      <h2 className="text-h2">{t('settings.branding.title')}</h2>
+      <h2 className="font-display text-h2">{t('settings.branding.title')}</h2>
       <p className="text-body-sm text-ink-muted">{t('settings.branding.description')}</p>
 
       {error ? (

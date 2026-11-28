@@ -142,10 +142,11 @@ function SettingsPage() {
     <div className="mx-auto w-full max-w-content px-6 py-8">
       <h1 className="font-display text-h1">{t('settings.title')}</h1>
 
+      {/* The rail is a column of rows, not a stack of pills: 36 high, 24 of
+          padding, one radius, an icon in a fixed 16 px column. Under 768 px it
+          is the same rows scrolling sideways, so the pattern keeps one shape. */}
       <div className="mt-6 flex flex-col gap-6 md:flex-row md:items-start md:gap-10">
         <nav aria-label={t('settings.rail.label')} className="min-w-0 md:w-56 md:shrink-0">
-          {/* A strip that scrolls sideways under 768 px, a column above it: the
-              same buttons, so the pattern does not fork into two screens. */}
           <div
             role="tablist"
             aria-orientation="vertical"
@@ -171,9 +172,9 @@ function SettingsPage() {
                   data-testid={`settings-tab-${id}`}
                   onClick={() => select(id)}
                   className={cn(
-                    'inline-flex h-8 shrink-0 snap-start items-center gap-2 rounded-full px-3 text-label transition-colors duration-[var(--dur-fast)] md:w-full',
+                    'inline-flex h-9 shrink-0 snap-start items-center gap-2 rounded-sm px-3 text-label transition-colors duration-[var(--dur-fast)] md:w-full',
                     selected
-                      ? 'bg-surface-2 text-ink'
+                      ? 'bg-surface-muted text-ink'
                       : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
                   )}
                 >
@@ -191,7 +192,7 @@ function SettingsPage() {
           aria-labelledby={`settings-tab-${active}`}
           data-testid="settings-panel"
           data-section={active}
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 max-w-240"
         >
           {SECTIONS[active].panel()}
         </div>
