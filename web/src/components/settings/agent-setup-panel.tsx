@@ -250,9 +250,9 @@ function BlockCard({
   onCopy: (value: string) => Promise<void>;
 }) {
   return (
-    <li className="flex min-w-0 flex-col gap-2 rounded-sm border border-border bg-surface-2 p-3">
+    <li className="flex min-w-0 flex-col gap-2 rounded-sm border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <span className="text-label font-medium text-ink">{block.name}</span>
+        <span className="font-mono text-mono-sm text-ink-subtle">{block.name}</span>
         <Button
           size="sm"
           variant="ghost"
@@ -266,8 +266,8 @@ function BlockCard({
       </div>
       <pre
         className={cn(
-          'overflow-y-auto whitespace-pre-wrap break-words font-mono text-mono text-ink',
-          block.capped === true ? 'max-h-56' : null,
+          'overflow-x-auto whitespace-pre font-mono text-mono text-ink',
+          block.capped === true ? 'max-h-56 overflow-y-auto' : null,
         )}
         {...(block.capped === true
           ? {

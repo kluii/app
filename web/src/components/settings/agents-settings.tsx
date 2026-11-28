@@ -121,7 +121,7 @@ export function AgentsSettings() {
 
       {creating ? (
         <form
-          className="flex flex-col gap-3 rounded-md border border-border p-4"
+          className="flex flex-col gap-3 rounded-sm border border-border bg-surface p-4"
           onSubmit={(event) => {
             event.preventDefault();
             create.mutate();
@@ -220,7 +220,7 @@ export function AgentsSettings() {
 
       {created ? (
         <div
-          className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3"
+          className="flex flex-col gap-2 rounded-sm border border-border bg-surface p-4"
           data-testid="agent-key-once"
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -249,7 +249,8 @@ export function AgentsSettings() {
               data-testid="agent-key-value"
             />
             <Button
-              variant="secondary"
+              size="sm"
+              variant="ghost"
               onClick={() => void copy(created.key)}
               data-testid="agent-key-copy"
             >
