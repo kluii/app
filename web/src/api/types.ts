@@ -9,6 +9,23 @@ export type LinkRole = 'read' | 'edit' | 'none';
 export type AnonWrite = 'off' | 'open' | 'moderated';
 export type MemberRole = 'owner' | 'admin' | 'editor' | 'viewer';
 
+/**
+ * The closed set of board icon names, mirrored from `server/src/contracts/boards.ts`
+ * `BOARD_ICONS` (D-60): the server stores a name, never an upload or a colour,
+ * and the client renders the name from its own icon set.
+ */
+export type BoardIcon =
+  | 'briefcase'
+  | 'palette'
+  | 'rocket'
+  | 'book'
+  | 'code'
+  | 'folder'
+  | 'layers'
+  | 'camera'
+  | 'cart'
+  | 'heart';
+
 export type Me = {
   id: string;
   email: string;
@@ -51,6 +68,8 @@ export type Branding = {
 export type Board = {
   id: string;
   name: string;
+  description: string | null;
+  icon: BoardIcon | null;
   slug: string;
   visibility: Visibility;
   link_role: LinkRole;

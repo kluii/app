@@ -54,6 +54,8 @@ describe('a board state under a frame', () => {
     board: {
       id: 'brd_a',
       name: 'Board',
+      description: null,
+      icon: null,
       slug: 'board',
       visibility: 'private',
       link_role: 'none',

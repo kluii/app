@@ -5,6 +5,7 @@ import type {
   AgentKeyTest,
   AnonWrite,
   Board,
+  BoardIcon,
   BoardLink,
   Branding,
   LinkRole,
@@ -258,6 +259,8 @@ export const api = {
     boardId: string,
     input: {
       name?: string;
+      description?: string | null;
+      icon?: BoardIcon | null;
       slug?: string;
       visibility?: Visibility;
       link_role?: LinkRole;
