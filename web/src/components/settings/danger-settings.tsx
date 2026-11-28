@@ -37,16 +37,19 @@ export function DangerSettings() {
 
   return (
     <section className="flex max-w-140 flex-col gap-4">
-      <h2 className="font-display text-h2 text-danger">{t('settings.danger.title')}</h2>
-      <p className="text-body-sm text-ink-muted">{t('settings.danger.description')}</p>
+      {/* The danger rule, not a red block: a 2 px --danger left rule, title
+          and body in --danger, no background (landing §7, brief §4.5). */}
+      <div className="flex flex-col gap-1 border-l-2 border-danger pl-4">
+        <h2 className="font-display text-h2 text-danger">{t('settings.danger.title')}</h2>
+        <p className="text-body-sm text-danger">{t('settings.danger.description')}</p>
+        {error ? (
+          <p className="text-body-sm text-danger" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
 
-      {error ? (
-        <p className="text-body-sm text-danger" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-md border border-border p-4">
+      <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-sm border border-border p-4">
         <Field label={t('settings.danger.password')} htmlFor="delete-account-password">
           <Input
             id="delete-account-password"
