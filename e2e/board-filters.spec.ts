@@ -80,20 +80,24 @@ async function openBoard(page: Page, request: APIRequestContext, username: strin
   await expect(page.getByRole('heading', { level: 1, name: 'Filter proof' })).toBeVisible();
 }
 
-test('two filters narrow the board, and removing one chip restores the count', async ({
+test('two filters narrow the board, and removing one chip restores the cards', async ({
   page,
   request,
 }) => {
   await openBoard(page, request, uniqueUsername('filter'));
 
-  await expect(page.getByText('4 of 4 cards')).toBeVisible();
+  // The bar carries no count any more: the rail is what says how many cards
+  // are on screen, so the test reads the rendered titles.
+  const titles = page.getByTestId('board-scroll').getByTestId('card-title');
+  await expect(titles).toHaveCount(4);
 
   await page.getByRole('button', { name: 'Filter', exact: true }).click();
   // `exact` because a card's button carries its tag names as part of its name.
   await page.getByRole('button', { name: 'docs', exact: true }).click();
   await page.getByRole('button', { name: 'bug', exact: true }).click();
 
-  await expect(page.getByText('3 of 4 cards')).toBeVisible();
+  // `docs` keeps two cards, `bug` one, and they do not overlap.
+  await expect(titles).toHaveCount(3);
   await expect(page.getByTestId('active-filter')).toHaveCount(2);
 
   // The column with no match explains itself instead of looking broken.
@@ -110,7 +114,9 @@ test('two filters narrow the board, and removing one chip restores the count', a
     .getByRole('button', { name: 'Dismiss' })
     .click();
 
-  await expect(page.getByText('2 of 4 cards')).toBeVisible();
+  // Only the two `docs` cards are left.
+  await expect(titles).toHaveCount(2);
+  await expect(titles).toHaveText(['Ship the release note', 'Review the copy']);
   await expect(page.getByTestId('active-filter')).toHaveCount(1);
 });
 
@@ -120,11 +126,13 @@ test('a text filter keeps the stored order and clears with one action', async ({
 }) => {
   await openBoard(page, request, uniqueUsername('filter-text'));
 
+  const titles = page.getByTestId('board-scroll').getByTestId('card-title');
   await page.getByRole('button', { name: 'Filter', exact: true }).click();
   await page.getByRole('textbox', { name: 'Text' }).fill('release');
-  await expect(page.getByText('1 of 4 cards')).toBeVisible();
+  await expect(titles).toHaveCount(1);
+  await expect(titles).toHaveText(['Ship the release note']);
 
   await page.getByRole('button', { name: 'Clear' }).click();
-  await expect(page.getByText('4 of 4 cards')).toBeVisible();
+  await expect(titles).toHaveCount(4);
   await expect(page.getByTestId('active-filter')).toHaveCount(0);
 });

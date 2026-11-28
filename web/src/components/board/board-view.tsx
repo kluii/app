@@ -473,9 +473,9 @@ function BoardFrame({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* One 56 px bar: the name, then the meta 12 px away, then the filters,
-          the card count and the settings. On a phone the same children stack
-          on two rows — the grid in app.css places them. */}
+      {/* One 56 px bar: the name, then the meta 12 px away, then the filters
+          and the settings. On a phone the same children stack on two rows — the
+          grid in app.css places them. */}
       <header
         data-testid="board-bar"
         className="board-bar flex h-14 items-center justify-between gap-4 border-b border-border bg-canvas px-6"
@@ -532,7 +532,6 @@ function BoardFrame({
               onChange={onFiltersChange}
               cards={cards}
               members={members}
-              shown={visible.length}
             />
           </div>
           <div className="board-bar-settings">

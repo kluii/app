@@ -49,13 +49,11 @@ export function BoardFilters({
   onChange,
   cards,
   members,
-  shown,
 }: {
   filters: Filters;
   onChange: (next: Filters) => void;
   cards: Card[];
   members: Member[];
-  shown: number;
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -91,10 +89,6 @@ export function BoardFilters({
         {t('board.filter.title')}
         {active ? <span className="font-mono text-mono-sm">{filterCount(filters)}</span> : null}
       </Button>
-
-      <span className="font-mono text-mono-sm text-ink-subtle">
-        {t('board.filter.count', { shown, total: cards.length })}
-      </span>
 
       <Popover
         open={open}
