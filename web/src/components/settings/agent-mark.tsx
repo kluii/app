@@ -27,10 +27,9 @@ const MARKS: Record<string, string> = {
     'M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81',
 };
 
-/** The first two letters of the name, as a title would set them. */
+/** The name's first letter, as a title would set it: O, P, H. */
 function monogram(id: string): string {
-  const letters = id.slice(0, 2);
-  return letters.charAt(0).toUpperCase() + letters.slice(1);
+  return id.charAt(0).toUpperCase();
 }
 
 export function AgentMark({ id }: { id: string }) {
@@ -38,7 +37,7 @@ export function AgentMark({ id }: { id: string }) {
   return (
     <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-key bg-surface-2 text-current">
       {path === undefined ? (
-        <span aria-hidden className="font-mono text-[10px] font-medium leading-none">
+        <span aria-hidden className="font-mono text-mono-sm font-medium leading-none">
           {monogram(id)}
         </span>
       ) : (
