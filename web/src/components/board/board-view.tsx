@@ -696,9 +696,7 @@ function ColumnSection({
       data-drop-active={active ? 'true' : undefined}
     >
       <header className="flex items-center justify-between px-1 py-1">
-        <h2 className="truncate text-label uppercase tracking-caps text-ink-muted">
-          {column.name}
-        </h2>
+        <h2 className="line-clamp-2 text-label text-ink-muted">{column.name}</h2>
         <span className="font-mono text-mono-sm text-ink-subtle">{cards.length}</span>
       </header>
 

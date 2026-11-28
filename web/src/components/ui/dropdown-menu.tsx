@@ -142,9 +142,7 @@ export function DropdownSeparator() {
 export function DropdownGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <li role="none">
-      <span className="block px-2 pb-1 pt-1 text-label uppercase tracking-caps text-ink-subtle">
-        {label}
-      </span>
+      <span className="block px-2 pt-2 pb-1 text-label text-ink-subtle">{label}</span>
       <ul role="group" aria-label={label}>
         {children}
       </ul>
