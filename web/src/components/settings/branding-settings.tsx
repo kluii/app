@@ -210,27 +210,29 @@ function BrandAssetRow({
   };
 
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-surface">
-        {url === null ? (
-          <span className="font-mono text-mono-sm text-ink-subtle">{asset}</span>
-        ) : (
-          <img src={url} alt="" className="h-full w-full object-contain" />
-        )}
-      </div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-surface">
+          {url === null ? (
+            <span className="font-mono text-mono-sm text-ink-subtle">{asset}</span>
+          ) : (
+            <img src={url} alt="" className="h-full w-full object-contain" />
+          )}
+        </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <label htmlFor={inputId} className="text-label font-medium text-ink">
-          {label}
-        </label>
-        <p id={hintId} className="text-body-sm text-ink-muted">
-          {hint}
-        </p>
-        {error === null ? null : (
-          <p role="alert" className="text-body-sm text-danger">
-            {error}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <label htmlFor={inputId} className="text-label font-medium text-ink">
+            {label}
+          </label>
+          <p id={hintId} className="text-body-sm text-ink-muted">
+            {hint}
           </p>
-        )}
+          {error === null ? null : (
+            <p role="alert" className="text-body-sm text-danger">
+              {error}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
