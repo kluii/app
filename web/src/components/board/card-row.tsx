@@ -19,6 +19,16 @@ import { useCardDnd, type MoveRequest } from './use-card-dnd';
  * The row itself is a button covering the card, because a card cannot nest
  * buttons: the tick and the menu sit above it instead of inside it.
  */
+/**
+ * The first 20 characters of a description, nothing more: the card is a fiche,
+ * and the description is one line of it. A long one is cut before the ellipsis
+ * so `word …` never reads as two spaces.
+ */
+export function snippet(description: string): string {
+  const head = description.slice(0, 20);
+  return description.length > 20 ? `${head.trimEnd()}…` : head;
+}
+
 export function CardRow({
   card,
   cards,
@@ -111,6 +121,12 @@ export function CardRow({
             {card.title}
           </span>
         </span>
+
+        {/* The description's opening line, in the mono voice: content, so it is
+            read, not hidden. One line, whatever the description does. */}
+        {card.description ? (
+          <p className="line-clamp-1 text-mono-sm text-ink-subtle">{snippet(card.description)}</p>
+        ) : null}
 
         {card.tags.length > 0 ? (
           <span className="flex flex-wrap gap-1">
