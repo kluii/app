@@ -58,9 +58,15 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
         {t('common.action.skipToContent')}
       </a>
 
+      {/* 56 px, 24 of padding, canvas ground. The board carries its own
+          hairline under its bar, so the shell drops its own there: one rule,
+          not two, and the board's frame stays a single 56 + 56 column. */}
       <header
         data-app-chrome="true"
-        className="flex h-14 items-center justify-between border-b border-border px-4"
+        className={cn(
+          'flex h-14 items-center justify-between border-b border-border bg-canvas px-6',
+          onBoard && 'border-b-0',
+        )}
       >
         <div className="flex items-center gap-3">
           <Link
@@ -71,7 +77,7 @@ export function AppShell({ children, actions }: { children?: ReactNode; actions?
             <img
               src={branding.data?.logo_url ?? (theme === 'dark' ? whiteLogo : blackLogo)}
               alt={branding.data?.instance_name ?? t('common.app.name')}
-              className="h-7 w-auto sm:h-8"
+              className="h-6 w-auto"
             />
           </Link>
           {actions}
