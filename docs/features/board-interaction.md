@@ -88,9 +88,9 @@ Engine: `@atlaskit/pragmatic-drag-and-drop`. No other drag library in the tree.
 
 ## 6. Responsive
 
-- ≥ 1024: board fills the viewport, columns in a row, horizontal scroll when they overflow.
+- ≥ 1024: board fills the viewport, columns in a row, horizontal scroll when they overflow. A column scrolls its own cards and keeps its header pinned, so a long list never walks the page.
 - 768–1023: same, narrower gutters, header actions collapse into an overflow menu.
-- < 768: horizontal snap rail, sticky column headers, modal becomes a bottom sheet, 40 px targets.
+- < 768: horizontal snap rail, modal becomes a bottom sheet, 40 px targets; the column still scrolls itself and its header stays pinned.
 - 390 px is the reference phone: the drag journey must pass there, and no page scrolls horizontally outside the board rail.
 
 ## 7. Empty, loading, error
