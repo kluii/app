@@ -15,6 +15,7 @@ import { Input, Select, Textarea } from '../components/ui/input';
 import { t } from '../i18n';
 import { failureMessage } from '../lib/api-error';
 import { cn } from '../lib/cn';
+import { fold } from '../lib/fold';
 import { useArrival } from '../lib/entrance';
 import { useShortcuts } from '../lib/hotkeys';
 import { queryClient, queryKeys } from '../lib/query-client';
@@ -54,14 +55,14 @@ function BoardsPage() {
   const items = boards.data?.items ?? [];
   // The overview counts the account, not the current filter.
   const ownedCount = items.filter((board) => board.role === 'owner').length;
-  const needle = query.trim().toLowerCase();
+  // Folded on both sides: a reader who types `marche` finds `Marché`.
+  const needle = fold(query.trim());
   const visible =
     needle === ''
       ? items
       : items.filter(
           (board) =>
-            board.name.toLowerCase().includes(needle) ||
-            (board.description ?? '').toLowerCase().includes(needle),
+            fold(board.name).includes(needle) || fold(board.description ?? '').includes(needle),
         );
   const owned = visible.filter((board) => board.role === 'owner');
   const shared = visible.filter((board) => board.role !== 'owner');
