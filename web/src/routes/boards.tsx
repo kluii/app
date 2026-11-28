@@ -183,15 +183,15 @@ function BoardsPage() {
         }}
       />
 
-      <EditBoardDialog board={editing} open={editing !== null} onClose={() => setEditing(null)} />
-
-      <DeleteBoardDialog
-        board={deleting}
-        open={deleting !== null}
-        onClose={() => setDeleting(null)}
-      />
-
-      <ImportBoardDialog open={importing} onClose={() => setImporting(false)} />
+      {/* Mounted only while open: a closed dialog still owns its labels in the
+          DOM, and `getByLabel('Board name')` must keep answering one field. */}
+      {editing === null ? null : (
+        <EditBoardDialog board={editing} onClose={() => setEditing(null)} />
+      )}
+      {deleting === null ? null : (
+        <DeleteBoardDialog board={deleting} onClose={() => setDeleting(null)} />
+      )}
+      {importing ? <ImportBoardDialog onClose={() => setImporting(false)} /> : null}
     </div>
   );
 }
@@ -277,41 +277,23 @@ function NewBoardDialog({
  * carries `expected_updated_at`, so a board that changed underneath answers
  * 409 and the reader is told to reload rather than overwrite.
  */
-function EditBoardDialog({
-  board,
-  open,
-  onClose,
-}: {
-  board: Board | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [icon, setIcon] = useState<BoardIcon | null>(null);
+function EditBoardDialog({ board, onClose }: { board: Board; onClose: () => void }) {
+  const [name, setName] = useState(board.name);
+  const [description, setDescription] = useState(board.description ?? '');
+  const [icon, setIcon] = useState<BoardIcon | null>(board.icon);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open && board !== null) {
-      setName(board.name);
-      setDescription(board.description ?? '');
-      setIcon(board.icon);
-      setError(null);
-    }
-  }, [open, board]);
 
   const trimmedDescription = description.trim() === '' ? null : description.trim();
   const dirty =
-    board !== null &&
-    (name.trim() !== board.name || trimmedDescription !== board.description || icon !== board.icon);
+    name.trim() !== board.name || trimmedDescription !== board.description || icon !== board.icon;
 
   const save = useMutation({
     mutationFn: () =>
-      api.updateBoard(board?.id ?? '', {
+      api.updateBoard(board.id, {
         name: name.trim(),
         description: trimmedDescription,
         icon,
-        expected_updated_at: board?.updated_at,
+        expected_updated_at: board.updated_at,
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.boards });
@@ -328,7 +310,7 @@ function EditBoardDialog({
 
   return (
     <Dialog
-      open={open}
+      open
       onClose={onClose}
       title={t('boards.edit.title')}
       footer={
@@ -412,22 +394,14 @@ function EditBoardDialog({
  * comments go with it. The reader stays on `/boards`; only the list is
  * invalidated.
  */
-function DeleteBoardDialog({
-  board,
-  open,
-  onClose,
-}: {
-  board: Board | null;
-  open: boolean;
-  onClose: () => void;
-}) {
+function DeleteBoardDialog({ board, onClose }: { board: Board; onClose: () => void }) {
   const { notify } = useToast();
   const [error, setError] = useState<string | null>(null);
 
   const remove = useMutation({
-    mutationFn: () => api.deleteBoard(board?.id ?? ''),
+    mutationFn: () => api.deleteBoard(board.id),
     onSuccess: async () => {
-      if (board !== null) queryClient.removeQueries({ queryKey: queryKeys.board(board.id) });
+      queryClient.removeQueries({ queryKey: queryKeys.board(board.id) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.boards });
       notify(t('board.delete.done'));
       onClose();
@@ -437,10 +411,10 @@ function DeleteBoardDialog({
 
   return (
     <Dialog
-      open={open}
+      open
       onClose={onClose}
       title={t('boards.delete.title')}
-      description={t('boards.delete.body', { board: board?.name ?? '' })}
+      description={t('boards.delete.body', { board: board.name })}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -482,21 +456,12 @@ function boardNameFromFile(file: File): string {
  * import leaves the dialog open and names the board it already created, so
  * nothing is silently orphaned.
  */
-function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function ImportBoardDialog({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [source, setSource] = useState<ImportSource>('klui');
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setSource('klui');
-      setFile(null);
-      setError(null);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  }, [open]);
 
   const run = useMutation({
     mutationFn: async (chosen: File) => {
@@ -546,7 +511,7 @@ function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
   return (
     <Dialog
-      open={open}
+      open
       onClose={onClose}
       title={t('boards.import.title')}
       footer={
