@@ -3,6 +3,8 @@
  * Response shapes. They mirror docs/api.md §2 exactly; the client types in
  * web/src/api/types.ts are checked against these by the contract tests.
  */
+import type { BoardIcon } from './boards.js';
+
 export type VisibilityDto = 'private' | 'link' | 'public';
 export type LinkRoleDto = 'read' | 'edit' | 'none';
 export type AnonWriteDto = 'off' | 'open' | 'moderated';
@@ -12,6 +14,7 @@ export type BoardDto = {
   id: string;
   name: string;
   description: string | null;
+  icon: BoardIcon | null;
   slug: string;
   visibility: VisibilityDto;
   link_role: LinkRoleDto;

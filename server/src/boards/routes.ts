@@ -261,6 +261,7 @@ export function registerBoardRoutes(app: FastifyInstance, context: AppContext): 
         id: board.id,
         name: board.name,
         description: board.description,
+        icon: board.icon,
         slug: board.slug,
         url: boardUrl(context.env.KLUI_PUBLIC_URL, board),
         updated_at: board.updated_at.toISOString(),

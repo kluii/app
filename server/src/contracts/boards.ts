@@ -8,12 +8,36 @@ export const visibilitySchema = z.enum(['private', 'link', 'public']);
 export const linkRoleSchema = z.enum(['read', 'edit', 'none']);
 export const anonWriteSchema = z.enum(['off', 'open', 'moderated']);
 
+/**
+ * The closed set of board icon names (D-60). A board carries a name from this
+ * list, never an upload or a colour: the app has no image pipeline for board
+ * data, so the client renders the name from its own icon set.
+ */
+export const BOARD_ICONS = [
+  'briefcase',
+  'palette',
+  'rocket',
+  'book',
+  'code',
+  'folder',
+  'layers',
+  'camera',
+  'cart',
+  'heart',
+] as const;
+
+export type BoardIcon = (typeof BOARD_ICONS)[number];
+
 /** Free text, trimmed, 1–280 characters. `null` clears it on PATCH. */
 export const boardDescriptionSchema = z.string().trim().min(1).max(280).nullable();
+
+/** One of `BOARD_ICONS`. `null` clears it on PATCH. */
+export const boardIconSchema = z.enum(BOARD_ICONS).nullable();
 
 export const createBoardSchema = z.object({
   name: boardNameSchema,
   description: boardDescriptionSchema.optional(),
+  icon: boardIconSchema.optional(),
   visibility: visibilitySchema.optional(),
   template: z.enum(['classic', 'blank']).optional(),
 });
@@ -22,6 +46,7 @@ export const patchBoardSchema = z
   .object({
     name: boardNameSchema.optional(),
     description: boardDescriptionSchema.optional(),
+    icon: boardIconSchema.optional(),
     slug: slugSchema.optional(),
     visibility: visibilitySchema.optional(),
     link_role: linkRoleSchema.optional(),

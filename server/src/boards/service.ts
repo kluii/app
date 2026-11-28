@@ -25,6 +25,7 @@ import { commitEvent, type Hub } from '../realtime/events.js';
 import type { BoardDto } from '../contracts/dto.js';
 import {
   sharePolicyConflict,
+  type BoardIcon,
   type CreateBoardInput,
   type PatchBoardInput,
 } from '../contracts/boards.js';
@@ -171,6 +172,7 @@ export function toBoardDto(
     id: string;
     name: string;
     description: string | null;
+    icon: string | null;
     slug: string;
     visibility: string;
     link_role: string;
@@ -187,6 +189,7 @@ export function toBoardDto(
     id: board.id,
     name: board.name,
     description: board.description,
+    icon: board.icon as BoardIcon | null,
     slug: board.slug,
     visibility: board.visibility as BoardDto['visibility'],
     link_role: board.link_role as BoardDto['link_role'],
@@ -339,6 +342,7 @@ export async function createBoard(context: BoardWrite, input: CreateBoardInput):
         owner_id: userId,
         name: input.name,
         description: input.description ?? null,
+        icon: input.icon ?? null,
         slug,
         visibility,
         link_role: 'none',
@@ -451,6 +455,10 @@ export async function updateBoard(
   if (input.description !== undefined && input.description !== loaded.board.description) {
     changes.description = [loaded.board.description, input.description];
     data.description = input.description;
+  }
+  if (input.icon !== undefined && input.icon !== loaded.board.icon) {
+    changes.icon = [loaded.board.icon, input.icon];
+    data.icon = input.icon;
   }
   if (input.slug !== undefined && input.slug !== loaded.board.slug) {
     changes.slug = [loaded.board.slug, input.slug];
