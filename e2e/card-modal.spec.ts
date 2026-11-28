@@ -151,3 +151,60 @@ test('deleting from the card menu names the card and removes it', async ({ page,
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect.poll(() => titlesIn(page, toDo)).toEqual(['Survivor']);
 });
+
+/**
+ * A deadline and an assignee are edited like the title is: from Edit, saved
+ * explicitly, and stored as the API's two fields (`due_at` at noon UTC, and
+ * `assignee` as a member id — never the free `assignee_label`).
+ */
+test('the editor sets a deadline and an assignee, and clears the day', async ({
+  page,
+  request,
+}) => {
+  const username = uniqueUsername('dated');
+  const { cards, boardId } = await openBoard(page, request, username, ['Dated']);
+  const card = cards[0];
+  if (!card) throw new Error('no card');
+
+  type Stored = {
+    due_at: string | null;
+    assignee: { id: string; username: string } | null;
+    assignee_label: string | null;
+  };
+  const stored = async (): Promise<Stored | undefined> => {
+    const state = (await (await request.get(`/api/v1/boards/${boardId}/state`)).json()) as {
+      cards: (Stored & { id: string })[];
+    };
+    return state.cards.find((entry) => entry.id === card.id);
+  };
+
+  await page.getByTestId(`card-${card.id}`).click();
+  const dialog = page.getByRole('dialog');
+  await page.getByRole('button', { name: 'Edit' }).click();
+
+  await dialog.getByLabel('Due date').fill('2026-03-12');
+  // Nobody is the first option; the board's own member is the second.
+  await dialog.getByLabel('Assignee').selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  // The read view is back, with the member as the assignee.
+  await expect(dialog.getByRole('heading', { level: 2, name: 'Dated' })).toBeVisible();
+  await expect(dialog.getByText(username)).toBeVisible();
+
+  const saved = await stored();
+  expect(saved?.due_at, 'a chosen day is stored at noon UTC').toBe('2026-03-12T12:00:00.000Z');
+  expect(saved?.assignee?.username, 'the member is the assignee').toBe(username);
+  expect(saved?.assignee_label, 'no free label beside a member').toBeNull();
+
+  // The editor opens on the day the card now carries, and an empty field
+  // clears the deadline instead of keeping it.
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const dueInput = dialog.getByLabel('Due date');
+  expect(await dueInput.inputValue(), 'the editor opens on the stored day').toBe('2026-03-12');
+  await dueInput.fill('');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog.getByRole('heading', { level: 2, name: 'Dated' })).toBeVisible();
+  await expect
+    .poll(async () => (await stored())?.due_at, { message: 'the day is cleared' })
+    .toBeNull();
+});

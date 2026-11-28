@@ -252,6 +252,7 @@ export function BoardView({ boardId }: { boardId: string }) {
           <CardEditorModal
             boardId={boardId}
             card={composerCard}
+            members={state.data.members}
             onSaved={() => setComposer({ kind: 'read', cardId: composerCard.id })}
             onClose={() => setComposer({ kind: 'read', cardId: composerCard.id })}
           />
