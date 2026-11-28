@@ -49,6 +49,7 @@ Status legend: **locked** (decided, implement as written) · **open** (needs a h
 | D-25 | **`pending_cards` expire after 7 days** and are purged by the sweeper. | An unmoderated queue that grows forever is a leak, not a feature. | ADR-0003 |
 
 | D-53 | **No board expiry and no archive.** Boards are never auto-archived, auto-closed or auto-purged on a timer. A board ends when its owner closes it (irreversible, D-22) or deletes it. The lifecycle sweeper keeps only the pending-card, digest, retention and session jobs. | A scheduled death makes people avoid the product for the projects that matter, and it silently destroys work when nobody logs in. "Short project" is a way of working, not a timer. v1's `archive_after_days` / `archive_at` / `archived_at` are gone; the v1 importer ignores them and says so in the job result. | ADR-0012 |
+| D-60 | **A board's icon is a name from a closed set, not an upload.** `boards.icon` stores one of `BOARD_ICONS` (`server/src/contracts/boards.ts`: `briefcase, palette, rocket, book, code, folder, layers, camera, cart, heart`), validated by `z.enum` on every write; no colour, no image, no free-form string. | The app has no image pipeline for board data — no upload endpoint, no object storage, no moderation of arbitrary images. A name from a fixed set is checked at the contract, rendered by the client from its own icon set, and needs no audit; an upload would add the whole pipeline for ten marks. | — |
 
 ## API and realtime
 

@@ -66,7 +66,8 @@ The anonymous buckets are keyed on `request.ip`, which only honours `X-Forwarded
 
 ```jsonc
 // Board
-{ "id":"brd_…", "name":"Retro S2", "slug":"retro-s2", "visibility":"link",
+{ "id":"brd_…", "name":"Retro S2", "description":"Sprint retro and planning", "icon":"rocket",
+  "slug":"retro-s2", "visibility":"link",
   "link_role":"edit", "anon_write":"off", "link_suffix":"k3f9",
   "url":"https://host/will/retro-s2-k3f9",
   "owner":{"id":"usr_…","username":"will"},
@@ -96,6 +97,8 @@ The anonymous buckets are keyed on `request.ip`, which only honours `X-Forwarded
 ```
 
 Ids are prefixed opaque strings (`brd_`, `col_`, `crd_`, `cmt_`, `evt_`, `usr_`, `key_`), 26 chars total, URL-safe. They are not UUIDs and clients must treat them as opaque.
+
+`Board.description` is free text, trimmed, 1–280 characters, `null` when the board has none. `Board.icon` is `null` or one name from the closed set `briefcase, palette, rocket, book, code, folder, layers, camera, cart, heart` — exported as `BOARD_ICONS` from the server contracts — never an upload or a colour (D-60). Both appear in every board serialisation: the list, `GET /boards/:id`, the create and patch responses, the state payload and the public profile list.
 
 Positions are serialized as **strings** (`"1024"`, `"1536"`) because they are `Decimal`. A client that parses them as floats will eventually round two cards onto the same rank.
 
@@ -166,9 +169,9 @@ the same address. Both take effect on the next request, with no restart.
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/boards` | Boards the actor can read, `{items:[…]}`, newest activity first. Includes role. Closed boards are listed with `closed_at` set (there is no archive, D-53). |
-| `POST` | `/boards` | `{name, visibility?, template?}`. `201` + Board. Default visibility `private`. A template seeds columns (`classic`: To Do / Doing / Done; `blank`: none). |
+| `POST` | `/boards` | `{name, description?, icon?, visibility?, template?}`. `201` + Board. Default visibility `private`. `description` is trimmed, 1–280 chars; `icon` is one of the closed set in §2. A template seeds columns (`classic`: To Do / Doing / Done; `blank`: none). |
 | `GET` | `/boards/:id` | Board without content. `404` if unreadable. |
-| `PATCH` | `/boards/:id` | `{name?, slug?, visibility?, link_role?, anon_write?, expected_updated_at?}`. Changing to `private` forces `link_role:none` and `anon_write:off` in the same transaction. Changing to `link` generates a suffix if absent. |
+| `PATCH` | `/boards/:id` | `{name?, description?, icon?, slug?, visibility?, link_role?, anon_write?, expected_updated_at?}`. `description: null` or `icon: null` clears the field; a field not sent is left untouched. Changing to `private` forces `link_role:none` and `anon_write:off` in the same transaction. Changing to `link` generates a suffix if absent. |
 | `DELETE` | `/boards/:id` | `{confirm:true}` in the body. `204`. Owner only. |
 | `GET` | `/boards/:id/state` | `BoardState`. `ETag` supported. |
 | `GET` | `/boards/:id/search` | `?q&assignee&tags=<csv>&done&column&limit&cursor`. Server-side equivalent of the filter panel and of the MCP `search_cards` tool; returns `{items:[Card], next_cursor, truncated}`. Same `can()` gate as `state`. |
@@ -198,7 +201,7 @@ the same address. Both take effect on the next request, with no restart.
 |---|---|---|
 | `GET` | `/users/:username/boards/:slug` | Resolves a public URL to the page. `301` to `/<owner>/<slug>` (or the suffixed URL for a `link` board) **only for an actor who can read the board**; anything else, including a bare slug on a link board, a suffix that does not match, and a credential-less request, answers the same `404` an unknown slug answers. Renames inside their 90-day reservation redirect too, but only after that readability check. |
 | `GET` | `/users/:username/boards/:segment/resolve` | What the SPA calls when a human opens `/<username>/<segment>`. `{board_id, url}` for an actor who can read the board, the same `404` otherwise. No cookie, no resolution: this is not a public read. |
-| `GET` | `/users/:username/boards` | `{owner:{username}, items:[{id,name,slug,url,updated_at}]}` — **public** boards of that account, newest first. `404` for an unknown username. Never lists a `link` or `private` board. |
+| `GET` | `/users/:username/boards` | `{owner:{username}, items:[{id,name,description,icon,slug,url,updated_at}]}` — **public** boards of that account, newest first. `404` for an unknown username. Never lists a `link` or `private` board. |
 
 **HTML responses and crawlers.** `GET /<username>` is server-rendered inside `#root` (the SPA replaces it on mount): a crawler reads the public boards, a human gets the product page. `GET /<username>/<segment>` is the SPA shell with a computed `<head>`: `noindex` (meta **and** `X-Robots-Tag`) for a `link` board and for any board the caller cannot read, canonical URL and `og:*` for a `public` board. `/robots.txt` disallows `/api/`, `/l/` and `/mcp`, and names `/sitemap.xml`; the sitemap lists public boards and the profiles that own them, and nothing else. Every `/api/*` response carries `X-Robots-Tag: noindex`.
 
