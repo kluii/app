@@ -4,7 +4,9 @@
  *
  * The values are parsed from `tokens.css`, never duplicated here: a palette
  * change must travel through this test. Text tokens are measured against every
- * surface they can sit on, in both themes.
+ * surface they can sit on, in both themes. Aliases (`--column: var(--surface-2)`)
+ * are resolved recursively before measuring, so an alias is never read as a
+ * literal.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -40,6 +42,27 @@ function hexToRgb(hex: string): Rgb {
   return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
 }
 
+/** Follows `var(--name)` references inside one theme block, with a depth guard. */
+function resolve(value: string, tokens: Record<string, string>, depth = 0): string {
+  if (depth > 8) throw new Error(`var() chain too deep while resolving "${value}"`);
+  return value.replace(/var\(--([a-z0-9-]+)\)/g, (_match, name: string) => {
+    const target = tokens[name];
+    if (target === undefined) throw new Error(`--${name} is not defined in this theme`);
+    return resolve(target, tokens, depth + 1);
+  });
+}
+
+/** Resolves aliases, then parses a hex or rgb()/rgba() literal into channels. */
+function toRgb(value: string, tokens: Record<string, string>): Rgb {
+  const resolved = resolve(value, tokens).trim();
+  const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(resolved);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  if (!/^#[0-9a-f]{3,8}$/i.test(resolved)) {
+    throw new Error(`cannot parse "${value}" (resolved to "${resolved}")`);
+  }
+  return hexToRgb(resolved);
+}
+
 function channel(value: number): number {
   const c = value / 255;
   return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -72,7 +95,15 @@ const light = block(
   CSS.includes('[data-theme="light"]') ? '[data-theme="light"] {' : "[data-theme='light'] {",
 );
 
-const SURFACES = ['canvas', 'column', 'card', 'surface', 'surface-2', 'surface-muted'] as const;
+const SURFACES = [
+  'canvas',
+  'column',
+  'card',
+  'surface',
+  'surface-2',
+  'surface-muted',
+  'surface-raised',
+] as const;
 const TEXT_TOKENS = ['ink', 'ink-muted', 'ink-subtle', 'danger'] as const;
 
 describe.each([
@@ -88,7 +119,7 @@ describe.each([
         const surfaceValue = tokens[surface];
         expect(surfaceValue, `${name}: --${surface} is missing`).toBeDefined();
         if (!surfaceValue) continue;
-        const measured = ratio(hexToRgb(value), hexToRgb(surfaceValue));
+        const measured = ratio(toRgb(value, tokens), toRgb(surfaceValue, tokens));
         expect(
           measured,
           `${name}: --${text} on --${surface} measures ${measured.toFixed(2)}`,
@@ -97,15 +128,18 @@ describe.each([
     }
   });
 
-  it('keeps the control boundary at 3:1 against the surfaces it separates', () => {
+  it('keeps the control boundary at 3:1 against every surface it separates', () => {
     const control = tokens['control-border'];
     expect(control).toBeDefined();
     if (!control) return;
-    for (const surface of ['canvas', 'surface-2'] as const) {
+    for (const surface of SURFACES) {
       const surfaceValue = tokens[surface];
       if (!surfaceValue) continue;
-      const measured = ratio(hexToRgb(control), hexToRgb(surfaceValue));
-      expect(measured, `${name}: --control-border on --${surface}`).toBeGreaterThanOrEqual(3);
+      const measured = ratio(toRgb(control, tokens), toRgb(surfaceValue, tokens));
+      expect(
+        measured,
+        `${name}: --control-border on --${surface} measures ${measured.toFixed(2)}`,
+      ).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -115,7 +149,7 @@ describe.each([
     expect(foreground).toBeDefined();
     expect(primary).toBeDefined();
     if (!foreground || !primary) return;
-    expect(ratio(hexToRgb(foreground), hexToRgb(primary))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(toRgb(foreground, tokens), toRgb(primary, tokens))).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps a tag chip readable for the two extreme hues', () => {
@@ -127,11 +161,59 @@ describe.each([
     if (!card || !ink) return;
 
     const extreme: Rgb = name === 'dark' ? [255, 255, 255] : [0, 0, 0];
-    const chip = mix(extreme, tint, hexToRgb(card));
-    const measured = ratio(hexToRgb(ink), chip);
+    const chip = mix(extreme, tint, toRgb(card, tokens));
+    const measured = ratio(toRgb(ink, tokens), chip);
     expect(
       measured,
       `${name}: ink on a ${name === 'dark' ? 'white' : 'black'} tag`,
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps every surface and seam neutral: max(R,G,B) − min(R,G,B) ≤ 3', () => {
+    const ramp = [...SURFACES, 'border', 'border-strong'] as const;
+    for (const token of ramp) {
+      const value = tokens[token];
+      expect(value, `${name}: --${token} is missing`).toBeDefined();
+      if (!value) continue;
+      const [r, g, b] = toRgb(value, tokens);
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      expect(
+        chroma,
+        `${name}: --${token} ${resolve(value, tokens)} has a chroma of ${chroma} (${r},${g},${b})`,
+      ).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('keeps the plate text at 4.5:1 on the plate', () => {
+    const plate = tokens.plate;
+    expect(plate, `${name}: --plate is missing`).toBeDefined();
+    if (!plate) return;
+    for (const text of ['plate-ink', 'plate-muted'] as const) {
+      const value = tokens[text];
+      expect(value, `${name}: --${text} is missing`).toBeDefined();
+      if (!value) continue;
+      const measured = ratio(toRgb(value, tokens), toRgb(plate, tokens));
+      expect(
+        measured,
+        `${name}: --${text} on --plate measures ${measured.toFixed(2)}`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('keeps the worst tag label readable on the plate', () => {
+    const tint = Number.parseFloat((tokens['tag-tint'] ?? '18%').replace('%', ''));
+    const plate = tokens.plate;
+    const plateInk = tokens['plate-ink'];
+    expect(plate).toBeDefined();
+    expect(plateInk).toBeDefined();
+    if (!plate || !plateInk) return;
+
+    const extreme: Rgb = name === 'dark' ? [255, 255, 255] : [0, 0, 0];
+    const chip = mix(extreme, tint, toRgb(plate, tokens));
+    const measured = ratio(toRgb(plateInk, tokens), chip);
+    expect(
+      measured,
+      `${name}: plate-ink on a ${name === 'dark' ? 'white' : 'black'} tag over --plate measures ${measured.toFixed(2)}`,
     ).toBeGreaterThanOrEqual(4.5);
   });
 });
@@ -161,6 +243,23 @@ describe('the palette', () => {
   it('caps the light-theme tag tint lower than the dark one', () => {
     expect(Number.parseFloat((dark['tag-tint'] ?? '').replace('%', ''))).toBe(18);
     expect(Number.parseFloat((light['tag-tint'] ?? '').replace('%', ''))).toBe(12);
+  });
+
+  it('keeps the plate the warm exception in the dark theme (R > G > B)', () => {
+    for (const token of ['plate', 'plate-ink', 'plate-muted'] as const) {
+      const value = dark[token];
+      expect(value, `dark: --${token} is missing`).toBeDefined();
+      if (!value) continue;
+      const [r, g, b] = toRgb(value, dark);
+      expect(
+        r,
+        `dark: --${token} ${resolve(value, dark)} must have R > G (${r},${g},${b})`,
+      ).toBeGreaterThan(g);
+      expect(
+        g,
+        `dark: --${token} ${resolve(value, dark)} must have G > B (${r},${g},${b})`,
+      ).toBeGreaterThan(b);
+    }
   });
 
   it('uses only the two radii the system allows', () => {
