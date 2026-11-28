@@ -31,6 +31,14 @@ export const boardsRoute = createRoute({
 const GRID =
   'mt-4 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
 
+/**
+ * A tile offers only the actions its reader can perform. Name, description and
+ * icon are board settings, which a manager sets; deleting the board is the
+ * owner's alone, and the API refuses anyone else.
+ */
+const canManage = (board: Board): boolean => board.role === 'owner' || board.role === 'admin';
+const canDelete = (board: Board): boolean => board.role === 'owner';
+
 function BoardsPage() {
   const navigate = useNavigate();
   const arrived = useArrival();
@@ -142,8 +150,8 @@ function BoardsPage() {
                       <li key={board.id}>
                         <BoardTile
                           board={board}
-                          onEdit={() => setEditing(board)}
-                          onDelete={() => setDeleting(board)}
+                          onEdit={canManage(board) ? () => setEditing(board) : undefined}
+                          onDelete={canDelete(board) ? () => setDeleting(board) : undefined}
                         />
                       </li>
                     ))}
@@ -161,8 +169,8 @@ function BoardsPage() {
                       <li key={board.id}>
                         <BoardTile
                           board={board}
-                          onEdit={() => setEditing(board)}
-                          onDelete={() => setDeleting(board)}
+                          onEdit={canManage(board) ? () => setEditing(board) : undefined}
+                          onDelete={canDelete(board) ? () => setDeleting(board) : undefined}
                         />
                       </li>
                     ))}

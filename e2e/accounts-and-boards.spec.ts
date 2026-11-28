@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { expect, test, type Page } from '@playwright/test';
+import { expect, request as playwrightRequest, test, type Page } from '@playwright/test';
+import { post, uniqueUsername } from './support';
 
 const PASSWORD = 'a-long-passphrase-9';
 // The suite runs against a schema that may hold earlier runs (a targeted
@@ -95,6 +96,54 @@ test('a second account gets the same answer for a foreign board as for one that 
 
   await owner.close();
   await stranger.close();
+});
+
+/**
+ * A control that cannot work is not a control. Editing a board is a manager's
+ * right and deleting it the owner's, so a viewer's tile carries neither button:
+ * the two the list used to draw answered 403.
+ */
+test('a shared board offers no edit and no delete to a viewer, and both to the owner', async ({
+  browser,
+  request,
+}) => {
+  const owner = uniqueUsername('holder');
+  await request.post('/api/v1/auth/signup', {
+    data: { email: `${owner}@klui.test`, username: owner, password: PASSWORD },
+  });
+  const board = await post<{ id: string }>(request, '/api/v1/boards', {
+    name: 'Shared with a viewer',
+  });
+
+  const reader = uniqueUsername('reader');
+  const readerRequest = await playwrightRequest.newContext({
+    baseURL: test.info().project.use.baseURL,
+  });
+  await readerRequest.post('/api/v1/auth/signup', {
+    data: { email: `${reader}@klui.test`, username: reader, password: PASSWORD },
+  });
+  await post(request, `/api/v1/boards/${board.id}/members`, { username: reader, role: 'viewer' });
+
+  // The owner's own tile carries both corner actions.
+  const ownerContext = await browser.newContext();
+  const ownerPage = await ownerContext.newPage();
+  await ownerContext.addCookies((await request.storageState()).cookies);
+  await ownerPage.goto('/boards', { waitUntil: 'domcontentloaded' });
+  await expect(ownerPage.getByTestId(`board-edit-${board.id}`)).toHaveCount(1);
+  await expect(ownerPage.getByTestId(`board-delete-${board.id}`)).toHaveCount(1);
+
+  // The viewer reads the same board under `Shared with me`, with no actions.
+  const readerContext = await browser.newContext();
+  const readerPage = await readerContext.newPage();
+  await readerContext.addCookies((await readerRequest.storageState()).cookies);
+  await readerPage.goto('/boards', { waitUntil: 'domcontentloaded' });
+  await expect(readerPage.getByText('Shared with a viewer')).toBeVisible();
+  await expect(readerPage.getByTestId(`board-edit-${board.id}`)).toHaveCount(0);
+  await expect(readerPage.getByTestId(`board-delete-${board.id}`)).toHaveCount(0);
+
+  await ownerContext.close();
+  await readerContext.close();
+  await readerRequest.dispose();
 });
 
 test('the reset page fails closed when the instance cannot send mail', async ({ page }) => {
