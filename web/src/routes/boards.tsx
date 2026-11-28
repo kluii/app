@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, createRoute, useNavigate } from '@tanstack/react-router';
+import { createRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Board } from '../api/types';
-import { Chip } from '../components/ui/chip';
+import { BoardTile } from '../components/boards/board-tile';
 import { Button } from '../components/ui/button';
 import { Dialog } from '../components/ui/dialog';
 import { Field } from '../components/ui/field';
@@ -51,9 +51,9 @@ function BoardsPage() {
           <p className="max-w-80 text-body-sm text-ink-muted">{t('boards.empty.body')}</p>
         </div>
       ) : (
-        <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {boards.data.items.map((board) => (
-            <li key={board.id}>
+            <li key={board.id} className="flex">
               <BoardTile board={board} />
             </li>
           ))}
@@ -69,28 +69,6 @@ function BoardsPage() {
         }}
       />
     </div>
-  );
-}
-
-function BoardTile({ board }: { board: Board }) {
-  const visibility = t(`boards.meta.${board.visibility}`);
-  const role = board.role ? t(`board.role.${board.role}`) : null;
-  return (
-    <Link
-      to="/boards/$boardId"
-      params={{ boardId: board.id }}
-      data-testid={`board-${board.id}`}
-      className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4 transition-colors hover:border-border-strong"
-    >
-      <span className="flex items-start justify-between gap-3">
-        <span className="text-h3 text-ink">{board.name}</span>
-        {board.closed_at ? <Chip>{t('boards.meta.closed')}</Chip> : null}
-      </span>
-      <span className="flex flex-wrap items-center gap-1">
-        <Chip>{visibility}</Chip>
-        {role ? <Chip>{role}</Chip> : null}
-      </span>
-    </Link>
   );
 }
 

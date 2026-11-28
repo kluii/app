@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Link, createRoute } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { PublicBoardTile } from '../components/boards/board-tile';
 import { AppShell } from '../components/layout/app-shell';
 import { queryKeys } from '../lib/query-client';
-import { formatDate } from '../lib/format';
 import { t } from '../i18n';
 import { rootRoute } from './root';
 
@@ -36,25 +36,16 @@ function ProfilePage() {
         </header>
 
         {profile.isPending ? (
-          <p className="text-body-sm text-ink-muted">{t('common.state.loading')}</p>
+          <p className="text-body-sm text-ink-subtle">{t('common.state.loading')}</p>
         ) : profile.isError ? (
           <p className="text-body-sm text-ink-muted">{t('notFound.body')}</p>
         ) : profile.data.items.length === 0 ? (
           <p className="text-body-sm text-ink-muted">{t('profile.empty')}</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-border border-y border-border">
+          <ul className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {profile.data.items.map((board) => (
-              <li key={board.id} className="flex items-center justify-between gap-4 py-2">
-                <Link
-                  to="/$username/$slug"
-                  params={{ username, slug: board.slug }}
-                  className="rounded-sm text-label underline-offset-4 hover:underline"
-                >
-                  {board.name}
-                </Link>
-                <span className="font-mono text-mono-sm text-ink-subtle">
-                  {formatDate(board.updated_at)}
-                </span>
+              <li key={board.id} className="flex">
+                <PublicBoardTile username={username} board={board} />
               </li>
             ))}
           </ul>
