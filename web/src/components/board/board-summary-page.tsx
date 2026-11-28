@@ -64,7 +64,7 @@ export function BoardSummaryPage({ boardId }: { boardId: string }) {
         {t('board.summary.back')}
       </Link>
       <header className="mt-4 border-b border-border pb-4">
-        <h1 className="font-display text-display text-ink">{data.board.name}</h1>
+        <h1 className="font-display text-h1 text-ink">{data.board.name}</h1>
         <p className="mt-1 font-mono text-mono-sm text-ink-subtle">
           {t('board.summary.closedOn', { date: longDate(data.closed_at) })}
         </p>

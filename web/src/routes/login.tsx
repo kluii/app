@@ -80,7 +80,7 @@ function LoginPage() {
 
   return (
     <AuthPage>
-      <h1 className="font-display text-display">{t('auth.signIn.title')}</h1>
+      <h1 className="font-display text-h1">{t('auth.signIn.title')}</h1>
       <p className="mt-2 text-body-sm text-ink-muted">{t('auth.signIn.subtitle')}</p>
 
       {oidcError === 'link_required' ? (

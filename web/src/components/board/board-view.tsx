@@ -853,7 +853,7 @@ function BoardName({ board, canRename }: { board: Board; canRename: boolean }) {
   };
 
   if (!canRename) {
-    return <h1 className="truncate font-display text-h1 text-ink">{board.name}</h1>;
+    return <h1 className="truncate font-display text-h2 text-ink">{board.name}</h1>;
   }
 
   if (editing) {
@@ -885,7 +885,7 @@ function BoardName({ board, canRename }: { board: Board; canRename: boolean }) {
             setEditing(false);
           }
         }}
-        className="w-full min-w-0 rounded-sm border border-control-border bg-surface-2 px-2 font-display text-h1 text-ink"
+        className="w-full min-w-0 rounded-sm border border-control-border bg-surface-2 px-2 font-display text-h2 text-ink"
       />
     );
   }
@@ -901,7 +901,7 @@ function BoardName({ board, canRename }: { board: Board; canRename: boolean }) {
         title={t('board.rename.label')}
         aria-description={t('board.rename.label')}
         data-testid="board-name"
-        className="block max-w-full truncate rounded-sm font-display text-h1 text-ink underline-offset-4 hover:underline hover:decoration-ink-subtle"
+        className="block max-w-full truncate rounded-sm font-display text-h2 text-ink underline-offset-4 hover:underline hover:decoration-ink-subtle"
       >
         {board.name}
       </button>

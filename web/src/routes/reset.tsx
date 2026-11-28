@@ -47,7 +47,7 @@ function RequestForm() {
 
   return (
     <>
-      <h1 className="font-display text-display">{t('auth.reset.title')}</h1>
+      <h1 className="font-display text-h1">{t('auth.reset.title')}</h1>
       <p className="mt-2 text-body-sm text-ink-muted">{t('auth.reset.requestBody')}</p>
 
       <form
@@ -112,7 +112,7 @@ function ConfirmForm({ token }: { token: string }) {
 
   return (
     <>
-      <h1 className="font-display text-display">{t('auth.reset.confirmTitle')}</h1>
+      <h1 className="font-display text-h1">{t('auth.reset.confirmTitle')}</h1>
       <p className="mt-2 text-body-sm text-ink-muted">{t('auth.reset.confirmBody')}</p>
 
       {done ? (

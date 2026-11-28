@@ -31,7 +31,7 @@ function ProfilePage() {
     <AppShell>
       <div className="mx-auto flex w-full max-w-content flex-col gap-6 px-6 py-8">
         <header className="flex flex-col gap-1">
-          <h1 className="font-mono text-h1">@{username}</h1>
+          <h1 className="font-display text-h1">@{username}</h1>
           <p className="text-body-sm text-ink-muted">{t('profile.intro')}</p>
         </header>
 
