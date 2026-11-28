@@ -6,6 +6,7 @@ import { cn } from '../../lib/cn';
 export function Field({
   label,
   htmlFor,
+  labelId,
   hint,
   error,
   children,
@@ -13,6 +14,8 @@ export function Field({
 }: {
   label: string;
   htmlFor: string;
+  /** For a trigger that names itself with `aria-labelledby` instead. */
+  labelId?: string;
   hint?: string;
   error?: string | null;
   children: ReactNode;
@@ -20,7 +23,7 @@ export function Field({
 }) {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      <label htmlFor={htmlFor} className="text-label font-medium text-ink-muted">
+      <label id={labelId} htmlFor={htmlFor} className="text-label font-medium text-ink-muted">
         {label}
       </label>
       {children}

@@ -21,7 +21,9 @@ import { cn } from '../../lib/cn';
 import { Button } from '../ui/button';
 import { Field } from '../ui/field';
 import { Select } from '../ui/input';
+import { SelectMenu } from '../ui/select-menu';
 import { useToast } from '../ui/toast';
+import { AgentMark } from './agent-mark';
 
 type CopyBlock = {
   id: string;
@@ -125,20 +127,21 @@ export function AgentSetupPanel({
       </div>
 
       <div className="flex flex-col gap-2">
-        <Field label={t('settings.agents.setup.clientLabel')} htmlFor="agent-client">
-          <Select
+        <Field
+          label={t('settings.agents.setup.clientLabel')}
+          htmlFor="agent-client"
+          labelId="agent-client-label"
+        >
+          <SelectMenu
             id="agent-client"
+            labelId="agent-client-label"
+            testId="agent-client"
             value={clientId}
-            onChange={(event) => setClientId(event.target.value)}
-            data-testid="agent-client"
+            onChange={setClientId}
+            options={clients.map((block) => ({ id: block.id, label: block.name }))}
+            renderMark={(id) => <AgentMark id={id} />}
             className="sm:w-64"
-          >
-            {clients.map((block) => (
-              <option key={block.id} value={block.id}>
-                {block.name}
-              </option>
-            ))}
-          </Select>
+          />
         </Field>
         <ul className="grid grid-cols-1 gap-3">
           <BlockCard
@@ -153,20 +156,21 @@ export function AgentSetupPanel({
         <h3 className="text-h3">{t('settings.agents.skill.title')}</h3>
         <p className="text-body-sm text-ink-muted">{t('settings.agents.skill.description')}</p>
         <p className="text-body-sm text-ink-subtle">{t('settings.agents.skill.scrollHint')}</p>
-        <Field label={t('settings.agents.setup.skillLabel')} htmlFor="agent-skill">
-          <Select
+        <Field
+          label={t('settings.agents.setup.skillLabel')}
+          htmlFor="agent-skill"
+          labelId="agent-skill-label"
+        >
+          <SelectMenu
             id="agent-skill"
+            labelId="agent-skill-label"
+            testId="agent-skill"
             value={skillId}
-            onChange={(event) => setSkillId(event.target.value)}
-            data-testid="agent-skill"
+            onChange={setSkillId}
+            options={skills.map((block) => ({ id: block.id, label: block.name }))}
+            renderMark={(id) => <AgentMark id={id} />}
             className="sm:w-64"
-          >
-            {skills.map((block) => (
-              <option key={block.id} value={block.id}>
-                {block.name}
-              </option>
-            ))}
-          </Select>
+          />
         </Field>
         <ul className="grid grid-cols-1 gap-3">
           <BlockCard
