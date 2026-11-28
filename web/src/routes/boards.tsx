@@ -3,15 +3,17 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
-import type { Board } from '../api/types';
+import { api, ApiError } from '../api/client';
+import type { Board, BoardIcon } from '../api/types';
 import { BoardTile } from '../components/boards/board-tile';
+import { BOARD_ICONS, BoardIconGlyph } from '../components/boards/board-icon';
 import { Button } from '../components/ui/button';
 import { Dialog } from '../components/ui/dialog';
 import { EmptySlot } from '../components/ui/empty-slot';
 import { Field } from '../components/ui/field';
-import { Input, Select } from '../components/ui/input';
+import { Input, Select, Textarea } from '../components/ui/input';
 import { t } from '../i18n';
+import { failureMessage } from '../lib/api-error';
 import { cn } from '../lib/cn';
 import { useArrival } from '../lib/entrance';
 import { useShortcuts } from '../lib/hotkeys';
@@ -33,6 +35,7 @@ function BoardsPage() {
   const arrived = useArrival();
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState('');
+  const [editing, setEditing] = useState<Board | null>(null);
   const boards = useQuery({ queryKey: queryKeys.boards, queryFn: api.boards });
 
   useShortcuts([{ key: 'n', handler: () => setCreating(true) }]);
@@ -106,7 +109,7 @@ function BoardsPage() {
               <ul className={cn(GRID, arrived && 'enter-stagger')}>
                 {owned.map((board) => (
                   <li key={board.id}>
-                    <BoardTile board={board} />
+                    <BoardTile board={board} onEdit={() => setEditing(board)} />
                   </li>
                 ))}
               </ul>
@@ -121,7 +124,7 @@ function BoardsPage() {
               <ul className={cn(GRID, arrived && 'enter-stagger')}>
                 {shared.map((board) => (
                   <li key={board.id}>
-                    <BoardTile board={board} />
+                    <BoardTile board={board} onEdit={() => setEditing(board)} />
                   </li>
                 ))}
               </ul>
@@ -138,6 +141,8 @@ function BoardsPage() {
           void navigate({ to: '/boards/$boardId', params: { boardId: board.id } });
         }}
       />
+
+      <EditBoardDialog board={editing} open={editing !== null} onClose={() => setEditing(null)} />
     </div>
   );
 }
@@ -213,6 +218,140 @@ function NewBoardDialog({
             <option value="blank">{t('boards.template.blank')}</option>
           </Select>
         </Field>
+      </div>
+    </Dialog>
+  );
+}
+
+/**
+ * Rename, redescribe and re-icon a board from the list (brief §4.5). The save
+ * carries `expected_updated_at`, so a board that changed underneath answers
+ * 409 and the reader is told to reload rather than overwrite.
+ */
+function EditBoardDialog({
+  board,
+  open,
+  onClose,
+}: {
+  board: Board | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [icon, setIcon] = useState<BoardIcon | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open && board !== null) {
+      setName(board.name);
+      setDescription(board.description ?? '');
+      setIcon(board.icon);
+      setError(null);
+    }
+  }, [open, board]);
+
+  const trimmedDescription = description.trim() === '' ? null : description.trim();
+  const dirty =
+    board !== null &&
+    (name.trim() !== board.name || trimmedDescription !== board.description || icon !== board.icon);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.updateBoard(board?.id ?? '', {
+        name: name.trim(),
+        description: trimmedDescription,
+        icon,
+        expected_updated_at: board?.updated_at,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.boards });
+      onClose();
+    },
+    onError: (cause) => {
+      setError(
+        cause instanceof ApiError && cause.status === 409
+          ? t('boards.edit.conflict')
+          : failureMessage(cause),
+      );
+    },
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={t('boards.edit.title')}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.action.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            loading={save.isPending}
+            disabled={!dirty || name.trim() === ''}
+            onClick={() => save.mutate()}
+          >
+            {t('common.action.save')}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Field label={t('boards.new.name')} htmlFor="edit-board-name" error={error}>
+          <Input
+            id="edit-board-name"
+            autoFocus
+            maxLength={80}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </Field>
+        <Field label={t('boards.edit.description')} htmlFor="edit-board-description">
+          <Textarea
+            id="edit-board-description"
+            maxLength={280}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+          <p className="mt-1 text-right font-mono text-mono-sm text-ink-subtle">
+            {description.length}/280
+          </p>
+        </Field>
+        <div className="flex flex-col gap-1">
+          <span className="text-label font-medium text-ink-muted">{t('boards.edit.icon')}</span>
+          <div className="flex flex-wrap gap-2">
+            {BOARD_ICONS.map((iconName) => (
+              <button
+                key={iconName}
+                type="button"
+                aria-pressed={icon === iconName}
+                aria-label={t('boards.edit.iconFor', { icon: iconName })}
+                onClick={() => setIcon(iconName)}
+                className={cn(
+                  'flex h-10 w-10 items-center justify-center rounded-sm border border-border text-ink-muted transition-colors duration-[var(--dur-fast)] hover:bg-surface-2 hover:text-ink',
+                  icon === iconName &&
+                    'bg-surface-muted text-ink shadow-[var(--shadow-active)] hover:bg-surface-muted',
+                )}
+              >
+                <BoardIconGlyph name={iconName} size={20} />
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={icon === null}
+              onClick={() => setIcon(null)}
+              className={cn(
+                'h-10 rounded-sm border border-border px-3 text-label font-medium text-ink-muted transition-colors duration-[var(--dur-fast)] hover:bg-surface-2 hover:text-ink',
+                icon === null &&
+                  'bg-surface-muted text-ink shadow-[var(--shadow-active)] hover:bg-surface-muted',
+              )}
+            >
+              {t('boards.edit.iconNone')}
+            </button>
+          </div>
+        </div>
       </div>
     </Dialog>
   );

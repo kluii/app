@@ -63,26 +63,30 @@ export function BoardTile({
         closed={board.closed_at !== null}
         updatedAt={board.updated_at}
       />
-      {onEdit === undefined || onDelete === undefined ? null : (
+      {onEdit === undefined && onDelete === undefined ? null : (
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-100 [@media(pointer:coarse)]:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-          <button
-            type="button"
-            onClick={onEdit}
-            aria-label={t('boards.tile.edit')}
-            data-testid={`board-edit-${board.id}`}
-            className="flex h-7 w-7 items-center justify-center rounded-key bg-surface-raised/90 text-ink-muted transition-colors duration-[var(--dur-fast)] hover:text-ink"
-          >
-            <Pencil aria-hidden="true" size={16} strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            aria-label={t('boards.tile.delete')}
-            data-testid={`board-delete-${board.id}`}
-            className="flex h-7 w-7 items-center justify-center rounded-key bg-surface-raised/90 text-ink-muted transition-colors duration-[var(--dur-fast)] hover:text-danger"
-          >
-            <Trash2 aria-hidden="true" size={16} strokeWidth={1.5} />
-          </button>
+          {onEdit === undefined ? null : (
+            <button
+              type="button"
+              onClick={onEdit}
+              aria-label={t('boards.tile.edit')}
+              data-testid={`board-edit-${board.id}`}
+              className="flex h-7 w-7 items-center justify-center rounded-key bg-surface-raised/90 text-ink-muted transition-colors duration-[var(--dur-fast)] hover:text-ink"
+            >
+              <Pencil aria-hidden="true" size={16} strokeWidth={1.5} />
+            </button>
+          )}
+          {onDelete === undefined ? null : (
+            <button
+              type="button"
+              onClick={onDelete}
+              aria-label={t('boards.tile.delete')}
+              data-testid={`board-delete-${board.id}`}
+              className="flex h-7 w-7 items-center justify-center rounded-key bg-surface-raised/90 text-ink-muted transition-colors duration-[var(--dur-fast)] hover:text-danger"
+            >
+              <Trash2 aria-hidden="true" size={16} strokeWidth={1.5} />
+            </button>
+          )}
         </div>
       )}
     </div>
