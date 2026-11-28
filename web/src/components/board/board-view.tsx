@@ -687,7 +687,7 @@ function ColumnSection({
   return (
     <section
       ref={droppable.ref}
-      className="board-column flex w-column shrink-0 flex-col gap-2 rounded-md bg-column p-2"
+      className="board-column flex w-column shrink-0 flex-col gap-2 rounded-md border border-border bg-column p-2"
       data-testid={`column-${column.id}`}
       data-drop-active={active ? 'true' : undefined}
     >

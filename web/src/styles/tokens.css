@@ -4,7 +4,10 @@
  * (DESIGN.md §15). Every value below is measured in
  * web/test/contrast.test.ts against the surfaces it actually sits on.
  *
- * The palette is the landing page's: warm graphite, warm paper, one serif.
+ * The palette is the landing page's: a neutral ramp — every surface and seam
+ * within max(R,G,B) − min(R,G,B) ≤ 3 of grey, measured in
+ * web/test/contrast.test.ts — with the plate as the only warm surface.
+ * One serif, Newsreader, announces.
  */
 
 /* ── The three families ────────────────────────────────────────────────────
@@ -39,39 +42,40 @@
 :root {
   color-scheme: dark;
 
-  /* surfaces: a step, not a shadow (§5) */
-  --canvas: #121110;
-  --column: #171514;
-  --card: #201e1c;
-  --surface: #1a1817;
-  --surface-2: #242220;
-  --surface-muted: #2a2724;
+  /* surfaces: a step, not a shadow (§5) — the landing's neutral ramp */
+  --canvas: #0b0b0c;
+  --surface: #121213;
+  --surface-2: #171718;
+  --surface-muted: #1e1e1f;
+  --surface-raised: #242425;
+  --column: var(--surface-2);
+  --card: var(--surface-muted);
 
   /* seams */
-  --border: #302d29;
-  --border-strong: #46413a;
-  /* #6e675c measured 2.83:1 against --surface-2, under the 3:1 the control
-     boundary owes its surface; raised by two steps of lightness (3.25:1). */
-  --control-border: #767065;
+  --border: #2a2a2c;
+  --border-strong: #3f3f42;
+  /* #78787c keeps ≥ 3:1 on every surface (worst 3.53:1 on --surface-raised) */
+  --control-border: #78787c;
 
   /* ink */
-  --ink: #f4f1eb;
-  --ink-muted: #ada79e;
-  --ink-subtle: #948e85;
+  --ink: #f5f5f5;
+  --ink-muted: #a3a3a3;
+  --ink-subtle: #8c8c8c;
 
   /* the accent is the ink */
-  --primary: #f5f2ec;
-  --primary-hover: #fffdf8;
-  --primary-foreground: #14120f;
+  --primary: #f5f5f5;
+  --primary-hover: #ffffff;
+  --primary-foreground: #0e0e10;
 
-  /* the inverted plate: a menu header, a printed rule */
+  /* the plate: the only warm surface, the landing's paper */
   --plate: #e9e5dd;
   --plate-ink: #14120f;
+  --plate-muted: #5f5a52;
 
   --danger: #e8836f;
-  --focus: #f5f2ec;
-  --selection: #2e2b27;
-  --insert-line: #f5f2ec;
+  --focus: #f5f5f5;
+  --selection: #333336;
+  --insert-line: var(--plate);
 
   /* tag tints (D-21): capped so any hue keeps the label readable */
   --tag-tint: 18%;
@@ -103,32 +107,34 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  --canvas: #f7f5f0;
-  --column: #ebe7de;
+  --canvas: #f5f5f4;
+  --surface: #f8f8f7;
+  --surface-2: #ebebe9;
+  --surface-muted: #e4e4e1;
   --card: #ffffff;
-  --surface: #fcfbf7;
-  --surface-2: #f3efe7;
-  --surface-muted: #e8e3d8;
+  --surface-raised: #ffffff;
+  --column: var(--surface-2);
 
-  --border: #d9d3c6;
-  --border-strong: #b5ae9e;
-  --control-border: #7a7365;
+  --border: #dadad7;
+  --border-strong: #bcbcba;
+  --control-border: #77777a;
 
   --ink: #14120f;
-  --ink-muted: #5b564d;
-  --ink-subtle: #635e54;
+  --ink-muted: #5f5a52;
+  --ink-subtle: #68645b;
 
   --primary: #14120f;
   --primary-hover: #000000;
-  --primary-foreground: #fffdf8;
+  --primary-foreground: #f5f5f5;
 
   --plate: #14120f;
-  --plate-ink: #f7f5f0;
+  --plate-ink: #f5f5f5;
+  --plate-muted: #a19c92;
 
   --danger: #a33a22;
   --focus: #14120f;
-  --selection: #e4dfd3;
-  --insert-line: #14120f;
+  --selection: #dadad7;
+  --insert-line: var(--plate);
 
   --tag-tint: 12%;
   --tag-slate: #64748b;
@@ -160,6 +166,7 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-raised: var(--surface-raised);
 
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
@@ -175,6 +182,7 @@
 
   --color-plate: var(--plate);
   --color-plate-ink: var(--plate-ink);
+  --color-plate-muted: var(--plate-muted);
 
   --color-danger: var(--danger);
   --color-focus: var(--focus);
