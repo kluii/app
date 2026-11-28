@@ -131,7 +131,7 @@ Newsreader for `h1` (32) and `h2` (24); Inter for `h3` (16), `body` (16), `body-
 - Spacing is Tailwind's 4 px scale, **pinned in px** (`--spacing: 4px`): the root font size is the body type token, so a
   rem-derived step would render 56 as 52.5. A named size beats an arbitrary value; `.5` steps do not exist.
 - A column sizes to its content and aligns to the top of the rail (`items-start`); a sparse column never stretches to its tallest
-  neighbour. The board is a fixed frame (`h-dvh overflow-hidden`), so the rail's horizontal scrollbar sits at the viewport bottom.
+  neighbour. The board page scrolls as one document — its header and bar scroll away with the columns — and only the rail scrolls sideways, under the tallest column.
 - Breakpoints 390 / 640 (a dialog becomes a bottom sheet) / 768 / 1024 (the auth plate appears) / 1440.
 
 ## 5. Surfaces and depth
