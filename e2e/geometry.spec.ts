@@ -171,3 +171,131 @@ test('four boards are four tiles on one row, all the same height', async ({ page
   expect(second.x - first.right, 'gap between two tiles').toBe(16);
   expect(last.right - first.x, 'four tiles fit the content width').toBe(1392);
 });
+
+/**
+ * Phase 8 — the plate (brief §8). The plate is the app's one signature
+ * surface: a card being held (here, lifted with Space) and the auth mat from
+ * 1024 px. At most one rendered element on screen carries `--plate` as its
+ * computed background. The count runs in the dark theme, where `--plate` is a
+ * colour no other token shares; in the light theme the plate is the inverted
+ * ink and collides with `--primary` by design.
+ */
+test.describe('phase 8 — the plate', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  /** The computed `--plate` colour in the page's current theme. */
+  async function plateColour(page: Page): Promise<string> {
+    return page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.backgroundColor = 'var(--plate)';
+      document.body.appendChild(probe);
+      const colour = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return colour;
+    });
+  }
+
+  /** How many rendered elements on the page are painted with `--plate`. */
+  async function plateCount(page: Page): Promise<number> {
+    const plate = await plateColour(page);
+    return page.evaluate(
+      (target) =>
+        [...document.querySelectorAll('*')].filter(
+          (element) =>
+            element.getClientRects().length > 0 &&
+            getComputedStyle(element).backgroundColor === target,
+        ).length,
+      plate,
+    );
+  }
+
+  for (const theme of ['dark', 'light'] as const) {
+    test(`a card lifted with Space is printed on the plate in ${theme}, and Esc restores it`, async ({
+      page,
+      request,
+    }) => {
+      await page.addInitScript((value) => {
+        localStorage.setItem('klui-theme', value);
+      }, theme);
+      const { cards } = await openBoard(page, request, uniqueUsername(`plate-lift-${theme}`));
+      const [alpha] = cards;
+      if (!alpha) throw new Error('seed failed');
+
+      const card = page.getByTestId(`card-${alpha.id}`);
+      await card.focus();
+      await page.keyboard.press('Space');
+
+      // Exactly one plate: the lifted card's own surface. The card's
+      // background transitions over 140 ms, so poll until it settles.
+      const plate = page.locator('.card-plate');
+      await expect(plate, 'one held card on the plate').toHaveCount(1);
+      await expect
+        .poll(() => plate.evaluate((el) => getComputedStyle(el).backgroundColor))
+        .toBe(theme === 'dark' ? 'rgb(233, 229, 221)' : 'rgb(20, 18, 15)');
+      expect(await plate.evaluate((el) => getComputedStyle(el).color), 'lifted card ink').toBe(
+        theme === 'dark' ? 'rgb(20, 18, 15)' : 'rgb(245, 245, 245)',
+      );
+
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.card-plate'), 'the plate is gone after Esc').toHaveCount(0);
+      // The background transitions back over 140 ms; poll until it settles.
+      await expect
+        .poll(() =>
+          card.locator('..').evaluate((row) => {
+            const body = row.firstElementChild;
+            if (!(body instanceof HTMLElement)) throw new Error('the card has no body');
+            return getComputedStyle(body).backgroundColor;
+          }),
+        )
+        .toBe(theme === 'dark' ? 'rgb(30, 30, 31)' : 'rgb(255, 255, 255)');
+
+      if (theme === 'dark') {
+        // No plate at rest on the board, exactly one during the lift.
+        expect(await plateCount(page), 'plates at rest on the board').toBe(0);
+        await card.focus();
+        await page.keyboard.press('Space');
+        await expect.poll(() => plateCount(page), 'plate-painted elements during the lift').toBe(1);
+        await page.keyboard.press('Escape');
+        await expect.poll(() => plateCount(page), 'plates after Esc').toBe(0);
+      }
+    });
+  }
+
+  test('the auth page carries exactly one plate at 1280 px', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('klui-theme', 'dark');
+    });
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    const plate = page.getByTestId('auth-plate');
+    await expect(plate, 'the plate is rendered from 1024 px').toBeVisible();
+
+    expect(await plateCount(page), 'plate-painted elements on /login at 1280').toBe(1);
+    expect(await plate.getAttribute('aria-hidden'), 'the mock is hidden from AT').toBe('true');
+    const focusable = await plate.evaluate(
+      (element) =>
+        element.querySelectorAll('a, button, input, select, textarea, summary, [tabindex]').length,
+    );
+    expect(focusable, 'focusable descendants inside the plate').toBe(0);
+    const styles = await plate.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        radius: style.borderRadius,
+        shadow: style.boxShadow,
+        transform: style.transform,
+      };
+    });
+    expect(styles.radius, 'the mat is printed flat at 8 px').toBe('8px');
+    expect(styles.shadow, 'no shadow on the mat').toBe('none');
+    expect(styles.transform, 'no rotation on the mat').toBe('none');
+  });
+
+  test('the auth page renders no plate at 1023 px', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('klui-theme', 'dark');
+    });
+    await page.setViewportSize({ width: 1023, height: 800 });
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('auth-plate'), 'no plate below 1024 px').toBeHidden();
+    expect(await plateCount(page), 'plate-painted elements on /login at 1023').toBe(0);
+  });
+});
