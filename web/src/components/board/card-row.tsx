@@ -4,6 +4,7 @@ import type { KeyboardEvent } from 'react';
 import type { Card, Column } from '../../api/types';
 import { t } from '../../i18n';
 import { cn } from '../../lib/cn';
+import { formatDate } from '../../lib/format';
 import { Button } from '../ui/button';
 import { CardMenu } from './card-menu';
 import { TagChip } from './tag-chip';
@@ -55,7 +56,7 @@ export function CardRow({
   onHoverEnd: () => void;
   onSettle: (cardId: string) => void;
 }) {
-  const due = card.due_at ? formatDue(card.due_at) : null;
+  const due = card.due_at ? formatDate(card.due_at) : null;
   const { ref, dragging, consumeDragClick } = useCardDnd({
     card,
     cards,
@@ -111,7 +112,10 @@ export function CardRow({
               <TagChip key={tag.name} tag={tag} />
             ))}
             {due ? (
-              <span className="font-mono text-mono-sm text-ink-subtle" title={card.due_at ?? ''}>
+              <span
+                className="font-mono text-mono-sm text-ink-subtle tabular-nums"
+                title={card.due_at ?? ''}
+              >
                 {due}
               </span>
             ) : null}
@@ -179,13 +183,4 @@ export function CardRow({
       </div>
     </li>
   );
-}
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** `28 Nov`, in the browser's locale-agnostic short form the design asks for. */
-function formatDue(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${date.getDate()} ${MONTHS[date.getMonth()] ?? ''}`;
 }
