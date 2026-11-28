@@ -259,7 +259,9 @@ test('four boards are four tiles on one row, all the same height', async ({ page
   await page.goto('/boards', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
 
-  const tiles = page.locator('[data-testid^="board-"]');
+  // The tile is the link (`board-<id>`); its corner actions carry
+  // `board-edit-<id>` / `board-delete-<id>`, so the tiles are the anchors.
+  const tiles = page.locator('a[data-testid^="board-"]');
   await expect(tiles).toHaveCount(4);
   const boxes = await Promise.all(Array.from({ length: 4 }, (_, index) => box(tiles.nth(index))));
 
