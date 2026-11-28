@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { createRoute, useNavigate } from '@tanstack/react-router';
-import { Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { LayoutGrid, Search, SquareKanban, Upload } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../api/client';
 import type { Board, BoardIcon } from '../api/types';
 import { BoardTile } from '../components/boards/board-tile';
@@ -38,6 +38,7 @@ function BoardsPage() {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Board | null>(null);
   const [deleting, setDeleting] = useState<Board | null>(null);
+  const [importing, setImporting] = useState(false);
   const boards = useQuery({ queryKey: queryKeys.boards, queryFn: api.boards });
 
   useShortcuts([{ key: 'n', handler: () => setCreating(true) }]);
@@ -78,9 +79,15 @@ function BoardsPage() {
             data-testid="boards-search"
           />
         </div>
-        <Button variant="primary" onClick={() => setCreating(true)}>
-          {t('boards.action.new')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setImporting(true)}>
+            <Upload aria-hidden="true" size={16} strokeWidth={1.5} />
+            {t('boards.action.import')}
+          </Button>
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            {t('boards.action.new')}
+          </Button>
+        </div>
       </div>
 
       {boards.isPending ? (
@@ -159,6 +166,8 @@ function BoardsPage() {
         open={deleting !== null}
         onClose={() => setDeleting(null)}
       />
+
+      <ImportBoardDialog open={importing} onClose={() => setImporting(false)} />
     </div>
   );
 }
@@ -431,6 +440,172 @@ function DeleteBoardDialog({
           {error}
         </p>
       )}
+    </Dialog>
+  );
+}
+
+type ImportSource = 'klui' | 'trello';
+
+/** The board a file import is named after: the file name without its extension. */
+function boardNameFromFile(file: File): string {
+  const stem = file.name.replace(/\.[^./\\]+$/, '').trim();
+  return stem === '' ? t('boards.import.defaultName') : stem;
+}
+
+/**
+ * Import a board (brief §4.7): pick a source, drop a `.json` file, and the app
+ * creates a board named after the file, imports into it and opens it. A failed
+ * import leaves the dialog open and names the board it already created, so
+ * nothing is silently orphaned.
+ */
+function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [source, setSource] = useState<ImportSource>('klui');
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setSource('klui');
+      setFile(null);
+      setError(null);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }, [open]);
+
+  const run = useMutation({
+    mutationFn: async (chosen: File) => {
+      const board = await api.createBoard({ name: boardNameFromFile(chosen) });
+      try {
+        await api.importBoard(board.id, chosen);
+      } catch (cause) {
+        // The board exists now: name it, so the reader is not left with an
+        // orphan they never asked for and cannot find.
+        throw new Error(
+          t('boards.import.errorCreated', {
+            board: board.name,
+            message: failureMessage(cause),
+          }),
+          { cause },
+        );
+      }
+      return board;
+    },
+    onSuccess: async (board) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.boards });
+      onClose();
+      void navigate({ to: '/boards/$boardId', params: { boardId: board.id } });
+    },
+    onError: (cause) => setError(cause instanceof Error ? cause.message : failureMessage(cause)),
+  });
+
+  const sourceCard = (value: ImportSource, mark: ReactNode, name: string, hint: string) => (
+    <button
+      type="button"
+      aria-pressed={source === value}
+      onClick={() => setSource(value)}
+      className={cn(
+        'flex flex-col items-start gap-1 rounded-sm border border-border p-3 text-left transition-colors duration-[var(--dur-fast)] hover:bg-surface-2',
+        source === value && 'border-border-strong bg-surface-muted shadow-[var(--shadow-active)]',
+      )}
+    >
+      <span className="flex items-center gap-2 text-body-sm font-medium text-ink">
+        <span aria-hidden="true" className="text-ink-muted">
+          {mark}
+        </span>
+        {name}
+      </span>
+      <span className="text-body-sm text-ink-muted">{hint}</span>
+    </button>
+  );
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={t('boards.import.title')}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.action.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            loading={run.isPending}
+            disabled={file === null}
+            onClick={() => {
+              if (file !== null) {
+                setError(null);
+                run.mutate(file);
+              }
+            }}
+          >
+            {t('boards.import.submit')}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-label font-medium text-ink-muted">{t('boards.import.source')}</span>
+          <div className="grid grid-cols-2 gap-2">
+            {sourceCard(
+              'klui',
+              <SquareKanban size={16} strokeWidth={1.5} />,
+              t('boards.import.sourceKlui'),
+              t('boards.import.sourceKluiHint'),
+            )}
+            {sourceCard(
+              'trello',
+              <LayoutGrid size={16} strokeWidth={1.5} />,
+              t('boards.import.sourceTrello'),
+              t('boards.import.sourceTrelloHint'),
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-label font-medium text-ink-muted">{t('boards.import.file')}</span>
+          <div
+            className="flex flex-col items-start gap-3 rounded-sm border border-dashed border-border-strong p-6"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              const dropped = event.dataTransfer.files?.[0];
+              if (dropped !== undefined) {
+                setFile(dropped);
+                setError(null);
+              }
+            }}
+          >
+            <p className="text-body-sm text-ink-muted">{t('boards.import.dropHint')}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+                {t('boards.import.choose')}
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".json,application/json"
+                className="sr-only"
+                onChange={(event) => {
+                  setFile(event.target.files?.[0] ?? null);
+                  setError(null);
+                }}
+                data-testid="import-file"
+              />
+              <span className="min-w-0 truncate font-mono text-mono-sm text-ink-muted">
+                {file?.name ?? ''}
+              </span>
+            </div>
+          </div>
+        </div>
+        {error === null ? null : (
+          <p role="alert" className="text-body-sm text-danger">
+            {error}
+          </p>
+        )}
+      </div>
     </Dialog>
   );
 }
