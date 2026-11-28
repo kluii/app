@@ -166,6 +166,9 @@ function StyleguidePage() {
         <Cell state="default">
           <Checkbox id="sg-checked" label={t('styleguide.value')} defaultChecked />
         </Cell>
+        <Cell state="default">
+          <Checkbox id="sg-indeterminate" label={t('styleguide.value')} indeterminate />
+        </Cell>
         <Cell state="focus">
           <Checkbox id="sg-focus" label={t('styleguide.value')} autoFocus />
         </Cell>
