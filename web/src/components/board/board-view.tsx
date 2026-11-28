@@ -13,6 +13,7 @@ import { connectBoardStream, type LiveStatus } from '../../data/live';
 import { queryKeys } from '../../lib/query-client';
 import { Button, buttonVariants } from '../ui/button';
 import { DropdownItem, DropdownMenu, DropdownSeparator } from '../ui/dropdown-menu';
+import { EmptySlot } from '../ui/empty-slot';
 import { Input } from '../ui/input';
 import { useToast } from '../ui/toast';
 import { ActivityDialog } from './activity-dialog';
@@ -547,11 +548,7 @@ function BoardFrame({
 
       {columns.length === 0 ? (
         <div className="px-6 py-6">
-          <ColumnRail
-            boardId={board.id}
-            canWrite={caller.can_manage_columns}
-            className="border-none p-0"
-          />
+          <ColumnRail boardId={board.id} canWrite={caller.can_manage_columns} />
         </div>
       ) : (
         <div
@@ -593,25 +590,14 @@ function BoardFrame({
   );
 }
 
-function ColumnRail({
-  boardId,
-  canWrite,
-  className,
-}: {
-  boardId: string;
-  canWrite: boolean;
-  className?: string;
-}) {
+function ColumnRail({ boardId, canWrite }: { boardId: string; canWrite: boolean }) {
   return (
-    <div className={className}>
-      <div className="flex flex-col items-center gap-2 rounded-md border border-border px-6 py-10 text-center">
-        <h2 className="font-display text-h2">{t('board.empty.noColumns')}</h2>
-        <p className="max-w-72 text-body-sm text-ink-muted">
-          {canWrite ? t('board.empty.noColumnsBody') : t('board.empty.noColumnsBodyReader')}
-        </p>
-        {canWrite ? <AddColumn boardId={boardId} /> : null}
-      </div>
-    </div>
+    <EmptySlot
+      className="w-column"
+      title={t('board.empty.noColumns')}
+      body={canWrite ? t('board.empty.noColumnsBody') : t('board.empty.noColumnsBodyReader')}
+      action={canWrite ? <AddColumn boardId={boardId} className="w-full" /> : null}
+    />
   );
 }
 
@@ -774,7 +760,7 @@ function ColumnSection({
   );
 }
 
-function AddColumn({ boardId }: { boardId: string }) {
+function AddColumn({ boardId, className }: { boardId: string; className?: string }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -792,7 +778,10 @@ function AddColumn({ boardId }: { boardId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-10 w-column shrink-0 items-center gap-2 rounded-sm border border-dashed border-border-strong px-2 text-label text-ink-subtle transition-colors duration-[var(--dur-fast)] hover:border-ink-subtle hover:text-ink"
+        className={cn(
+          'flex h-10 w-column shrink-0 items-center gap-2 rounded-sm border border-dashed border-border-strong px-2 text-label text-ink-subtle transition-colors duration-[var(--dur-fast)] hover:border-ink-subtle hover:text-ink',
+          className,
+        )}
       >
         <Plus size={14} strokeWidth={1.5} aria-hidden="true" />
         {t('board.column.add')}
@@ -802,7 +791,10 @@ function AddColumn({ boardId }: { boardId: string }) {
 
   return (
     <form
-      className="flex w-column shrink-0 flex-col gap-2 rounded-md border border-border bg-column p-2"
+      className={cn(
+        'flex w-column shrink-0 flex-col gap-2 rounded-md border border-border bg-column p-2',
+        className,
+      )}
       onSubmit={(event) => {
         event.preventDefault();
         if (name.trim() !== '' && !create.isPending) create.mutate();

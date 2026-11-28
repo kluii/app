@@ -19,6 +19,7 @@ import { formatDay, relativeUnit } from '../../lib/format';
 import { queryKeys } from '../../lib/query-client';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
+import { EmptySlot } from '../ui/empty-slot';
 import { Field } from '../ui/field';
 import { Input, Select } from '../ui/input';
 import { useToast } from '../ui/toast';
@@ -272,12 +273,10 @@ export function AgentsSettings() {
             </Button>
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center gap-1 rounded-md border border-border px-4 py-6 text-center">
-            <h4 className="text-h3">{t('settings.agents.empty.title')}</h4>
-            <p className="max-w-80 text-body-sm text-ink-muted">
-              {t('settings.agents.empty.body')}
-            </p>
-          </div>
+          <EmptySlot
+            title={t('settings.agents.empty.title')}
+            body={t('settings.agents.empty.body')}
+          />
         ) : (
           <ul className="flex flex-col divide-y divide-border">
             {items.map((key) => (

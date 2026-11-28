@@ -7,6 +7,7 @@ import type { Board } from '../api/types';
 import { BoardTile } from '../components/boards/board-tile';
 import { Button } from '../components/ui/button';
 import { Dialog } from '../components/ui/dialog';
+import { EmptySlot } from '../components/ui/empty-slot';
 import { Field } from '../components/ui/field';
 import { Input, Select } from '../components/ui/input';
 import { t } from '../i18n';
@@ -46,10 +47,11 @@ function BoardsPage() {
           </Button>
         </div>
       ) : boards.data.items.length === 0 ? (
-        <div className="mt-16 flex flex-col items-center gap-2 text-center">
-          <h2 className="font-display text-h2">{t('boards.empty.title')}</h2>
-          <p className="max-w-80 text-body-sm text-ink-muted">{t('boards.empty.body')}</p>
-        </div>
+        <EmptySlot
+          className="mt-6 w-column min-h-36"
+          title={t('boards.empty.title')}
+          body={t('boards.empty.body')}
+        />
       ) : (
         <ul className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {boards.data.items.map((board) => (
