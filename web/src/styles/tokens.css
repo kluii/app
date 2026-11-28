@@ -100,9 +100,10 @@
   --size-dialog-wide: 640px;
   --size-content: 1440px;
 
-  /* one shadow, overlays only; the active row and the dark primary button
-     get a 1 px inset highlight instead (brief §5.2) */
+  /* two shadows, overlays and the phone sheet only; the active row and the
+     dark primary button get a 1 px inset highlight instead (brief §5.2) */
   --shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-sheet: 0 -8px 40px rgba(0, 0, 0, 0.55);
   --shadow-active: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --scrim: rgba(0, 0, 0, 0.64);
 }
@@ -154,6 +155,7 @@
   --tag-pink: #db2777;
 
   --shadow-overlay: 0 10px 30px rgba(20, 18, 15, 0.12);
+  --shadow-sheet: 0 -8px 40px rgba(0, 0, 0, 0.55);
   --shadow-active: none;
   --scrim: rgba(20, 18, 15, 0.32);
 }

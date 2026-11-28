@@ -98,7 +98,9 @@
   }
 
   /* A modal on a phone is a sheet: it comes from the bottom, full width, and
-     scrolls inside itself instead of the page behind it. */
+     scrolls inside itself instead of the page behind it. The landing's one
+     shadow lifts it off the page, and the bottom padding keeps the last
+     control clear of the home indicator. */
   dialog.dialog-panel {
     width: 100%;
     max-width: 100%;
@@ -107,6 +109,8 @@
     overflow-y: auto;
     border-radius: 8px 8px 0 0;
     border-bottom: 0;
+    box-shadow: var(--shadow-sheet);
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
   }
 }
 
