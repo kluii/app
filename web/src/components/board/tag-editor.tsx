@@ -7,15 +7,16 @@
  * The common action comes first: the input adds a tag on Enter or `,`, and
  * Backspace on an empty input removes the last one. A chip is a real `TagChip`
  * followed by a 16 px `X`; clicking the chip opens its colour panel, where the
- * pill preview carries the draft colour live. "Use on every card with this
- * tag" stays a second, explicit action: it writes the board default, and the
- * card's own value stops overriding it.
+ * pill preview carries the draft colour live — five presets, an eyedropper for
+ * any hex, and `None` to fall back to the board default. "Use on every card
+ * with this tag" stays a second, explicit action: it writes the board default,
+ * and the card's own value stops overriding it.
  */
-import { useId, useState } from 'react';
-import { X } from 'lucide-react';
+import { useId, useRef, useState } from 'react';
+import { Pipette, X } from 'lucide-react';
 import type { Card, Tag } from '../../api/types';
 import { t } from '../../i18n';
-import { normalizeTag, palette } from '../../lib/tag-palette';
+import { normalizeTag, presetPalette } from '../../lib/tag-palette';
 import { Input } from '../ui/input';
 import { TagChip } from './tag-chip';
 
@@ -43,7 +44,8 @@ export function TagEditor({
   const [adding, setAdding] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
   const listId = useId();
-  const swatches = palette();
+  const colorInput = useRef<HTMLInputElement>(null);
+  const presets = presetPalette();
 
   const setAt = (name: string, patch: Partial<TagDraft>): void => {
     onChange(tags.map((tag) => (tag.name === name ? { ...tag, ...patch } : tag)));
@@ -140,19 +142,51 @@ export function TagEditor({
             role="group"
             aria-label={t('board.tags.color')}
           >
-            {swatches.map((swatch) => (
+            {presets.map((preset) => (
               <button
-                key={swatch.hue}
+                key={preset.hue}
                 type="button"
                 disabled={disabled}
-                aria-label={swatch.hue}
-                aria-pressed={editingTag.color?.toLowerCase() === swatch.color.toLowerCase()}
-                data-testid={`swatch-${editingTag.name}-${swatch.hue}`}
+                aria-label={preset.hue}
+                aria-pressed={editingTag.color?.toLowerCase() === preset.color.toLowerCase()}
+                data-testid={`swatch-${editingTag.name}-${preset.hue}`}
                 className="h-9 w-9 rounded-sm border border-border"
-                style={{ backgroundColor: swatch.color }}
-                onClick={() => setAt(editingTag.name, { color: swatch.color })}
+                style={{ backgroundColor: preset.color }}
+                onClick={() => setAt(editingTag.name, { color: preset.color })}
               />
             ))}
+            {/* The eyedropper opens the native picker; the hidden input carries
+                the chosen hex to the preview live. */}
+            <button
+              type="button"
+              disabled={disabled}
+              aria-label={t('board.tags.customColor')}
+              data-testid={`pipette-${editingTag.name}`}
+              className="flex h-9 w-9 items-center justify-center rounded-sm border border-border text-ink-muted transition-colors duration-[var(--dur-fast)] hover:bg-surface hover:text-ink"
+              onClick={() => colorInput.current?.click()}
+            >
+              <Pipette aria-hidden size={16} strokeWidth={1.5} />
+            </button>
+            <input
+              ref={colorInput}
+              type="color"
+              aria-label={t('board.tags.customColor')}
+              data-testid={`color-input-${editingTag.name}`}
+              className="sr-only"
+              value={editingTag.color ?? presets[0]?.color ?? ''}
+              disabled={disabled}
+              onChange={(event) => setAt(editingTag.name, { color: event.target.value })}
+            />
+            <button
+              type="button"
+              disabled={disabled}
+              aria-pressed={editingTag.color === null}
+              data-testid={`swatch-${editingTag.name}-none`}
+              className="h-9 rounded-sm border border-border px-2 text-body-sm text-ink-muted transition-colors duration-[var(--dur-fast)] hover:bg-surface hover:text-ink"
+              onClick={() => setAt(editingTag.name, { color: null })}
+            >
+              {t('board.tags.none')}
+            </button>
           </div>
           <label className="flex items-center gap-2 text-body-sm text-ink-muted">
             <input

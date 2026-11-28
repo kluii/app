@@ -220,6 +220,8 @@
   "board.tags.boardWide": "Utiliser sur toutes les cartes portant cette étiquette",
   "board.tags.color": "Couleur",
   "board.tags.colorOf": "Couleur de l’étiquette {name}",
+  "board.tags.customColor": "Couleur personnalisée",
+  "board.tags.none": "Aucune",
   "board.tags.removeNamed": "Retirer l’étiquette {name}",
   "board.tags.title": "Étiquettes",
   "board.visibility.link": "Lien",

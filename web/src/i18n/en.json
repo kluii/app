@@ -220,6 +220,8 @@
   "board.tags.boardWide": "Use on every card with this tag",
   "board.tags.color": "Colour",
   "board.tags.colorOf": "Colour of tag {name}",
+  "board.tags.customColor": "Custom colour",
+  "board.tags.none": "None",
   "board.tags.removeNamed": "Remove tag {name}",
   "board.tags.title": "Tags",
   "board.visibility.link": "Link",

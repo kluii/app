@@ -22,6 +22,15 @@ export const TAG_HUES = [
 
 export type TagHue = (typeof TAG_HUES)[number];
 
+/**
+ * The five presets the tag editor offers: sky, green, amber, pink, violet. The
+ * twelve hues stay — existing cards may carry any of them — and so do their
+ * `--tag-*` tokens.
+ */
+export const PRESETS = ['sky', 'green', 'amber', 'pink', 'violet'] as const;
+
+export type TagPreset = (typeof PRESETS)[number];
+
 function readToken(name: string): string | null {
   if (typeof document === 'undefined') return null;
   const value = getComputedStyle(document.documentElement).getPropertyValue(`--tag-${name}`).trim();
@@ -36,6 +45,13 @@ export function hueColor(hue: TagHue): string {
 export function palette(): { hue: TagHue; color: string }[] {
   return TAG_HUES.map((hue) => ({ hue, color: hueColor(hue) })).filter(
     (entry): entry is { hue: TagHue; color: string } => entry.color !== '',
+  );
+}
+
+/** The five presets for the current theme, in the order they are shown. */
+export function presetPalette(): { hue: TagPreset; color: string }[] {
+  return PRESETS.map((hue) => ({ hue, color: hueColor(hue) })).filter(
+    (entry): entry is { hue: TagPreset; color: string } => entry.color !== '',
   );
 }
 

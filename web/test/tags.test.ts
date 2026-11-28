@@ -5,7 +5,7 @@
  * the same `[a-z0-9-]`, 1–24).
  */
 import { describe, expect, it } from 'vitest';
-import { TAG_HUES, isHex, normalizeTag } from '../src/lib/tag-palette';
+import { PRESETS, TAG_HUES, isHex, normalizeTag } from '../src/lib/tag-palette';
 
 describe('the tag palette', () => {
   it('names the twelve hues of DESIGN.md, in order', () => {
@@ -24,6 +24,11 @@ describe('the tag palette', () => {
       'violet',
       'pink',
     ]);
+  });
+
+  it('offers five presets, drawn from the twelve hues', () => {
+    expect([...PRESETS]).toEqual(['sky', 'green', 'amber', 'pink', 'violet']);
+    for (const preset of PRESETS) expect(TAG_HUES).toContain(preset);
   });
 
   it('normalises a name the way the server does', () => {
