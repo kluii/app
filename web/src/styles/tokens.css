@@ -71,6 +71,9 @@
   --plate: #e9e5dd;
   --plate-ink: #14120f;
   --plate-muted: #5f5a52;
+  /* the hairline that separates the auth mat from its frame: 20% of the
+     plate's own legend colour over the plate */
+  --plate-rule: color-mix(in srgb, var(--plate-muted) 20%, var(--plate));
 
   --danger: #e8836f;
   --focus: #f5f5f5;
@@ -134,6 +137,7 @@
   --plate: #14120f;
   --plate-ink: #f5f5f5;
   --plate-muted: #a19c92;
+  --plate-rule: color-mix(in srgb, var(--plate-muted) 20%, var(--plate));
 
   --danger: #a33a22;
   --focus: #14120f;
@@ -189,6 +193,7 @@
   --color-plate: var(--plate);
   --color-plate-ink: var(--plate-ink);
   --color-plate-muted: var(--plate-muted);
+  --color-plate-rule: var(--plate-rule);
 
   --color-danger: var(--danger);
   --color-focus: var(--focus);
@@ -337,6 +342,30 @@
     background-color: var(--tag);
   }
 
+  /* The plate scope (brief §8): a card being held — the drag ghost, the
+     keyboard-lifted row — is printed on the plate, so its descendants read
+     the plate's tokens. A tag chip (which mixes its hue into `--card`) and a
+     date stay legible with no special class. `--surface-2` and
+     `--primary-foreground` are re-pointed for the same reason: the plain tag
+     chip's fill and the done tick's glyph sit on the plate too. Under forced
+     colors the plate keeps the system pair. */
+  .card-plate {
+    --card: var(--plate);
+    --ink: var(--plate-ink);
+    --ink-muted: var(--plate-muted);
+    --ink-subtle: var(--plate-muted);
+    --border: var(--plate-muted);
+    --surface-2: var(--plate);
+    --primary-foreground: var(--plate);
+  }
+
+  @media (forced-colors: active) {
+    .card-plate {
+      background-color: Canvas;
+      color: CanvasText;
+    }
+  }
+
   .dialog-panel {
     width: var(--size-dialog);
     max-width: calc(100vw - 2rem);
@@ -448,8 +477,9 @@
 }
 
 [data-drop-active="true"] {
-  background-color: var(--surface-2);
-  outline: 1px solid var(--border-strong);
+  /* The target column steps up by its border alone: no fill change, the
+     insertion line already says where the card will land. */
+  border-color: var(--border-strong);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -457,7 +487,7 @@
   [data-drop-active="true"] {
     transition:
       opacity var(--dur-fast) var(--ease),
-      background-color var(--dur-fast) var(--ease);
+      border-color var(--dur-fast) var(--ease);
   }
 
   .insert-line {

@@ -10,6 +10,7 @@ import { Field } from '../components/ui/field';
 import { Input, Select, Textarea } from '../components/ui/input';
 import { Separator } from '../components/ui/separator';
 import { Spinner } from '../components/ui/spinner';
+import { EmptySlot } from '../components/ui/empty-slot';
 import { TagChip } from '../components/board/tag-chip';
 import { useToast } from '../components/ui/toast';
 import { Tooltip } from '../components/ui/tooltip';
@@ -187,6 +188,46 @@ function StyleguidePage() {
         </Cell>
         <Cell state="default">
           <TagChip tag={{ name: t('styleguide.tag'), color: null }} />
+        </Cell>
+      </Section>
+
+      <Separator />
+
+      <Section title={t('styleguide.section.plate')}>
+        <Cell state="default">
+          {/* The held card: lifted by the keyboard or dragged, it is printed on
+              the plate — the scope keeps its tag and date legible, and the
+              dashed ring marks the slot it came from. */}
+          <div className="w-full">
+            <div className="card-plate w-card rounded-key border border-plate bg-plate p-3 text-plate-ink shadow-[var(--shadow-overlay)] outline-2 outline-dashed outline-focus outline-offset-2">
+              <p className="line-clamp-3 text-body-sm font-medium">{t('styleguide.value')}</p>
+              <span className="mt-2 flex flex-wrap gap-1">
+                <TagChip tag={{ name: t('styleguide.tag'), color: tagColour }} />
+                <TagChip tag={{ name: t('styleguide.tag'), color: null }} />
+              </span>
+            </div>
+          </div>
+        </Cell>
+        <Cell state="default">
+          <EmptySlot
+            className="w-full"
+            title={t('styleguide.value')}
+            body={t('styleguide.intro')}
+          />
+        </Cell>
+        <Cell state="default">
+          <TagChip tag={{ name: t('styleguide.tag'), color: tagColour }} />
+          <TagChip tag={{ name: t('styleguide.tag'), color: null }} />
+        </Cell>
+        <Cell state="default">
+          <div className="flex w-full flex-col gap-2 rounded-sm border border-border bg-surface p-4">
+            <span className="font-mono text-mono-sm text-ink-subtle">
+              {t('styleguide.section.code')}
+            </span>
+            <pre className="overflow-x-auto whitespace-pre font-mono text-mono text-ink">
+              <code>{t('styleguide.value')}</code>
+            </pre>
+          </div>
         </Cell>
       </Section>
 

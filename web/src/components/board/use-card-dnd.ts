@@ -74,17 +74,20 @@ export function isBelowHalf(element: Element, clientY: number): boolean {
  *
  * It is built with `createElement`, not rendered through React: the native drag
  * image has to exist synchronously inside `onGenerateDragPreview`, and a portal
- * is not ready then. Classes come from tokens.css, so the ghost is the same
- * card the reader picked up: 270 px, 4 px radius, one hairline, the overlay
- * shadow, and 1.5° of tilt so it reads as lifted rather than duplicated.
+ * is not ready then. Classes come from tokens.css. The ghost is the card being
+ * held, printed on the plate (brief §4.4): same geometry as the row — 270 px,
+ * 4 px radius, 12 px padding, `body-sm` 500 title — plus the overlay shadow and
+ * 1.5° of tilt so it reads as lifted rather than duplicated. `card-plate` goes
+ * on the ghost itself: the preview lives in a detached container and inherits
+ * nothing, so the plate scope has to be on the element that carries the colours.
  */
 function buildDragPreview(container: HTMLElement, card: Card): void {
   const ghost = document.createElement('div');
   ghost.className =
-    'w-card rounded-key border border-border-strong bg-card p-3 text-ink shadow-[var(--shadow-overlay)] rotate-[1.5deg]';
+    'card-plate w-card rounded-key border border-plate bg-plate p-3 text-plate-ink shadow-[var(--shadow-overlay)] rotate-[1.5deg]';
 
   const title = document.createElement('p');
-  title.className = 'line-clamp-3 text-body text-ink';
+  title.className = 'line-clamp-3 text-body-sm font-medium';
   title.textContent = card.title;
   ghost.appendChild(title);
 
@@ -101,6 +104,11 @@ function buildDragPreview(container: HTMLElement, card: Card): void {
       } else {
         chip.className =
           'tag-chip inline-flex h-5 items-center gap-1 rounded-key px-2 font-mono text-mono-sm';
+        const bar = document.createElement('span');
+        bar.setAttribute('aria-hidden', 'true');
+        bar.className = 'tag-chip__bar inline-block h-2.5 w-0.5 rounded-xs';
+        chip.appendChild(bar);
+        chip.appendChild(document.createTextNode(tag.name));
         chip.style.setProperty('--tag', tag.color);
       }
       row.appendChild(chip);

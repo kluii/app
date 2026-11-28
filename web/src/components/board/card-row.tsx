@@ -81,6 +81,11 @@ export function CardRow({
         className={cn(
           'flex w-full flex-col gap-2 rounded-key border border-border bg-card p-3',
           'transition-colors duration-[var(--dur-fast)] group-hover:border-border-strong',
+          // Lifted by the keyboard, the card is printed on the plate in place
+          // (brief §4.4): the scope re-points the card's tokens, so the title,
+          // the tags and the date keep their contrast on `--plate`. Only one
+          // card can be lifted at a time — never two plates on screen.
+          lifted && 'card-plate text-plate-ink',
         )}
       >
         <span className="flex items-start gap-2">
