@@ -45,11 +45,18 @@
  * columns on a desktop you then cannot tell which one you are reading. It pins
  * to the column's own scrollport and paints the column surface, so the cards
  * leave a clean edge instead of showing through the title.
+ *
+ * The column carries no top padding: a sticky element pins to its parent's
+ * content box, so those 8 px stayed a window, and a scrolled card painted its
+ * tail in the band above the pinned title. The header owns that 8 px itself
+ * (`min-h-10` on it in the markup keeps the title where it was), so scrolling
+ * the column paints nothing above it.
  */
 .board-column > header {
   position: sticky;
   top: 0;
   z-index: 1;
+  padding-top: 8px;
   background: var(--column);
 }
 

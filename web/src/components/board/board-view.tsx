@@ -716,11 +716,11 @@ function ColumnSection({
   return (
     <section
       ref={droppable.ref}
-      className="board-column flex w-column shrink-0 flex-col gap-2 rounded-sm border border-border bg-column p-2"
+      className="board-column flex w-column shrink-0 flex-col gap-2 rounded-sm border border-border bg-column px-2 pb-2"
       data-testid={`column-${column.id}`}
       data-drop-active={active ? 'true' : undefined}
     >
-      <header className="flex min-h-8 items-center justify-between px-2">
+      <header className="flex min-h-10 items-center justify-between px-2">
         <h2 className="line-clamp-2 text-label text-ink">{column.name}</h2>
         <span className="font-mono text-mono-sm tabular-nums text-ink-subtle">{cards.length}</span>
       </header>

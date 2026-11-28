@@ -171,6 +171,12 @@ test.describe('the band above the board bar', () => {
  * The header is what tells you which column you are reading, so it does not
  * travel with the cards: it pins to the column's scrollport at every width, and
  * at rest it is in the flow, inside the column's own padding.
+ *
+ * A sticky element pins to its parent's **content** box, so the 8 px of padding
+ * the column used to carry at the top stayed a window: scrolled 400 px, the tail
+ * of a card painted in the band above the pinned title. The column now has no
+ * top padding and the header carries that 8 px itself, so the header's own top
+ * edge is the column's.
  */
 test.describe('a board column scrolls its own cards', () => {
   const twelve = Array.from({ length: 12 }, (_, index) => `Card number ${index + 1}`);
@@ -214,8 +220,8 @@ test.describe('a board column scrolls its own cards', () => {
         measured.scroll,
       );
 
-      // The header is in the flow at rest: 1 px of column border plus the
-      // column's own padding below the column's top edge, not above its border.
+      // The header is in the flow at rest: 1 px of column border and no column
+      // padding, so it starts at the column's own top edge.
       const rest = await column.evaluate((element) => {
         const header = element.querySelector('header');
         if (!header) throw new Error('the column has no header');
@@ -228,6 +234,7 @@ test.describe('a board column scrolls its own cards', () => {
         };
       });
       expect(rest.border, 'the column keeps its 1 px border').toBe(1);
+      expect(rest.padding, 'the column leaves no band above its header').toBe(0);
       expect(rest.header, 'the header sits inside the column padding').toBeCloseTo(
         rest.column + rest.border + rest.padding,
         0,
@@ -247,14 +254,23 @@ test.describe('a board column scrolls its own cards', () => {
 
       // The header does not go with them: 400 px of scroll leaves its top where
       // it was, and the first card has left the top of the column's box.
-      const headerTop = await column.evaluate((element) => {
+      const stuck = await column.evaluate((element) => {
         const header = element.querySelector('header');
         if (!header) throw new Error('the column has no header');
-        return header.getBoundingClientRect().top;
+        return {
+          column: element.getBoundingClientRect().top,
+          header: header.getBoundingClientRect().top,
+        };
       });
       expect(
-        Math.abs(headerTop - rest.header),
+        Math.abs(stuck.header - rest.header),
         'the header stays pinned while its cards scroll',
+      ).toBeLessThanOrEqual(1);
+      // And no band is left above it: the pinned header's top is the column's
+      // own outer edge, so nothing of a card can paint over the title.
+      expect(
+        Math.abs(stuck.header - stuck.column),
+        'the pinned header covers the column top edge',
       ).toBeLessThanOrEqual(1);
       expect((await box(firstCard)).y, 'the first card moved up under the header').toBeLessThan(
         cardAtRest,
