@@ -17,10 +17,13 @@ const TILE =
   'flex h-full w-full min-h-24 flex-col justify-between gap-4 rounded-sm border border-border bg-card p-4 transition-colors duration-[var(--dur-fast)] hover:border-border-strong';
 
 /**
- * The signed-in tile: the link is stretched over the whole tile (`absolute
- * inset-0`) so a click anywhere opens the board, and the name, description and
- * meta sit above it with `pointer-events-none`. The corner actions ride above
- * the link — they must live outside it, a button cannot nest in a link.
+ * The signed-in tile: a `relative` wrapper holds the link, stretched over the
+ * whole tile with `absolute inset-0` so a click anywhere opens the board. The
+ * visual surface sits under it and its content is `pointer-events-none`, so
+ * the click lands on the link; the corner actions ride above both — they must
+ * live outside the link, a button cannot nest in a link. The wrapper carries
+ * no border of its own, so the stretched link measures the tile's full box,
+ * border included.
  */
 export function BoardTile({
   board,
@@ -32,36 +35,38 @@ export function BoardTile({
   onDelete?: () => void;
 }) {
   return (
-    <div className={cn('group relative', TILE)}>
+    <div className="group relative h-full w-full">
+      <div className={TILE}>
+        <div className="pointer-events-none flex min-w-0 flex-1 flex-col gap-2">
+          <span className="flex items-start gap-2">
+            {/* The 20 px box exists even without an icon, so the names of two
+                tiles stay on the same column. */}
+            <span
+              aria-hidden="true"
+              className="flex h-5 w-5 shrink-0 items-center justify-center text-ink-muted"
+            >
+              {board.icon === null ? null : <BoardIconGlyph name={board.icon} size={20} />}
+            </span>
+            <span className="line-clamp-2 min-w-0 text-h3 text-ink">{board.name}</span>
+          </span>
+          {board.description === null ? null : (
+            <p className="line-clamp-1 text-body-sm text-ink-muted">{board.description}</p>
+          )}
+        </div>
+        <TileMeta
+          className="pointer-events-none"
+          visibility={t(`boards.meta.${board.visibility}`)}
+          role={board.role === undefined ? null : t(`board.role.${board.role}`)}
+          closed={board.closed_at !== null}
+          updatedAt={board.updated_at}
+        />
+      </div>
       <Link
         to="/boards/$boardId"
         params={{ boardId: board.id }}
         data-testid={`board-${board.id}`}
         aria-label={t('boards.tile.open', { name: board.name })}
         className="absolute inset-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-      />
-      <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-2">
-        <span className="flex items-start gap-2">
-          {/* The 20 px box exists even without an icon, so the names of two
-              tiles stay on the same column. */}
-          <span
-            aria-hidden="true"
-            className="flex h-5 w-5 shrink-0 items-center justify-center text-ink-muted"
-          >
-            {board.icon === null ? null : <BoardIconGlyph name={board.icon} size={20} />}
-          </span>
-          <span className="line-clamp-2 min-w-0 text-h3 text-ink">{board.name}</span>
-        </span>
-        {board.description === null ? null : (
-          <p className="line-clamp-1 text-body-sm text-ink-muted">{board.description}</p>
-        )}
-      </div>
-      <TileMeta
-        className="pointer-events-none relative"
-        visibility={t(`boards.meta.${board.visibility}`)}
-        role={board.role === undefined ? null : t(`board.role.${board.role}`)}
-        closed={board.closed_at !== null}
-        updatedAt={board.updated_at}
       />
       {onEdit === undefined && onDelete === undefined ? null : (
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-100 [@media(pointer:coarse)]:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
