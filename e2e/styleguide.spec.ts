@@ -31,6 +31,7 @@ test('the states page shows every primitive in every state', async ({ page }) =>
     'Button',
     'Input, textarea, select',
     'Checkbox',
+    'Switch',
     'Chip and tag chip',
     'Dialog',
     'Popover and menu',

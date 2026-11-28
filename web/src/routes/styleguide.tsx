@@ -10,6 +10,7 @@ import { Field } from '../components/ui/field';
 import { Input, Select, Textarea } from '../components/ui/input';
 import { Separator } from '../components/ui/separator';
 import { Spinner } from '../components/ui/spinner';
+import { Switch } from '../components/ui/switch';
 import { EmptySlot } from '../components/ui/empty-slot';
 import { TagChip } from '../components/board/tag-chip';
 import { useToast } from '../components/ui/toast';
@@ -55,6 +56,8 @@ function Cell({ state, children }: { state: State; children: ReactNode }) {
 function StyleguidePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [switchOff, setSwitchOff] = useState(false);
+  const [switchOn, setSwitchOn] = useState(true);
   const toast = useToast();
   // A tag colour is user data; the specimen reads the token so this page holds
   // no colour literal (DESIGN.md §15).
@@ -174,6 +177,36 @@ function StyleguidePage() {
         </Cell>
         <Cell state="disabled">
           <Checkbox id="sg-disabled" label={t('styleguide.value')} disabled />
+        </Cell>
+      </Section>
+
+      <Separator />
+
+      <Section title={t('styleguide.section.switch')}>
+        <Cell state="default">
+          <Switch
+            aria-label={t('styleguide.value')}
+            checked={switchOff}
+            onCheckedChange={setSwitchOff}
+          />
+        </Cell>
+        <Cell state="default">
+          <Switch
+            aria-label={t('styleguide.value')}
+            checked={switchOn}
+            onCheckedChange={setSwitchOn}
+          />
+        </Cell>
+        <Cell state="focus">
+          <Switch
+            aria-label={t('styleguide.value')}
+            checked={switchOn}
+            onCheckedChange={setSwitchOn}
+            autoFocus
+          />
+        </Cell>
+        <Cell state="disabled">
+          <Switch aria-label={t('styleguide.value')} checked disabled onCheckedChange={() => {}} />
         </Cell>
       </Section>
 
