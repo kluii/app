@@ -102,7 +102,7 @@ export function Popover({
         if ((event as unknown as { newState?: string }).newState === 'closed') onClose();
       }}
       className={cn(
-        'rounded-md border border-border bg-surface p-3 text-ink',
+        'rounded-sm border border-border-strong bg-surface-raised p-1 text-ink',
         'shadow-[var(--shadow-overlay)]',
         className,
       )}

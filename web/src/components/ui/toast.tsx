@@ -44,7 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={toast.id}
             data-testid="toast"
             className={cn(
-              'pointer-events-auto flex items-start justify-between gap-3 rounded-md border bg-surface px-3 py-2 text-body-sm',
+              'pointer-events-auto flex items-start justify-between gap-3 rounded-sm border bg-surface-raised px-3 py-2 text-body-sm',
               toast.tone === 'danger' ? 'border-danger text-danger' : 'border-border text-ink',
             )}
           >

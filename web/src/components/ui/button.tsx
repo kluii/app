@@ -5,15 +5,17 @@ import { cn } from '../../lib/cn';
 
 /**
  * Height 32 (28 small, 36 large), one radius, one label size (DESIGN.md §7).
- * A variant is added here, never at the call site.
+ * A variant is added here, never at the call site. The press is a 1 px drop,
+ * the hover a colour change — no scale, no catch-all transition.
  */
 export const buttonVariants = cva(
-  'inline-flex select-none items-center justify-center gap-2 rounded-full text-label font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+  'inline-flex select-none items-center justify-center gap-2 rounded-sm text-label font-medium transition-[color,background-color,border-color,transform] duration-[var(--dur-fast)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40',
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
-        secondary: 'border border-border bg-surface-2 text-ink hover:bg-surface-muted',
+        primary:
+          'bg-primary text-primary-foreground hover:bg-primary-hover shadow-[var(--shadow-active)]',
+        secondary: 'border border-border-strong bg-transparent text-ink hover:bg-surface-2',
         ghost: 'text-ink-muted hover:bg-surface-2 hover:text-ink',
         danger: 'bg-danger text-primary-foreground',
         link: 'h-auto px-0 text-ink underline-offset-4 hover:underline',

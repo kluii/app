@@ -113,7 +113,7 @@ export function NotificationBell() {
         <div
           role="dialog"
           aria-label={t('notifications.title')}
-          className="absolute right-0 top-10 z-50 w-80 rounded-md border border-border bg-surface shadow-sm"
+          className="absolute right-0 top-11 z-50 w-80 rounded-sm border border-border-strong bg-surface-raised shadow-[var(--shadow-overlay)]"
         >
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-label font-medium text-ink">{t('notifications.title')}</span>

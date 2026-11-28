@@ -174,7 +174,7 @@ function SettingsPage() {
                   className={cn(
                     'inline-flex h-9 shrink-0 snap-start items-center gap-2 rounded-sm px-3 text-label transition-colors duration-[var(--dur-fast)] md:w-full',
                     selected
-                      ? 'bg-surface-muted text-ink'
+                      ? 'bg-surface-muted text-ink shadow-[var(--shadow-active)]'
                       : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
                   )}
                 >

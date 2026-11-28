@@ -63,7 +63,7 @@ export function Dialog({
         if (event.target === ref.current) onClose();
       }}
       className={cn(
-        'dialog-panel m-auto rounded-md border border-border bg-surface p-5 text-ink',
+        'dialog-panel m-auto rounded-sm border border-border-strong bg-surface-raised p-6 text-ink',
         className,
       )}
       aria-labelledby={titleId}

@@ -22,7 +22,7 @@ export type MenuTriggerProps = {
 };
 
 const ITEM =
-  'flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-body-sm text-ink hover:bg-surface-2';
+  'flex h-8 w-full items-center gap-2 rounded-key px-2 text-left text-body-sm text-ink hover:bg-surface-muted';
 
 /**
  * A menu is a list of actions, not a navigation bar: `role="menu"` with items
@@ -115,7 +115,7 @@ export function DropdownMenu({
         labelledBy={id}
         anchor={triggerRef}
         align={align}
-        className={cn('min-w-56 p-1', align === 'end' ? 'ml-auto' : '', panelClassName)}
+        className={cn('min-w-56', align === 'end' ? 'ml-auto' : '', panelClassName)}
       >
         <ul role="menu" id={id} aria-label={label} ref={menuRef} onKeyDown={onKeyDown}>
           {children}
@@ -175,7 +175,9 @@ export function DropdownItem({
         data-testid={testId}
         className={cn(ITEM, tone === 'danger' ? 'text-danger' : 'text-ink')}
       >
-        {icon}
+        {icon ? (
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">{icon}</span>
+        ) : null}
         <span className="flex-1 truncate">{children}</span>
         {trailing === undefined ? null : (
           <span className="font-mono text-mono-sm text-ink-subtle">{trailing}</span>
